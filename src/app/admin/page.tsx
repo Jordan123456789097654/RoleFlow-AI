@@ -28,8 +28,6 @@ import {
 } from "lucide-react";
 import { UserProfile, SystemConfig, ModerationLogEntry } from "@/types";
 
-const ADMIN_EMAIL = "jordanedanield13@gmail.com";
-
 export default function AdminPage() {
   const [activeTab, setActiveTab] = useState<"telemetry" | "config" | "users" | "moderation">("telemetry");
   const [user, setUser] = useState<UserProfile | null>(null);
@@ -95,11 +93,9 @@ export default function AdminPage() {
       }
     }
 
-    const email = localUser?.email?.toLowerCase();
-    const isJordan = email === ADMIN_EMAIL.toLowerCase();
     const hasAdminFlag = Boolean(localUser?.isAdmin);
 
-    if (isJordan || hasAdminFlag) {
+    if (hasAdminFlag) {
       setIsAdminAuthorized(true);
       fetchAllAdminData();
     } else {
@@ -308,11 +304,11 @@ export default function AdminPage() {
           <div className="w-14 h-14 mx-auto rounded-full bg-rose-500/10 border border-rose-500/20 flex items-center justify-center mb-5 text-rose-400">
             <Lock className="w-7 h-7" />
           </div>
-          <h1 className="text-xl font-semibold text-[#f4f4f0] mb-2 font-claude-serif">
+          <h1 className="text-xl font-semibold text-[#f4f4f0] mb-2 font-roleflow-serif">
             Administrative Access Restricted
           </h1>
           <p className="text-sm text-[#9b9a97] mb-6 leading-relaxed">
-            The RoleFlow Cluster Console requires verified system administrator privileges ({ADMIN_EMAIL}).
+            The RoleFlow Cluster Console requires verified system administrator privileges.
           </p>
           <div className="flex flex-col gap-3">
             <Link
@@ -390,7 +386,7 @@ export default function AdminPage() {
 
           <div className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-[#1b1a19] border border-[#2d2c2a] text-xs font-mono text-[#d97706]">
             <Shield className="w-3.5 h-3.5" />
-            <span>{ADMIN_EMAIL}</span>
+            <span>{user?.email || "System Administrator"}</span>
           </div>
         </div>
       </header>
@@ -830,7 +826,8 @@ export default function AdminPage() {
                       </tr>
                     ) : (
                       filteredUsers.map((u) => {
-                        const isJordan = u.email.toLowerCase() === ADMIN_EMAIL.toLowerCase();
+                        const isAdminUser = Boolean(u.isAdmin);
+                        const isSelf = u.id === user?.id || Boolean(user?.email && u.email.toLowerCase() === user.email.toLowerCase());
                         return (
                           <tr key={u.id} className="hover:bg-[#201f1e] transition-colors">
                             {/* User Profile */}
@@ -848,7 +845,7 @@ export default function AdminPage() {
 
                             {/* Role */}
                             <td className="px-4 py-3.5">
-                              {Boolean(u.isAdmin) || isJordan ? (
+                              {isAdminUser ? (
                                 <span className="inline-flex items-center gap-1 text-[10px] font-mono font-semibold px-2 py-0.5 rounded bg-amber-500/10 text-amber-300 border border-amber-500/30">
                                   <Shield className="w-3 h-3" />
                                   ADMIN
@@ -877,7 +874,7 @@ export default function AdminPage() {
                             {/* Daily Quota */}
                             <td className="px-4 py-3.5">
                               <div className="font-mono text-xs text-[#f4f4f0]">
-                                {u.isAdmin || isJordan ? (
+                                {isAdminUser ? (
                                   <span className="text-amber-400 font-semibold">Unlimited</span>
                                 ) : (
                                   <span>
@@ -905,7 +902,7 @@ export default function AdminPage() {
                             <td className="px-5 py-3.5 text-right">
                               <div className="flex items-center justify-end gap-1.5">
                                 {/* Toggle Admin */}
-                                {!isJordan && (
+                                {!isSelf && (
                                   <button
                                     type="button"
                                     onClick={() => handleUserAction("toggleAdmin", u)}
@@ -922,7 +919,7 @@ export default function AdminPage() {
                                 )}
 
                                 {/* Ban / Unban */}
-                                {!isJordan && (
+                                {!isSelf && (
                                   <button
                                     type="button"
                                     onClick={() => handleUserAction(u.isBanned ? "unbanUser" : "banUser", u)}
