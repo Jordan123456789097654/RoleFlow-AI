@@ -1,14 +1,22 @@
 import fs from "fs";
 import path from "path";
 import { sql } from "@vercel/postgres";
-import { Chat, Project, UserProfile, ModerationLogEntry, ModerationStatus } from "@/types";
+import { Chat, Project, UserProfile, ModerationLogEntry, ModerationStatus, SystemConfig, MemoryItem } from "@/types";
 
 const DATA_DIR = path.join(process.cwd(), ".data");
 const STORE_FILE = path.join(DATA_DIR, "store.json");
 
-export const ADMIN_EMAIL = "jordanedanield13@gmail.com";
+export const ADMIN_EMAIL = process.env.ADMIN_EMAIL || "jordanedanield13@gmail.com";
 export const FREE_DAILY_LIMIT = 25;
 export const GUEST_TOTAL_LIMIT = 5;
+
+export const DEFAULT_SYSTEM_CONFIG: SystemConfig = {
+  guestLimit: 5,
+  registeredDailyLimit: 25,
+  maintenanceMode: false,
+  broadcastBanner: "",
+  allowHighEffort: true,
+};
 
 interface LocalStore {
   users: Record<string, UserProfile>;
@@ -16,10 +24,12 @@ interface LocalStore {
   projects: Record<string, Project>;
   authCodes: Record<
     string,
-    { code: string; email: string; token: string; expiresAt: number }
+    { code: string; email: string; token: string; expiresAt: number; attempts?: number }
   >;
   guestUsage?: Record<string, { count: number; lastResetDate: string }>;
   moderationLogs?: Record<string, ModerationLogEntry>;
+  memories?: Record<string, MemoryItem[]>;
+  systemConfig?: SystemConfig;
 }
 
 export function getTodayDateString(): string {
@@ -160,7 +170,25 @@ async function ensureDb() {
         email VARCHAR(255) PRIMARY KEY,
         code VARCHAR(10) NOT NULL,
         token VARCHAR(255) NOT NULL,
-        expires_at BIGINT NOT NULL
+        expires_at BIGINT NOT NULL,
+        attempts INTEGER DEFAULT 0
+      );
+    `;
+    await sql`
+      ALTER TABLE roleflow_auth_codes ADD COLUMN IF NOT EXISTS attempts INTEGER DEFAULT 0;
+    `;
+    await sql`
+      CREATE TABLE IF NOT EXISTS roleflow_system_configs (
+        key VARCHAR(50) PRIMARY KEY,
+        value JSONB NOT NULL
+      );
+    `;
+    await sql`
+      CREATE TABLE IF NOT EXISTS roleflow_memories (
+        id VARCHAR(255) PRIMARY KEY,
+        user_id VARCHAR(255) NOT NULL,
+        memory TEXT NOT NULL,
+        created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
       );
     `;
     isInitialized = true;
@@ -173,13 +201,14 @@ export const db = {
   // Auth Codes
   async saveAuthCode(email: string, code: string, token: string, expiresAt: number) {
     await ensureDb();
+    const cleanEmail = email.toLowerCase().trim();
     if (isPostgresConfigured) {
       try {
         await sql`
-          INSERT INTO roleflow_auth_codes (email, code, token, expires_at)
-          VALUES (${email.toLowerCase()}, ${code}, ${token}, ${expiresAt})
+          INSERT INTO roleflow_auth_codes (email, code, token, expires_at, attempts)
+          VALUES (${cleanEmail}, ${code}, ${token}, ${expiresAt}, 0)
           ON CONFLICT (email) DO UPDATE
-          SET code = ${code}, token = ${token}, expires_at = ${expiresAt};
+          SET code = ${code}, token = ${token}, expires_at = ${expiresAt}, attempts = 0;
         `;
         return;
       } catch (e) {
@@ -187,38 +216,129 @@ export const db = {
       }
     }
     const store = getLocalStore();
-    store.authCodes[email.toLowerCase()] = { code, email, token, expiresAt };
+    store.authCodes[cleanEmail] = { code, email: cleanEmail, token, expiresAt, attempts: 0 };
     saveLocalStore(store);
   },
 
-  async verifyAuthCode(email: string, inputCodeOrToken: string): Promise<boolean> {
+  async getAuthCode(email: string): Promise<{ code: string; email: string; token: string; expiresAt: number; attempts: number } | null> {
     await ensureDb();
-    const cleanEmail = email.toLowerCase();
-    const now = Date.now();
+    const cleanEmail = email.toLowerCase().trim();
+    if (isPostgresConfigured) {
+      try {
+        const { rows } = await sql`
+          SELECT code, email, token, expires_at as "expiresAt", COALESCE(attempts, 0) as attempts
+          FROM roleflow_auth_codes
+          WHERE email = ${cleanEmail};
+        `;
+        if (rows[0]) {
+          return {
+            code: String(rows[0].code),
+            email: String(rows[0].email),
+            token: String(rows[0].token),
+            expiresAt: Number(rows[0].expiresAt),
+            attempts: Number(rows[0].attempts || 0),
+          };
+        }
+        return null;
+      } catch (e) {
+        console.error("Postgres get auth code error:", e);
+      }
+    }
+    const store = getLocalStore();
+    const entry = store.authCodes[cleanEmail];
+    if (entry) {
+      return {
+        ...entry,
+        attempts: entry.attempts || 0,
+      };
+    }
+    return null;
+  },
+
+  async recordFailedAuthAttempt(email: string): Promise<{ invalidated: boolean; remaining: number }> {
+    await ensureDb();
+    const cleanEmail = email.toLowerCase().trim();
+    let currentAttempts = 0;
 
     if (isPostgresConfigured) {
       try {
         const { rows } = await sql`
-          SELECT * FROM roleflow_auth_codes
-          WHERE email = ${cleanEmail} AND (code = ${inputCodeOrToken} OR token = ${inputCodeOrToken}) AND expires_at > ${now};
+          UPDATE roleflow_auth_codes
+          SET attempts = COALESCE(attempts, 0) + 1
+          WHERE email = ${cleanEmail}
+          RETURNING attempts;
         `;
-        if (rows.length > 0) {
-          await sql`DELETE FROM roleflow_auth_codes WHERE email = ${cleanEmail};`;
-          return true;
+        if (rows[0]) {
+          currentAttempts = Number(rows[0].attempts);
+          if (currentAttempts >= 5) {
+            await sql`DELETE FROM roleflow_auth_codes WHERE email = ${cleanEmail};`;
+            return { invalidated: true, remaining: 0 };
+          }
+          return { invalidated: false, remaining: Math.max(0, 5 - currentAttempts) };
         }
-        return false;
       } catch (e) {
-        console.error("Postgres auth verify error:", e);
+        console.error("Postgres record failed auth attempt error:", e);
       }
     }
 
     const store = getLocalStore();
     const entry = store.authCodes[cleanEmail];
-    if (entry && (entry.code === inputCodeOrToken || entry.token === inputCodeOrToken) && entry.expiresAt > now) {
-      delete store.authCodes[cleanEmail];
+    if (entry) {
+      currentAttempts = (entry.attempts || 0) + 1;
+      if (currentAttempts >= 5) {
+        delete store.authCodes[cleanEmail];
+        saveLocalStore(store);
+        return { invalidated: true, remaining: 0 };
+      }
+      entry.attempts = currentAttempts;
+      store.authCodes[cleanEmail] = entry;
       saveLocalStore(store);
+      return { invalidated: false, remaining: Math.max(0, 5 - currentAttempts) };
+    }
+    return { invalidated: true, remaining: 0 };
+  },
+
+  async deleteAuthCode(email: string): Promise<void> {
+    await ensureDb();
+    const cleanEmail = email.toLowerCase().trim();
+    if (isPostgresConfigured) {
+      try {
+        await sql`DELETE FROM roleflow_auth_codes WHERE email = ${cleanEmail};`;
+        return;
+      } catch (e) {
+        console.error("Postgres delete auth code error:", e);
+      }
+    }
+    const store = getLocalStore();
+    delete store.authCodes[cleanEmail];
+    saveLocalStore(store);
+  },
+
+  async verifyAuthCode(email: string, inputCodeOrToken: string): Promise<boolean> {
+    await ensureDb();
+    const cleanEmail = email.toLowerCase().trim();
+    const now = Date.now();
+
+    const entry = await this.getAuthCode(cleanEmail);
+    if (!entry || entry.expiresAt <= now) {
+      if (entry) await this.deleteAuthCode(cleanEmail);
+      return false;
+    }
+
+    if (entry.attempts >= 5) {
+      await this.deleteAuthCode(cleanEmail);
+      return false;
+    }
+
+    const matchesCode = entry.code === inputCodeOrToken;
+    const matchesToken = entry.token === inputCodeOrToken;
+
+    if (matchesCode || matchesToken) {
+      await this.deleteAuthCode(cleanEmail);
       return true;
     }
+
+    await this.recordFailedAuthAttempt(cleanEmail);
     return false;
   },
 
@@ -302,6 +422,9 @@ export const db = {
     resetsAt: string;
   }> {
     const today = getTodayDateString();
+    const config = await this.getSystemConfig();
+    const dynamicGuestLimit = config.guestLimit || GUEST_TOTAL_LIMIT;
+    const dynamicDailyLimit = config.registeredDailyLimit || FREE_DAILY_LIMIT;
 
     if (!identifier || isGuest || identifier.startsWith("guest_")) {
       const store = getLocalStore();
@@ -309,7 +432,7 @@ export const db = {
       const key = identifier || "guest_default";
       const entry = guestRecords[key] || { count: 0, lastResetDate: today };
       const used = entry.count;
-      const limit = GUEST_TOTAL_LIMIT;
+      const limit = dynamicGuestLimit;
       return {
         allowed: used < limit,
         used,
@@ -336,8 +459,8 @@ export const db = {
       return {
         allowed: true,
         used: 0,
-        limit: GUEST_TOTAL_LIMIT,
-        remaining: GUEST_TOTAL_LIMIT,
+        limit: dynamicGuestLimit,
+        remaining: dynamicGuestLimit,
         isUnlimited: false,
         resetsAt: "sign in",
       };
@@ -363,7 +486,7 @@ export const db = {
       await this.upsertUser(user);
     }
 
-    const limit = FREE_DAILY_LIMIT;
+    const limit = dynamicDailyLimit;
     return {
       allowed: used < limit,
       used,
@@ -383,6 +506,9 @@ export const db = {
     resetsAt: string;
   }> {
     const today = getTodayDateString();
+    const config = await this.getSystemConfig();
+    const dynamicGuestLimit = config.guestLimit || GUEST_TOTAL_LIMIT;
+    const dynamicDailyLimit = config.registeredDailyLimit || FREE_DAILY_LIMIT;
 
     if (!identifier || isGuest || identifier.startsWith("guest_")) {
       const store = getLocalStore();
@@ -394,7 +520,7 @@ export const db = {
       saveLocalStore(store);
 
       const used = entry.count;
-      const limit = GUEST_TOTAL_LIMIT;
+      const limit = dynamicGuestLimit;
       return {
         allowed: used <= limit,
         used,
@@ -421,8 +547,8 @@ export const db = {
       return {
         allowed: true,
         used: 1,
-        limit: GUEST_TOTAL_LIMIT,
-        remaining: Math.max(0, GUEST_TOTAL_LIMIT - 1),
+        limit: dynamicGuestLimit,
+        remaining: Math.max(0, dynamicGuestLimit - 1),
         isUnlimited: false,
         resetsAt: "sign in",
       };
@@ -451,7 +577,7 @@ export const db = {
     user.messageCount = count;
     await this.upsertUser(user);
 
-    const limit = FREE_DAILY_LIMIT;
+    const limit = dynamicDailyLimit;
     return {
       allowed: count <= limit,
       used: count,
@@ -601,6 +727,34 @@ export const db = {
       return true;
     }
     return false;
+  },
+
+  async deleteAllChats(userId?: string): Promise<boolean> {
+    await ensureDb();
+    if (isPostgresConfigured) {
+      try {
+        if (userId) {
+          await sql`DELETE FROM roleflow_chats WHERE user_id = ${userId} OR user_id IS NULL;`;
+        } else {
+          await sql`DELETE FROM roleflow_chats;`;
+        }
+        return true;
+      } catch (e) {
+        console.error("Postgres delete all chats error:", e);
+      }
+    }
+    const store = getLocalStore();
+    if (userId) {
+      for (const id of Object.keys(store.chats)) {
+        if (!store.chats[id].userId || store.chats[id].userId === userId) {
+          delete store.chats[id];
+        }
+      }
+    } else {
+      store.chats = {};
+    }
+    saveLocalStore(store);
+    return true;
   },
 
   async getAllChats(userId?: string): Promise<Chat[]> {
@@ -917,5 +1071,134 @@ export const db = {
       };
     }
     return { isBanned: false, strikes: 0 };
+  },
+
+  // ───────────────────────────────────────────────────────────────────────────
+  // System Configurations
+  // ───────────────────────────────────────────────────────────────────────────
+  async getSystemConfig(): Promise<SystemConfig> {
+    await ensureDb();
+    if (isPostgresConfigured) {
+      try {
+        const { rows } = await sql`
+          SELECT value FROM roleflow_system_configs WHERE key = 'global';
+        `;
+        if (rows[0]?.value) {
+          return {
+            ...DEFAULT_SYSTEM_CONFIG,
+            ...(typeof rows[0].value === "string" ? JSON.parse(rows[0].value) : rows[0].value),
+          };
+        }
+      } catch (e) {
+        console.error("Postgres get system config error:", e);
+      }
+    }
+    const store = getLocalStore();
+    return {
+      ...DEFAULT_SYSTEM_CONFIG,
+      ...(store.systemConfig || {}),
+    };
+  },
+
+  async updateSystemConfig(patch: Partial<SystemConfig>): Promise<SystemConfig> {
+    await ensureDb();
+    const current = await this.getSystemConfig();
+    const updated: SystemConfig = {
+      guestLimit: typeof patch.guestLimit === "number" && patch.guestLimit > 0 ? patch.guestLimit : current.guestLimit,
+      registeredDailyLimit: typeof patch.registeredDailyLimit === "number" && patch.registeredDailyLimit > 0 ? patch.registeredDailyLimit : current.registeredDailyLimit,
+      maintenanceMode: typeof patch.maintenanceMode === "boolean" ? patch.maintenanceMode : current.maintenanceMode,
+      broadcastBanner: typeof patch.broadcastBanner === "string" ? patch.broadcastBanner.trim() : current.broadcastBanner,
+      allowHighEffort: typeof patch.allowHighEffort === "boolean" ? patch.allowHighEffort : current.allowHighEffort,
+    };
+
+    if (isPostgresConfigured) {
+      try {
+        await sql`
+          INSERT INTO roleflow_system_configs (key, value)
+          VALUES ('global', ${JSON.stringify(updated)})
+          ON CONFLICT (key) DO UPDATE SET value = ${JSON.stringify(updated)};
+        `;
+      } catch (e) {
+        console.error("Postgres update system config error:", e);
+      }
+    }
+
+    const store = getLocalStore();
+    store.systemConfig = updated;
+    saveLocalStore(store);
+
+    return updated;
+  },
+
+  // ───────────────────────────────────────────────────────────────────────────
+  // User Management
+  // ───────────────────────────────────────────────────────────────────────────
+  async getAllUsers(): Promise<UserProfile[]> {
+    await ensureDb();
+    const usersMap = new Map<string, UserProfile>();
+
+    if (isPostgresConfigured) {
+      try {
+        const { rows } = await sql`
+          SELECT id, email, name, custom_instructions as "customInstructions", response_instructions as "responseInstructions", is_admin as "isAdmin", plan, message_count as "messageCount", last_reset_date as "lastResetDate", is_banned as "isBanned", strikes, created_at as "createdAt"
+          FROM roleflow_users ORDER BY created_at DESC;
+        `;
+        for (const row of rows) {
+          const patched = patchUserProfile(row as unknown as UserProfile);
+          usersMap.set(patched.email.toLowerCase(), patched);
+        }
+      } catch (e) {
+        console.error("Postgres get all users error:", e);
+      }
+    }
+
+    const store = getLocalStore();
+    for (const rawUser of Object.values(store.users || {})) {
+      const patched = patchUserProfile(rawUser);
+      if (!usersMap.has(patched.email.toLowerCase())) {
+        usersMap.set(patched.email.toLowerCase(), patched);
+      }
+    }
+
+    return Array.from(usersMap.values()).sort(
+      (a, b) => new Date(b.createdAt || 0).getTime() - new Date(a.createdAt || 0).getTime()
+    );
+  },
+
+  async toggleUserAdmin(userIdOrEmail: string): Promise<UserProfile | null> {
+    await ensureDb();
+    if (!userIdOrEmail) return null;
+    const clean = userIdOrEmail.toLowerCase().trim();
+    let user = clean.includes("@")
+      ? await this.getUserByEmail(clean)
+      : await this.getUserById(userIdOrEmail);
+
+    if (!user) return null;
+
+    // Jordan Daniels is permanently super admin
+    if (user.email.toLowerCase() === ADMIN_EMAIL.toLowerCase()) {
+      user.isAdmin = true;
+      user.plan = "ADMIN";
+      return await this.upsertUser(user);
+    }
+
+    user.isAdmin = !user.isAdmin;
+    user.plan = user.isAdmin ? "ADMIN" : "FREE";
+    return await this.upsertUser(user);
+  },
+
+  async resetUserQuota(userIdOrEmail: string): Promise<UserProfile | null> {
+    await ensureDb();
+    if (!userIdOrEmail) return null;
+    const clean = userIdOrEmail.toLowerCase().trim();
+    let user = clean.includes("@")
+      ? await this.getUserByEmail(clean)
+      : await this.getUserById(userIdOrEmail);
+
+    if (!user) return null;
+
+    user.messageCount = 0;
+    user.lastResetDate = getTodayDateString();
+    return await this.upsertUser(user);
   },
 };

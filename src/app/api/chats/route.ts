@@ -1,23 +1,17 @@
 import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/lib/db";
 import { Chat } from "@/types";
+import { getSessionFromRequest } from "@/lib/auth";
 
 export const dynamic = "force-dynamic";
 
 function extractUserId(req: NextRequest): string | undefined {
-  const headerUser = req.headers.get("x-user-id");
-  if (headerUser) return headerUser;
+  const session = getSessionFromRequest(req);
+  if (session?.userId) return session.userId;
 
   const urlParam = req.nextUrl.searchParams.get("userId");
-  if (urlParam) return urlParam;
+  if (urlParam && urlParam.startsWith("guest_")) return urlParam;
 
-  const cookie = req.cookies.get("roleflow_user");
-  if (cookie?.value) {
-    try {
-      const parsed = JSON.parse(decodeURIComponent(cookie.value));
-      if (parsed?.id) return parsed.id;
-    } catch {}
-  }
   return undefined;
 }
 
@@ -51,6 +45,16 @@ export async function POST(req: NextRequest) {
 
     await db.saveChat(chat);
     return NextResponse.json({ chat });
+  } catch (error: any) {
+    return NextResponse.json({ error: error.message }, { status: 500 });
+  }
+}
+
+export async function DELETE(req: NextRequest) {
+  try {
+    const userId = extractUserId(req);
+    await db.deleteAllChats(userId);
+    return NextResponse.json({ success: true, message: "All chats deleted successfully" });
   } catch (error: any) {
     return NextResponse.json({ error: error.message }, { status: 500 });
   }

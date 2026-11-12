@@ -1,3 +1,18 @@
+export interface MemoryItem {
+  id: string;
+  userId: string;
+  memory: string;
+  createdAt: string;
+}
+
+export interface SystemConfig {
+  guestLimit: number;
+  registeredDailyLimit: number;
+  maintenanceMode: boolean;
+  broadcastBanner: string;
+  allowHighEffort: boolean;
+}
+
 export type EffortLevel = "low" | "medium" | "high" | "extra" | "max";
 
 export type ModelId = "roleflow-genesis-1" | "roleflow-flash-1";
@@ -37,6 +52,7 @@ export interface Message {
   role: "user" | "assistant" | "system";
   content: string;
   thinking?: string;
+  thinkingTime?: number;
   attachments?: Attachment[];
   artifact?: Artifact;
   createdAt: string;

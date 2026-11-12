@@ -1,20 +1,14 @@
 import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/lib/db";
+import { getSessionFromRequest } from "@/lib/auth";
 
 function extractUserId(req: NextRequest): string | undefined {
-  const headerUser = req.headers.get("x-user-id");
-  if (headerUser) return headerUser;
+  const session = getSessionFromRequest(req);
+  if (session?.userId) return session.userId;
 
   const urlParam = req.nextUrl.searchParams.get("userId");
-  if (urlParam) return urlParam;
+  if (urlParam && urlParam.startsWith("guest_")) return urlParam;
 
-  const cookie = req.cookies.get("roleflow_user");
-  if (cookie?.value) {
-    try {
-      const parsed = JSON.parse(decodeURIComponent(cookie.value));
-      if (parsed?.id) return parsed.id;
-    } catch {}
-  }
   return undefined;
 }
 

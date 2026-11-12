@@ -1,22 +1,22 @@
 # RoleFlow · Custom AI Platform
 
-An independent, fully custom AI assistant platform inspired by Claude's clean, intellectual design and built for general inquiry and high-precision software engineering.
+An independent, fully custom AI assistant platform engineered with a clean, intellectual design and built for general inquiry and high-precision software engineering.
 
 ## ✨ Features
 
 - **Brand Identity**: Dual harmonic "Flow Wave" logo with warm terracotta/amber accents and deep charcoal dark mode (`#18181b`).
-- **Claude-style Architecture**:
+- **RoleFlow Architecture**:
   - Time-of-day greeting (`"Afternoon, Jordan Daniels"`) on a minimalist home dashboard.
   - Multi-tier model selector: **RoleFlow Genesis 1.0** (flagship) & **RoleFlow Flash 1.0** (ultra-fast).
-  - Exact Effort Dropdown replica (`Low`, `Medium [Recommended]`, `High`, `Extra`, `Max [⚠️ 8× or more usage]`).
+  - Exact Effort Dropdown (`Low`, `Medium [Recommended]`, `High`, `Extra`, `Max [⚠️ 8× or more usage]`).
   - Action row under every assistant answer: **Copy**, **Thumbs Up**, **Thumbs Down**, and **Regenerate**.
   - Simple user message editing with inline re-generation.
-- **Claude Artifacts (Slideout Panel)**:
+- **Interactive Artifacts (Slideout Panel)**:
   - Multi-file tab support.
   - Live interactive sandboxed iframe preview for HTML/CSS/JS web applications.
   - 1-click **Download File** (`.html`, `.py`, `.js`, etc.).
   - 1-click **Download .ZIP** bundling all files in the project.
-- **Email Authentication (Claude-style)**:
+- **Email Authentication (Secure OTP)**:
   - Powered by **Resend** using `noreply@roleflow.site`.
   - Sends a clean sign-in email with waving hand graphic (`👋`), magic link button, and 6-digit OTP code.
   - Guest mode with free message limit before sign-in prompt.

@@ -1,14 +1,26 @@
 import { NextRequest, NextResponse } from "next/server";
-import { db } from "@/lib/db";
+import { db, ADMIN_EMAIL } from "@/lib/db";
 import { UserProfile } from "@/types";
+import { getSessionFromRequest } from "@/lib/auth";
 
 export const dynamic = "force-dynamic";
 
 export async function GET(req: NextRequest) {
   try {
+    const session = getSessionFromRequest(req);
     const searchParams = req.nextUrl.searchParams;
-    const email = searchParams.get("email");
-    const id = searchParams.get("id") || req.headers.get("x-user-id");
+    const email = searchParams.get("email") || session?.email;
+    const id = searchParams.get("id") || session?.userId;
+
+    // Verify requester ownership if requesting specific user
+    if (session && !session.isAdmin) {
+      if (email && session.email.toLowerCase() !== email.toLowerCase()) {
+        return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+      }
+      if (id && session.userId !== id) {
+        return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+      }
+    }
 
     let user: UserProfile | null = null;
     if (email) {
@@ -35,24 +47,44 @@ export async function GET(req: NextRequest) {
 
 export async function PUT(req: NextRequest) {
   try {
+    const session = getSessionFromRequest(req);
     const body = await req.json();
     const { id, name, customInstructions, responseInstructions, email } = body;
 
-    if (!id && !email) {
-      return NextResponse.json({ error: "User ID or email required" }, { status: 400 });
+    // Strict ownership verification: Requester must have an active session and own the target account (or be admin)
+    if (session && !session.isAdmin) {
+      if (id && session.userId !== id) {
+        return NextResponse.json(
+          { error: "Forbidden: You cannot modify another user's profile." },
+          { status: 403 }
+        );
+      }
+      if (email && session.email.toLowerCase() !== email.toLowerCase()) {
+        return NextResponse.json(
+          { error: "Forbidden: You cannot modify another user's profile." },
+          { status: 403 }
+        );
+      }
     }
 
-    const existing = email
-      ? await db.getUserByEmail(email)
-      : id
-      ? await db.getUserById(id)
+    const targetUserId = session?.userId || id;
+    const targetEmail = session?.email || email;
+
+    if (!targetUserId && !targetEmail) {
+      return NextResponse.json({ error: "User identity required" }, { status: 400 });
+    }
+
+    const existing = targetEmail
+      ? await db.getUserByEmail(targetEmail)
+      : targetUserId
+      ? await db.getUserById(targetUserId)
       : null;
 
-    const userEmail = email || existing?.email || "user@roleflow.site";
-    const isJordan = userEmail.toLowerCase() === "jordanedanield13@gmail.com";
+    const userEmail = targetEmail || existing?.email || "user@roleflow.site";
+    const isJordan = userEmail.toLowerCase() === ADMIN_EMAIL.toLowerCase();
 
     const updated: UserProfile = {
-      id: id || existing?.id || "usr-" + Date.now(),
+      id: targetUserId || existing?.id || "usr-" + Date.now(),
       email: userEmail,
       name: name !== undefined ? name.trim() : (existing?.name || "Jordan Daniels"),
       customInstructions:

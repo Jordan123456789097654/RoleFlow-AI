@@ -35,7 +35,6 @@ export default function MarketingLandingPage() {
   const router = useRouter();
   const [authModalOpen, setAuthModalOpen] = useState(false);
   const [user, setUser] = useState<UserProfile | null>(null);
-  const [activeTab, setActiveTab] = useState<"preview" | "code">("preview");
   const [activeFaq, setActiveFaq] = useState<number | null>(null);
   const [effortLevel, setEffortLevel] = useState<"low" | "medium" | "high" | "max">("high");
 
@@ -57,31 +56,6 @@ export default function MarketingLandingPage() {
     setAuthModalOpen(false);
     router.push("/chat");
   };
-
-  const sampleArtifactCode = `<!DOCTYPE html>
-<html lang="en">
-<head>
-  <meta charset="UTF-8">
-  <script src="https://cdn.tailwindcss.com"></script>
-</head>
-<body class="bg-[#121211] text-white flex items-center justify-center min-h-screen p-4">
-  <div class="p-6 rounded-2xl bg-[#1c1b1a] border border-[#2e2d2b] shadow-2xl max-w-sm w-full">
-    <div class="flex items-center justify-between mb-4">
-      <span class="text-xs font-mono text-[#d97706] tracking-wide">ORBITFLOW ENGINE</span>
-      <span class="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
-    </div>
-    <h3 class="text-lg font-serif font-medium text-stone-100 mb-1">N-Body Gravitation</h3>
-    <p class="text-xs text-stone-400 mb-4">Real-time Hamiltonian planetary physics simulation.</p>
-    <div class="relative w-full h-44 rounded-xl bg-[#0a0a09] border border-[#262523] overflow-hidden flex items-center justify-center">
-      <!-- Orbit rings -->
-      <div class="absolute w-32 h-32 rounded-full border border-dashed border-[#d97706]/30 animate-spin" style="animation-duration: 12s"></div>
-      <div class="absolute w-20 h-20 rounded-full border border-stone-800"></div>
-      <div class="w-5 h-5 rounded-full bg-gradient-to-tr from-amber-500 to-orange-400 shadow-lg shadow-amber-500/50"></div>
-      <div class="absolute w-2.5 h-2.5 rounded-full bg-sky-400 shadow-md shadow-sky-400/50 -top-1 left-16"></div>
-    </div>
-  </div>
-</body>
-</html>`;
 
   return (
     <div className="min-h-screen bg-[#141413] text-[#f4f4f0] selection:bg-[#d97706]/30 selection:text-[#fefefe] flex flex-col font-sans">
@@ -105,9 +79,6 @@ export default function MarketingLandingPage() {
             </a>
             <a href="#models" className="hover:text-[#f4f4f0] transition-colors">
               Models
-            </a>
-            <a href="#pricing" className="hover:text-[#f4f4f0] transition-colors">
-              Pricing
             </a>
             <a href="#faq" className="hover:text-[#f4f4f0] transition-colors">
               FAQ
@@ -147,7 +118,7 @@ export default function MarketingLandingPage() {
       {/* ─────────────────────────────────────────────────────────────
           2. HERO SECTION
       ───────────────────────────────────────────────────────────── */}
-      <section className="relative overflow-hidden pt-20 pb-24 lg:pt-28 lg:pb-32 claude-mesh-bg border-b border-[#222120]">
+      <section className="relative overflow-hidden pt-20 pb-24 lg:pt-28 lg:pb-32 roleflow-mesh-bg border-b border-[#222120]">
         {/* Ambient glow backgrounds */}
         <div className="absolute top-1/4 left-1/2 -translate-x-1/2 w-[700px] h-[350px] bg-gradient-to-tr from-amber-500/10 via-orange-600/5 to-transparent blur-3xl pointer-events-none rounded-full" />
 
@@ -206,235 +177,6 @@ export default function MarketingLandingPage() {
             </div>
           </div>
         </div>
-
-        {/* ─────────────────────────────────────────────────────────────
-            INTERACTIVE / VISUAL UI PREVIEW DASHBOARD
-        ───────────────────────────────────────────────────────────── */}
-        <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 mt-14 relative z-10">
-          <div className="rounded-2xl border border-[#2f2e2b] bg-[#171615] shadow-2xl shadow-black/80 overflow-hidden ring-1 ring-white/5">
-            {/* Window Top Bar */}
-            <div className="h-11 bg-[#1c1b1a] border-b border-[#282725] px-4 flex items-center justify-between">
-              <div className="flex items-center gap-2">
-                <div className="w-3 h-3 rounded-full bg-[#ff5f56]/80" />
-                <div className="w-3 h-3 rounded-full bg-[#ffbd2e]/80" />
-                <div className="w-3 h-3 rounded-full bg-[#27c93f]/80" />
-                <span className="ml-3 text-xs font-mono text-[#777672]">
-                  roleflow.site/chat — Genesis 1.0 (Flagship 120B)
-                </span>
-              </div>
-
-              <div className="flex items-center gap-2">
-                <span className="text-[11px] font-medium px-2 py-0.5 rounded-full bg-[#272624] text-[#d97706] border border-[#3b3a36]">
-                  High Effort · Deep Reasoning
-                </span>
-                <span className="text-[11px] text-[#706f6b] hidden sm:inline">
-                  Interactive Preview
-                </span>
-              </div>
-            </div>
-
-            {/* Split Screen Workspace: Left = Chat Flow, Right = Artifact Drawer */}
-            <div className="grid grid-cols-1 lg:grid-cols-12 min-h-[500px]">
-              {/* Left Chat Flow (7 Cols) */}
-              <div className="lg:col-span-7 p-6 border-b lg:border-b-0 lg:border-r border-[#262523] flex flex-col justify-between bg-[#141413]">
-                <div className="space-y-5">
-                  {/* User Message */}
-                  <div className="flex items-start gap-3">
-                    <div className="w-7 h-7 rounded-full bg-[#2a2927] border border-[#383734] flex items-center justify-center text-xs font-semibold text-[#f4f4f0] shrink-0 mt-0.5">
-                      JD
-                    </div>
-                    <div className="space-y-1">
-                      <div className="text-xs text-[#7d7c78] font-medium">Jordan Daniels</div>
-                      <div className="text-sm text-[#e4e3de] bg-[#1e1d1b] border border-[#2b2a28] rounded-xl p-3.5 shadow-sm leading-relaxed">
-                        Design an interactive N-Body Gravitation simulation with orbital velocity
-                        vectors and real-time celestial particle collisions. Output as a complete
-                        live artifact.
-                      </div>
-                    </div>
-                  </div>
-
-                  {/* Assistant Message with Reasoning Flow */}
-                  <div className="flex items-start gap-3">
-                    <div className="shrink-0 mt-0.5">
-                      <Logo size={28} showText={false} />
-                    </div>
-                    <div className="space-y-3 w-full">
-                      <div className="flex items-center gap-2">
-                        <span className="text-xs text-[#d97706] font-medium">RoleFlow Genesis 1.0</span>
-                        <span className="text-[10px] text-[#6d6c68]">• Thought for 3.4 seconds</span>
-                      </div>
-
-                      {/* Reasoning Process Block */}
-                      <div className="p-3 rounded-lg bg-[#1a1918] border border-[#2a2927] text-xs text-[#9b9a97] space-y-1.5 font-mono">
-                        <div className="flex items-center gap-1.5 text-emerald-400 text-[11px]">
-                          <span className="w-1.5 h-1.5 rounded-full bg-emerald-400" />
-                          <span>Physics Engine Breakdown:</span>
-                        </div>
-                        <p className="text-[11px] text-[#868580] leading-relaxed">
-                          1. Formulating symplectic Euler integration for energy conservation.
-                          <br />
-                          2. Calculating gravitational vectors: F = G * (m1 * m2) / r^2.
-                          <br />
-                          3. Embedding canvas renderer with responsive sliders &amp; ZIP export.
-                        </p>
-                      </div>
-
-                      <p className="text-sm text-[#cfcec9] leading-relaxed">
-                        I have engineered the full gravitational sandbox inside an interactive
-                        Artifact. You can test orbital stability, tune gravitational constants, and
-                        download the complete codebase below.
-                      </p>
-
-                      {/* Artifact Card Trigger */}
-                      <div className="p-3.5 rounded-xl bg-[#1d1c1a] border border-[#2f2e2b] flex items-center justify-between hover:border-[#d97706]/50 transition-colors">
-                        <div className="flex items-center gap-3">
-                          <div className="p-2 rounded-lg bg-[#292825] text-[#d97706]">
-                            <Code2 className="w-4 h-4" />
-                          </div>
-                          <div>
-                            <div className="text-xs font-semibold text-[#f4f4f0]">
-                              OrbitFlow Gravitational Simulation
-                            </div>
-                            <div className="text-[11px] text-[#82817d]">
-                              Interactive HTML5 / Tailwind Canvas Sandbox
-                            </div>
-                          </div>
-                        </div>
-                        <span className="text-xs px-2.5 py-1 rounded-md bg-[#2a2926] text-[#d97706] font-medium border border-[#3d3c38] flex items-center gap-1">
-                          <Play className="w-3 h-3 fill-[#d97706]" />
-                          Active
-                        </span>
-                      </div>
-                    </div>
-                  </div>
-                </div>
-
-                {/* Simulated Input Prompt */}
-                <div className="mt-6 pt-4 border-t border-[#222120]">
-                  <div className="p-3 rounded-xl bg-[#1b1a19] border border-[#2c2b29] flex items-center justify-between text-xs text-[#706f6b]">
-                    <span>Ask a follow-up or command an architectural refactor...</span>
-                    <div className="flex items-center gap-2">
-                      <span className="px-2 py-0.5 rounded bg-[#252422] text-[#9b9a97] text-[10px]">
-                        Return ↵
-                      </span>
-                    </div>
-                  </div>
-                </div>
-              </div>
-
-              {/* Right Artifact Drawer (5 Cols) */}
-              <div className="lg:col-span-5 bg-[#10100f] flex flex-col justify-between">
-                {/* Drawer Tab Header */}
-                <div className="h-11 px-4 border-b border-[#242321] flex items-center justify-between bg-[#151514]">
-                  <div className="flex items-center gap-2">
-                    <span className="text-xs font-mono text-[#d97706] font-medium">Artifact</span>
-                    <span className="text-xs text-[#777672]">· orbitflow.html</span>
-                  </div>
-
-                  <div className="flex items-center gap-1 bg-[#1f1e1d] p-1 rounded-lg border border-[#2a2927]">
-                    <button
-                      type="button"
-                      onClick={() => setActiveTab("preview")}
-                      className={`px-2.5 py-0.5 rounded text-xs font-medium transition-colors ${
-                        activeTab === "preview"
-                          ? "bg-[#2d2c2a] text-[#f4f4f0]"
-                          : "text-[#858480] hover:text-[#d0cfcb]"
-                      }`}
-                    >
-                      Preview
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => setActiveTab("code")}
-                      className={`px-2.5 py-0.5 rounded text-xs font-medium transition-colors ${
-                        activeTab === "code"
-                          ? "bg-[#2d2c2a] text-[#f4f4f0]"
-                          : "text-[#858480] hover:text-[#d0cfcb]"
-                      }`}
-                    >
-                      Code
-                    </button>
-                  </div>
-                </div>
-
-                {/* Tab Body */}
-                <div className="flex-1 p-5 flex items-center justify-center overflow-hidden">
-                  {activeTab === "preview" ? (
-                    <div className="w-full max-w-xs space-y-4">
-                      {/* Live Simulated Widget */}
-                      <div className="p-5 rounded-2xl bg-[#191817] border border-[#2b2a28] shadow-xl text-center space-y-4">
-                        <div className="flex items-center justify-between text-xs">
-                          <span className="text-[11px] font-mono text-[#d97706] tracking-wide">
-                            SIMULATION RUNNING
-                          </span>
-                          <span className="flex items-center gap-1 text-[10px] text-emerald-400">
-                            <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-ping" />
-                            60 FPS
-                          </span>
-                        </div>
-
-                        {/* Visual Orbit Graphic */}
-                        <div className="relative w-full h-40 rounded-xl bg-[#0b0b0a] border border-[#222120] flex items-center justify-center overflow-hidden">
-                          {/* Pulsing Sun */}
-                          <div className="w-8 h-8 rounded-full bg-gradient-to-tr from-amber-500 to-orange-500 shadow-lg shadow-amber-500/50 flex items-center justify-center text-[10px] font-bold text-black z-10 animate-pulse">
-                            ☀️
-                          </div>
-                          {/* Inner Orbit */}
-                          <div
-                            className="absolute w-24 h-24 rounded-full border border-[#d97706]/40 animate-spin"
-                            style={{ animationDuration: "8s" }}
-                          >
-                            <div className="w-3 h-3 rounded-full bg-emerald-400 shadow-sm shadow-emerald-400/50 -top-1.5 left-10" />
-                          </div>
-                          {/* Outer Orbit */}
-                          <div
-                            className="absolute w-36 h-36 rounded-full border border-dashed border-[#575652]/40 animate-spin"
-                            style={{ animationDuration: "14s" }}
-                          >
-                            <div className="w-2.5 h-2.5 rounded-full bg-sky-400 shadow-sm shadow-sky-400/50 top-6 -left-1" />
-                          </div>
-                        </div>
-
-                        {/* Interactive Sliders */}
-                        <div className="space-y-2 pt-1 text-left">
-                          <div className="flex justify-between text-[11px] text-[#9b9a97]">
-                            <span>Solar Mass (G)</span>
-                            <span className="font-mono text-[#f4f4f0]">1.989 × 10³⁰ kg</span>
-                          </div>
-                          <div className="w-full bg-[#272624] h-1.5 rounded-full overflow-hidden">
-                            <div className="bg-[#d97706] h-full w-3/4 rounded-full" />
-                          </div>
-                        </div>
-                      </div>
-                    </div>
-                  ) : (
-                    /* Code Tab */
-                    <div className="w-full h-full max-h-72 overflow-y-auto rounded-xl bg-[#0c0c0b] p-3 text-left border border-[#222120] font-mono text-[11px] text-[#a6a5a0] leading-relaxed">
-                      <pre>
-                        <code>{sampleArtifactCode}</code>
-                      </pre>
-                    </div>
-                  )}
-                </div>
-
-                {/* Artifact Action Bottom Bar */}
-                <div className="p-3 bg-[#151514] border-t border-[#242321] flex items-center justify-between text-xs">
-                  <div className="flex items-center gap-1.5 text-[#8c8b87]">
-                    <Terminal className="w-3.5 h-3.5 text-[#d97706]" />
-                    <span>Client Isolated Sandboxed iframe</span>
-                  </div>
-                  <Link
-                    href="/chat"
-                    className="flex items-center gap-1 px-3 py-1 rounded-md bg-[#252422] hover:bg-[#302f2d] text-[#f4f4f0] font-medium transition-colors border border-[#383734]"
-                  >
-                    <Download className="w-3 h-3 text-[#d97706]" />
-                    <span>1-Click ZIP</span>
-                  </Link>
-                </div>
-              </div>
-            </div>
-          </div>
-        </div>
       </section>
 
       {/* ─────────────────────────────────────────────────────────────
@@ -456,7 +198,7 @@ export default function MarketingLandingPage() {
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
-            {/* Feature 1: Claude-Style Artifacts */}
+            {/* Feature 1: Interactive Artifacts */}
             <div
               id="artifacts"
               className="p-8 rounded-2xl bg-[#171615] border border-[#282725] hover:border-[#3d3c38] transition-all group flex flex-col justify-between"
@@ -466,7 +208,7 @@ export default function MarketingLandingPage() {
                   <Code2 className="w-6 h-6" />
                 </div>
                 <h3 className="font-serif text-xl sm:text-2xl text-[#f4f4f0] mb-3">
-                  Claude-Style Artifacts
+                  Interactive Artifacts
                 </h3>
                 <p className="text-sm text-[#9b9a97] leading-relaxed mb-6">
                   Experience immediate, interactive HTML, JavaScript, CSS, and SVG sandboxes that render
@@ -628,7 +370,7 @@ export default function MarketingLandingPage() {
                   </div>
                   <div className="flex items-center gap-2">
                     <Check className="w-4 h-4 text-[#d97706]" />
-                    <span>Dynamic Claude-style Artifact creation with ZIP export</span>
+                    <span>Dynamic Interactive Artifact creation with ZIP export</span>
                   </div>
                   <div className="flex items-center gap-2">
                     <Check className="w-4 h-4 text-[#d97706]" />
@@ -751,144 +493,7 @@ export default function MarketingLandingPage() {
       </section>
 
       {/* ─────────────────────────────────────────────────────────────
-          5. PRICING & QUOTAS
-      ───────────────────────────────────────────────────────────── */}
-      <section id="pricing" className="py-24 lg:py-32 border-b border-[#222120]">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="text-center max-w-3xl mx-auto mb-20">
-            <h2 className="text-xs uppercase tracking-widest text-[#d97706] font-semibold mb-3">
-              Transparent Pricing
-            </h2>
-            <p className="font-serif text-3xl sm:text-5xl font-normal text-[#f4f4f0] tracking-tight mb-4">
-              Predictable access for individuals and teams.
-            </p>
-            <p className="text-sm sm:text-base text-[#9b9a97] leading-relaxed">
-              Start immediately with complimentary guest access. Authenticate via secure email OTP
-              for unlimited persistent workflows.
-            </p>
-          </div>
-
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
-            {/* Free Tier */}
-            <div className="p-8 rounded-3xl bg-[#171615] border border-[#282725] flex flex-col justify-between">
-              <div>
-                <h3 className="text-lg font-medium text-[#f4f4f0] mb-1">Guest &amp; Starter</h3>
-                <p className="text-xs text-[#8e8d89] mb-4">Try frontier AI without sign-up</p>
-                <div className="mb-6">
-                  <span className="font-serif text-4xl text-[#f4f4f0] font-normal">$0</span>
-                  <span className="text-xs text-[#706f6b]"> / forever</span>
-                </div>
-                <ul className="space-y-3 text-xs text-[#a3a29d] mb-8">
-                  <li className="flex items-center gap-2">
-                    <Check className="w-4 h-4 text-emerald-400" />
-                    <span>5 complimentary guest messages</span>
-                  </li>
-                  <li className="flex items-center gap-2">
-                    <Check className="w-4 h-4 text-emerald-400" />
-                    <span>Full access to Genesis 1.0 &amp; Flash 1.0</span>
-                  </li>
-                  <li className="flex items-center gap-2">
-                    <Check className="w-4 h-4 text-emerald-400" />
-                    <span>Interactive Artifacts sandbox preview</span>
-                  </li>
-                  <li className="flex items-center gap-2">
-                    <Check className="w-4 h-4 text-emerald-400" />
-                    <span>No credit card or setup required</span>
-                  </li>
-                </ul>
-              </div>
-              <Link
-                href="/chat"
-                className="w-full py-2.5 rounded-xl bg-[#252422] hover:bg-[#302f2d] text-[#f4f4f0] text-xs font-semibold text-center transition-colors border border-[#383734]"
-              >
-                Start Chatting Free
-              </Link>
-            </div>
-
-            {/* Pro / Builder Tier */}
-            <div className="relative p-8 rounded-3xl bg-gradient-to-b from-[#1c1b19] to-[#151413] border-2 border-[#d97706] shadow-2xl flex flex-col justify-between">
-              <div className="absolute -top-3.5 right-8 px-3.5 py-1 rounded-full bg-[#d97706] text-white text-[11px] font-semibold uppercase tracking-wider">
-                Most Popular
-              </div>
-
-              <div>
-                <h3 className="text-lg font-medium text-[#f4f4f0] mb-1">Builder Pro</h3>
-                <p className="text-xs text-[#8e8d89] mb-4">For active developers &amp; architects</p>
-                <div className="mb-6">
-                  <span className="font-serif text-4xl text-[#f4f4f0] font-normal">$20</span>
-                  <span className="text-xs text-[#706f6b]"> / month</span>
-                </div>
-                <ul className="space-y-3 text-xs text-[#c5c4be] mb-8">
-                  <li className="flex items-center gap-2">
-                    <Check className="w-4 h-4 text-[#d97706]" />
-                    <span>Unlimited Genesis 1.0 &amp; Flash 1.0 chats</span>
-                  </li>
-                  <li className="flex items-center gap-2">
-                    <Check className="w-4 h-4 text-[#d97706]" />
-                    <span>Max Effort deep reasoning allocation</span>
-                  </li>
-                  <li className="flex items-center gap-2">
-                    <Check className="w-4 h-4 text-[#d97706]" />
-                    <span>Unlimited Project Workspaces &amp; memories</span>
-                  </li>
-                  <li className="flex items-center gap-2">
-                    <Check className="w-4 h-4 text-[#d97706]" />
-                    <span>1-Click ZIP production artifact export</span>
-                  </li>
-                  <li className="flex items-center gap-2">
-                    <Check className="w-4 h-4 text-[#d97706]" />
-                    <span>Priority cloud compute &amp; low latency</span>
-                  </li>
-                </ul>
-              </div>
-              <Link
-                href="/chat"
-                className="w-full py-2.5 rounded-xl bg-[#d97706] hover:bg-[#b45309] text-white text-xs font-semibold text-center transition-colors shadow-md"
-              >
-                Upgrade to Pro
-              </Link>
-            </div>
-
-            {/* Enterprise Tier */}
-            <div className="p-8 rounded-3xl bg-[#171615] border border-[#282725] flex flex-col justify-between">
-              <div>
-                <h3 className="text-lg font-medium text-[#f4f4f0] mb-1">Enterprise Cluster</h3>
-                <p className="text-xs text-[#8e8d89] mb-4">Dedicated inference &amp; compliance</p>
-                <div className="mb-6">
-                  <span className="font-serif text-4xl text-[#f4f4f0] font-normal">Custom</span>
-                </div>
-                <ul className="space-y-3 text-xs text-[#a3a29d] mb-8">
-                  <li className="flex items-center gap-2">
-                    <Check className="w-4 h-4 text-emerald-400" />
-                    <span>Dedicated GPU cluster provisioning</span>
-                  </li>
-                  <li className="flex items-center gap-2">
-                    <Check className="w-4 h-4 text-emerald-400" />
-                    <span>Zero Data Retention (ZDR) legal SLA</span>
-                  </li>
-                  <li className="flex items-center gap-2">
-                    <Check className="w-4 h-4 text-emerald-400" />
-                    <span>Custom model fine-tuning on internal docs</span>
-                  </li>
-                  <li className="flex items-center gap-2">
-                    <Check className="w-4 h-4 text-emerald-400" />
-                    <span>Dedicated enterprise engineering support</span>
-                  </li>
-                </ul>
-              </div>
-              <a
-                href="mailto:support@roleflow.site?subject=Enterprise%20Cluster%20Inquiry"
-                className="w-full py-2.5 rounded-xl bg-[#252422] hover:bg-[#302f2d] text-[#f4f4f0] text-xs font-semibold text-center transition-colors border border-[#383734]"
-              >
-                Contact Sales
-              </a>
-            </div>
-          </div>
-        </div>
-      </section>
-
-      {/* ─────────────────────────────────────────────────────────────
-          6. FREQUENTLY ASKED QUESTIONS (FAQ)
+          5. FREQUENTLY ASKED QUESTIONS (FAQ)
       ───────────────────────────────────────────────────────────── */}
       <section id="faq" className="py-24 lg:py-32 border-b border-[#222120] bg-[#111110]">
         <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8">
@@ -905,10 +510,10 @@ export default function MarketingLandingPage() {
             {[
               {
                 q: "What makes RoleFlow different from standard chat platforms?",
-                a: "RoleFlow is built specifically for software engineers and intellectual inquiries. Unlike generic chatbots, RoleFlow features interactive Claude-style Artifacts (with live preview and 1-click ZIP export), adaptive reasoning effort controls (Low to Max), and project workspaces that retain dedicated custom instructions.",
+                a: "RoleFlow is built specifically for software engineers and intellectual inquiries. Unlike generic chatbots, RoleFlow features interactive Artifacts (with live preview and 1-click ZIP export), adaptive reasoning effort controls (Low to Max), and project workspaces that retain dedicated custom instructions.",
               },
               {
-                q: "How do Claude-Style Artifacts work?",
+                q: "How do Interactive Artifacts work?",
                 a: "When RoleFlow generates web apps, games, UI components, or diagrams, it packages them into an interactive Artifact. You can run, test, and interact with the code in an isolated sandboxed iframe directly in your browser, or export a ready-to-deploy ZIP archive with a single click.",
               },
               {

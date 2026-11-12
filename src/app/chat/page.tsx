@@ -51,8 +51,62 @@ export default function ChatPage() {
   const [selectedProjectId, setSelectedProjectId] = useState<string | undefined>(undefined);
   const [activeArtifact, setActiveArtifact] = useState<Artifact | null>(null);
   const [isLoading, setIsLoading] = useState(false);
+  const [thinkingSeconds, setThinkingSeconds] = useState(0);
+  const [isLiveTyping, setIsLiveTyping] = useState(false);
+  const thinkingTimerRef = useRef<NodeJS.Timeout | null>(null);
 
   const messagesEndRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    return () => {
+      if (thinkingTimerRef.current) clearInterval(thinkingTimerRef.current);
+    };
+  }, []);
+
+  const streamAssistantMessage = (fullMessage: Message) => {
+    const fullContent = fullMessage.content || "";
+    if (!fullContent) {
+      setMessages((prev) => [...prev, fullMessage]);
+      setIsLoading(false);
+      return;
+    }
+
+    const streamingMsg: Message = {
+      ...fullMessage,
+      content: "",
+    };
+
+    setMessages((prev) => [...prev, streamingMsg]);
+    setIsLoading(false);
+    setIsLiveTyping(true);
+
+    let currentIndex = 0;
+    const totalLength = fullContent.length;
+    const step = Math.max(3, Math.ceil(totalLength / 50));
+
+    const intervalId = setInterval(() => {
+      currentIndex = Math.min(totalLength, currentIndex + step);
+      const slice = fullContent.slice(0, currentIndex);
+
+      setMessages((prev) => {
+        if (prev.length === 0) return prev;
+        const updated = [...prev];
+        const last = updated[updated.length - 1];
+        if (last && last.id === fullMessage.id) {
+          updated[updated.length - 1] = { ...last, content: slice };
+        }
+        return updated;
+      });
+
+      if (currentIndex >= totalLength) {
+        clearInterval(intervalId);
+        setIsLiveTyping(false);
+        if (fullMessage.artifact) {
+          setActiveArtifact(fullMessage.artifact);
+        }
+      }
+    }, 18);
+  };
 
   // Restore or initialize user/guest identity
   useEffect(() => {
@@ -222,6 +276,12 @@ export default function ChatPage() {
     const newMessages = [...messages, userMessage];
     setMessages(newMessages);
     setIsLoading(true);
+    setThinkingSeconds(0);
+    const startThinkingTime = Date.now();
+    if (thinkingTimerRef.current) clearInterval(thinkingTimerRef.current);
+    thinkingTimerRef.current = setInterval(() => {
+      setThinkingSeconds((Date.now() - startThinkingTime) / 1000);
+    }, 100);
 
     if (!user) {
       const updatedCount = guestMessagesCount + 1;
@@ -255,6 +315,11 @@ export default function ChatPage() {
       });
 
       const data = await res.json();
+      if (thinkingTimerRef.current) {
+        clearInterval(thinkingTimerRef.current);
+        thinkingTimerRef.current = null;
+      }
+
       if (!res.ok) {
         if (data.isBanned) {
           const banMessage: Message = {
@@ -294,10 +359,10 @@ export default function ChatPage() {
         }
       }
 
-      setMessages((prev) => [...prev, data.message]);
-
-      if (data.message.artifact) {
-        setActiveArtifact(data.message.artifact);
+      const finalElapsed = Number(((Date.now() - startThinkingTime) / 1000).toFixed(1));
+      if (data.message) {
+        data.message.thinkingTime = data.message.thinkingTime || finalElapsed;
+        streamAssistantMessage(data.message);
       }
 
       if (!currentChatId && data.chatId) {
@@ -306,6 +371,10 @@ export default function ChatPage() {
 
       fetchUserChats(effectiveUserId);
     } catch (err: any) {
+      if (thinkingTimerRef.current) {
+        clearInterval(thinkingTimerRef.current);
+        thinkingTimerRef.current = null;
+      }
       console.error("Chat error:", err);
       const errorMessage: Message = {
         id: "msg-" + Date.now(),
@@ -334,6 +403,13 @@ export default function ChatPage() {
     setMessages(trimmed);
 
     setIsLoading(true);
+    setThinkingSeconds(0);
+    const startThinkingTime = Date.now();
+    if (thinkingTimerRef.current) clearInterval(thinkingTimerRef.current);
+    thinkingTimerRef.current = setInterval(() => {
+      setThinkingSeconds((Date.now() - startThinkingTime) / 1000);
+    }, 100);
+
     const effectiveUserId = getEffectiveUserId();
 
     fetch("/api/chat", {
@@ -356,15 +432,26 @@ export default function ChatPage() {
     })
       .then((r) => r.json())
       .then((data) => {
+        if (thinkingTimerRef.current) {
+          clearInterval(thinkingTimerRef.current);
+          thinkingTimerRef.current = null;
+        }
         if (data.usage) {
           setUsageStats(data.usage);
         }
         if (data.message) {
-          setMessages((prev) => [...prev, data.message]);
-          if (data.message.artifact) setActiveArtifact(data.message.artifact);
+          const finalElapsed = Number(((Date.now() - startThinkingTime) / 1000).toFixed(1));
+          data.message.thinkingTime = data.message.thinkingTime || finalElapsed;
+          streamAssistantMessage(data.message);
         }
       })
-      .catch((err) => console.error(err))
+      .catch((err) => {
+        if (thinkingTimerRef.current) {
+          clearInterval(thinkingTimerRef.current);
+          thinkingTimerRef.current = null;
+        }
+        console.error(err);
+      })
       .finally(() => setIsLoading(false));
   };
 
@@ -395,7 +482,7 @@ export default function ChatPage() {
   const activeProject = projects.find((p) => p.id === selectedProjectId);
 
   return (
-    <div className="flex h-screen w-screen overflow-hidden claude-mesh-bg text-[#f4f4f0]">
+    <div className="flex h-screen w-screen overflow-hidden roleflow-mesh-bg text-[#f4f4f0]">
       {/* Sidebar */}
       <Sidebar
         isOpen={sidebarOpen}
@@ -418,6 +505,7 @@ export default function ChatPage() {
         }}
         onOpenSettings={() => setSettingsModalOpen(true)}
         onSignOut={handleSignOut}
+        onClearConversation={handleNewChat}
       />
 
       {/* Main Chat Center Pane */}
@@ -436,11 +524,13 @@ export default function ChatPage() {
             setAuthModalOpen(true);
           }}
           onOpenSettings={() => setSettingsModalOpen(true)}
+          onClearConversation={handleNewChat}
+          onSignOut={handleSignOut}
         />
 
         <div className="flex-1 flex flex-col overflow-y-auto">
           {messages.length === 0 ? (
-            /* Blank Canvas (Luxury Claude Layout) */
+            /* Blank Canvas (RoleFlow Workspace) */
             <div className="flex-1 flex flex-col items-center justify-center p-6 text-center max-w-2xl mx-auto w-full">
               {/* Logo & Greeting */}
               <div className="flex items-center justify-center gap-3.5 mb-7">
@@ -492,22 +582,23 @@ export default function ChatPage() {
             /* Active Message Flow */
             <div className="flex-1 flex flex-col">
               <div className="flex-1 overflow-y-auto divide-y divide-[#222120]/40 pb-36">
-                {messages.map((message) => (
+                {messages.map((message, index) => (
                   <MessageItem
                     key={message.id}
                     message={message}
                     onEdit={handleEditMessage}
                     onRegenerate={handleRegenerate}
                     onOpenArtifact={(art) => setActiveArtifact(art)}
+                    isStreaming={isLiveTyping && index === messages.length - 1}
                   />
                 ))}
 
                 {isLoading && (
                   <div className="w-full max-w-3xl mx-auto py-5 px-4 animate-message">
-                    <div className="flex items-center gap-3 text-sm text-[#999894]">
-                      <div className="w-2 h-2 rounded-full bg-[#d97706] animate-ping" />
-                      <span className="font-serif text-[#c5c4be]">
-                        RoleFlow is reasoning...
+                    <div className="inline-flex items-center gap-2.5 px-3.5 py-1.5 rounded-full bg-[#1b1a19] border border-[#2d2c2a] shadow-sm select-none">
+                      <span className="w-2 h-2 rounded-full bg-[#d97706] animate-ping" />
+                      <span className="font-mono text-xs text-[#d97706] font-medium">
+                        Thinking for {thinkingSeconds.toFixed(1)}s...
                       </span>
                     </div>
                   </div>
@@ -535,7 +626,7 @@ export default function ChatPage() {
         </div>
       </div>
 
-      {/* Slide-out Claude Artifacts Panel */}
+      {/* Slide-out RoleFlow Artifacts Panel */}
       {activeArtifact && (
         <ArtifactsPanel
           artifact={activeArtifact}
@@ -560,6 +651,10 @@ export default function ChatPage() {
           onUpdate={(updated) => {
             setUser(updated);
             localStorage.setItem("roleflow_user", JSON.stringify(updated));
+          }}
+          onAllChatsDeleted={() => {
+            setChats([]);
+            handleNewChat();
           }}
         />
       )}

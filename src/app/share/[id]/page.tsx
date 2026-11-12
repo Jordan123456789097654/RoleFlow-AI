@@ -65,9 +65,18 @@ export default async function SharePage({ params }: { params: { id: string } }) 
 
       {/* Messages */}
       <main className="flex-1 max-w-3xl mx-auto w-full py-6 space-y-4">
-        {chat.messages.map((message) => (
-          <MessageItem key={message.id} message={message} />
-        ))}
+        {chat.messages.map((message) => {
+          // Sanitize message: strip any internal audit or user identity metadata
+          const sanitizedMsg = {
+            id: message.id,
+            role: message.role,
+            content: message.content,
+            thinkingTime: message.thinkingTime,
+            artifact: message.artifact,
+            createdAt: message.createdAt,
+          };
+          return <MessageItem key={message.id} message={sanitizedMsg} />;
+        })}
       </main>
 
       <footer className="py-6 border-t border-[#242321] text-center text-xs text-[#73726e]">

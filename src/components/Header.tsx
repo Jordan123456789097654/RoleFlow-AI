@@ -6,6 +6,7 @@ import { EffortLevel, ModelId, Project, UserProfile } from "@/types";
 import { formatCleanName } from "@/lib/format";
 import { ModelSelector } from "./ModelSelector";
 import { EffortDropdown } from "./EffortDropdown";
+import { UserAvatarMenu } from "./UserAvatarMenu";
 
 interface HeaderProps {
   model: ModelId;
@@ -18,6 +19,8 @@ interface HeaderProps {
   user: UserProfile | null;
   onOpenAuth: () => void;
   onOpenSettings: () => void;
+  onClearConversation?: () => void;
+  onSignOut?: () => void;
 }
 
 export const Header: React.FC<HeaderProps> = ({
@@ -31,6 +34,8 @@ export const Header: React.FC<HeaderProps> = ({
   user,
   onOpenAuth,
   onOpenSettings,
+  onClearConversation,
+  onSignOut,
 }) => {
   return (
     <header className="h-14 px-4 border-b border-[#242321] bg-[#141413] flex items-center justify-between shrink-0 z-20">
@@ -59,14 +64,13 @@ export const Header: React.FC<HeaderProps> = ({
         <EffortDropdown effort={effort} onChange={onEffortChange} />
 
         {user ? (
-          <button
-            type="button"
-            onClick={onOpenSettings}
-            className="w-8 h-8 rounded-full bg-[#262624] border border-[#383734] flex items-center justify-center text-xs font-semibold text-[#d97706] hover:border-[#d97706] transition-colors"
-            title={formatCleanName(user.name, user.email)}
-          >
-            {formatCleanName(user.name, user.email).charAt(0).toUpperCase()}
-          </button>
+          <UserAvatarMenu
+            user={user}
+            onOpenSettings={onOpenSettings}
+            onClearConversation={onClearConversation}
+            onSignOut={onSignOut}
+            position="top-right"
+          />
         ) : (
           <button
             type="button"

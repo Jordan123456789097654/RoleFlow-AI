@@ -1,31 +1,34 @@
 import { NextRequest, NextResponse } from "next/server";
 import { generateRoleFlowResponse } from "@/lib/ai-engine";
 import { db, ADMIN_EMAIL } from "@/lib/db";
-import { Chat, Message, ModerationLogEntry } from "@/types";
+import { Chat, Message, ModerationLogEntry, ModelId, EffortLevel } from "@/types";
 import { scanMessage } from "@/lib/moderation";
 import { sendSecurityAlertEmail } from "@/lib/email";
+import { getMemories, addMemory, removeMemory } from "@/lib/memory";
+import { getSessionFromRequest } from "@/lib/auth";
 
-function extractUserFromReq(req: NextRequest): { userId?: string; userEmail?: string } {
-  let userId = req.headers.get("x-user-id") || undefined;
-  let userEmail = req.headers.get("x-user-email") || undefined;
-
-  const cookie = req.cookies.get("roleflow_user");
-  if (cookie?.value) {
-    try {
-      const parsed = JSON.parse(decodeURIComponent(cookie.value));
-      if (parsed?.id) userId = parsed.id;
-      if (parsed?.email) userEmail = parsed.email;
-    } catch {}
-  }
-  return { userId, userEmail };
-}
+const ALLOWED_MODELS: ModelId[] = ["roleflow-genesis-1", "roleflow-flash-1"];
+const ALLOWED_EFFORTS: EffortLevel[] = ["low", "medium", "high", "extra", "max"];
 
 export async function POST(req: NextRequest) {
   try {
     const body = await req.json();
-    const authData = extractUserFromReq(req);
-    const userId = body.userId || authData.userId;
-    let userEmail = body.userEmail || authData.userEmail;
+    const session = getSessionFromRequest(req);
+
+    // Cryptographic Session Priority: Never trust raw client-provided identity for user accounts
+    let userId = session?.userId;
+    let userEmail = session?.email;
+
+    // If unauthenticated, fallback to secure guest isolation
+    if (!userId) {
+      const guestId = body.guestId || req.cookies.get("roleflow_guest_id")?.value;
+      if (guestId && typeof guestId === "string" && guestId.startsWith("guest_")) {
+        userId = guestId.slice(0, 36);
+      } else {
+        const ipHash = (req.headers.get("x-forwarded-for")?.split(",")[0]?.trim() || "127.0.0.1").replace(/[^a-zA-Z0-9]/g, "");
+        userId = `guest_${ipHash.slice(0, 16)}`;
+      }
+    }
 
     const {
       chatId,
@@ -38,6 +41,16 @@ export async function POST(req: NextRequest) {
 
     if (!messages || !Array.isArray(messages) || messages.length === 0) {
       return NextResponse.json({ error: "Messages array required" }, { status: 400 });
+    }
+
+    const safeModel: ModelId = ALLOWED_MODELS.includes(model) ? model : "roleflow-genesis-1";
+    const safeEffort: EffortLevel = ALLOWED_EFFORTS.includes(effort) ? effort : "medium";
+
+    // Cap conversation history to 30 messages to prevent token budget abuse
+    const cappedMessages = messages.slice(-30);
+    const latestUserMsg = [...cappedMessages].reverse().find((m: Message) => m.role === "user");
+    if (latestUserMsg && latestUserMsg.content && latestUserMsg.content.length > 16000) {
+      latestUserMsg.content = latestUserMsg.content.slice(0, 16000);
     }
 
     // Resolve user profile if user id provided without email
@@ -96,7 +109,6 @@ export async function POST(req: NextRequest) {
       "127.0.0.1";
 
     // 1. Run Trust & Safety Hybrid Scanner Before Model Generation
-    const latestUserMsg = [...messages].reverse().find((m: Message) => m.role === "user");
     const promptToScan = latestUserMsg ? latestUserMsg.content : "";
     const moderationVerdict = scanMessage(promptToScan);
 
@@ -254,24 +266,60 @@ export async function POST(req: NextRequest) {
       }
     }
 
+    // Retrieve persistent user memories
+    let persistentMemories: string[] = [];
+    if (userId && !isGuest) {
+      try {
+        const memItems = await getMemories(userId);
+        persistentMemories = memItems.map((m) => m.memory);
+      } catch (e) {
+        console.warn("Failed to load user memories for chat:", e);
+      }
+    }
+
     // Generate response from RoleFlow AI Engine
     const result = await generateRoleFlowResponse({
-      messages,
-      model,
-      effort,
+      messages: cappedMessages,
+      model: safeModel,
+      effort: safeEffort,
       customInstructions: effectiveInstructions,
+      memories: persistentMemories,
     });
+
+    // Auto-persist memories added or removed by AI
+    if (userId && !isGuest) {
+      if (result.memoriesAdded && result.memoriesAdded.length > 0) {
+        for (const added of result.memoriesAdded) {
+          try {
+            await addMemory(userId, added);
+          } catch (e) {}
+        }
+      }
+      if (result.memoriesRemoved && result.memoriesRemoved.length > 0) {
+        try {
+          const allMems = await getMemories(userId);
+          for (const rem of result.memoriesRemoved) {
+            const match = allMems.find((m) =>
+              m.memory.toLowerCase().includes(rem.toLowerCase())
+            );
+            if (match) {
+              await removeMemory(userId, match.id);
+            }
+          }
+        } catch (e) {}
+      }
+    }
 
     const assistantMessage: Message = {
       id: "msg-" + Date.now(),
       role: "assistant",
       content: result.content,
-      thinking: result.thinking,
+      thinkingTime: result.thinkingTime || 1.2,
       artifact: result.artifact,
       createdAt: new Date().toISOString(),
     };
 
-    const updatedMessages = [...messages, assistantMessage];
+    const updatedMessages = [...cappedMessages, assistantMessage];
 
     // Persist chat to Database strictly under user
     const currentChatId = chatId || "chat-" + Date.now();

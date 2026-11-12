@@ -14,10 +14,12 @@ import {
   ChevronLeft,
   ChevronRight,
   Trash2,
+  Shield,
 } from "lucide-react";
 import { Chat, Project, UserProfile } from "@/types";
 import { formatCleanName } from "@/lib/format";
 import { Logo } from "./Logo";
+import { UserAvatarMenu } from "./UserAvatarMenu";
 
 interface SidebarProps {
   isOpen: boolean;
@@ -37,6 +39,7 @@ interface SidebarProps {
   onOpenAuth: () => void;
   onOpenSettings: () => void;
   onSignOut: () => void;
+  onClearConversation?: () => void;
 }
 
 export const Sidebar: React.FC<SidebarProps> = ({
@@ -57,6 +60,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
   onOpenAuth,
   onOpenSettings,
   onSignOut,
+  onClearConversation,
 }) => {
   const [searchQuery, setSearchQuery] = useState("");
 
@@ -267,14 +271,18 @@ export const Sidebar: React.FC<SidebarProps> = ({
       <div className="p-3 border-t border-[#242321] bg-[#11100f]">
         {user ? (
           <div className="flex items-center justify-between">
-            <div
-              className="flex items-center gap-2.5 cursor-pointer hover:opacity-80 transition-opacity truncate"
-              onClick={onOpenSettings}
-            >
-              <div className="w-8 h-8 rounded-full bg-[#272624] border border-[#383734] flex items-center justify-center text-xs font-semibold text-[#d97706]">
-                {formatCleanName(user.name, user.email).charAt(0).toUpperCase()}
-              </div>
-              <div className="truncate">
+            <div className="flex items-center gap-2.5 truncate">
+              <UserAvatarMenu
+                user={user}
+                onOpenSettings={onOpenSettings}
+                onClearConversation={onClearConversation}
+                onSignOut={onSignOut}
+                position="bottom-left"
+              />
+              <div
+                className="truncate cursor-pointer hover:opacity-85 transition-opacity"
+                onClick={onOpenSettings}
+              >
                 <div className="text-xs font-medium text-[#f3f3ee] truncate flex items-center gap-1.5">
                   <span className="truncate">{formatCleanName(user.name, user.email)}</span>
                   {(Boolean(user.isAdmin) || user.email.toLowerCase() === "jordanedanield13@gmail.com") && (
@@ -290,11 +298,20 @@ export const Sidebar: React.FC<SidebarProps> = ({
             </div>
 
             <div className="flex items-center gap-1">
+              {(Boolean(user.isAdmin) || user.email.toLowerCase() === "jordanedanield13@gmail.com") && (
+                <Link
+                  href="/admin"
+                  className="p-1.5 text-amber-400 hover:text-amber-300 hover:bg-amber-500/10 rounded-lg transition-colors border border-amber-500/20"
+                  title="Admin Console"
+                >
+                  <Shield className="w-4 h-4" />
+                </Link>
+              )}
               <button
                 type="button"
                 onClick={onOpenSettings}
                 className="p-1.5 text-[#9b9a97] hover:text-[#f3f3ee] hover:bg-[#22211f] rounded-lg transition-colors"
-                title="Settings & Instructions"
+                title="Settings"
               >
                 <Settings className="w-4 h-4" />
               </button>

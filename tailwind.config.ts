@@ -12,7 +12,7 @@ const config: Config = {
       colors: {
         background: "var(--background)",
         foreground: "var(--foreground)",
-        claude: {
+        roleflow: {
           bg: "#18181b",
           dark: "#141413",
           surface: "#1f1e1d",

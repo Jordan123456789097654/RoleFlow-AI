@@ -40,7 +40,7 @@ export const Footer: React.FC = () => {
               </li>
               <li>
                 <a href="/#features" className="hover:text-[#f4f4f0] transition-colors">
-                  Claude Artifacts
+                  Interactive Artifacts
                 </a>
               </li>
               <li>
@@ -51,11 +51,6 @@ export const Footer: React.FC = () => {
               <li>
                 <a href="/#models" className="hover:text-[#f4f4f0] transition-colors">
                   Flash 1.0 (Ultra-Fast)
-                </a>
-              </li>
-              <li>
-                <a href="/#pricing" className="hover:text-[#f4f4f0] transition-colors">
-                  Pricing & Quotas
                 </a>
               </li>
               <li>

@@ -11,9 +11,9 @@ import {
   Code2,
   FileText,
   ChevronRight,
-  Brain,
   Terminal,
   ShieldAlert,
+  Sparkles,
 } from "lucide-react";
 import { Message, Artifact } from "@/types";
 
@@ -22,6 +22,7 @@ interface MessageItemProps {
   onEdit?: (messageId: string, newContent: string) => void;
   onRegenerate?: () => void;
   onOpenArtifact?: (artifact: Artifact) => void;
+  isStreaming?: boolean;
 }
 
 export const MessageItem: React.FC<MessageItemProps> = ({
@@ -29,6 +30,7 @@ export const MessageItem: React.FC<MessageItemProps> = ({
   onEdit,
   onRegenerate,
   onOpenArtifact,
+  isStreaming = false,
 }) => {
   const isUser = message.role === "user";
   const isBlocked = Boolean(message.moderationBlocked);
@@ -38,7 +40,6 @@ export const MessageItem: React.FC<MessageItemProps> = ({
   const [feedback, setFeedback] = useState<"up" | "down" | null>(null);
   const [isEditing, setIsEditing] = useState(false);
   const [editContent, setEditContent] = useState(message.content);
-  const [isThinkingOpen, setIsThinkingOpen] = useState(false);
 
   // Moderation Appeal State
   const [isAppealing, setIsAppealing] = useState(false);
@@ -357,38 +358,20 @@ export const MessageItem: React.FC<MessageItemProps> = ({
   return (
     <div className="w-full max-w-3xl mx-auto py-5 px-4 animate-message">
       <div className="space-y-4">
-        {/* Thinking Accordion (Claude/Reasoning luxury style) */}
-        {message.thinking && (
-          <div className="rounded-xl border border-[#2c2b29] bg-[#1a1918]/60 overflow-hidden">
-            <button
-              type="button"
-              onClick={() => setIsThinkingOpen(!isThinkingOpen)}
-              className="w-full flex items-center justify-between px-3.5 py-2 text-xs font-medium text-[#8f8e8a] hover:text-[#f4f4f0] transition-colors select-none"
-            >
-              <div className="flex items-center gap-2">
-                <Brain className="w-3.5 h-3.5 text-[#d97706]" />
-                <span>Reasoning Process</span>
-              </div>
-              <ChevronRight
-                className={`w-3.5 h-3.5 transition-transform duration-200 ${
-                  isThinkingOpen ? "rotate-90 text-[#f4f4f0]" : "text-[#777672]"
-                }`}
-              />
-            </button>
-
-            {isThinkingOpen && (
-              <div className="px-4 pb-3.5 pt-1 text-[12.5px] font-sans text-[#8f8e8a] leading-relaxed border-t border-[#262523] bg-[#141413]/50">
-                <div className="border-l-2 border-[#d97706]/40 pl-3 py-1 whitespace-pre-wrap font-mono text-xs">
-                  {message.thinking}
-                </div>
-              </div>
-            )}
+        {/* Thought for X.Xs subtle badge */}
+        {message.role === "assistant" && typeof message.thinkingTime === "number" && (
+          <div className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-[#1b1a19] border border-[#2a2927] text-xs text-[#8f8e8a] font-mono select-none">
+            <Sparkles className="w-3.5 h-3.5 text-[#d97706]" />
+            <span>Thought for {Number(message.thinkingTime).toFixed(1)}s</span>
           </div>
         )}
 
-        {/* Editorial Claude Typography */}
-        <div className="font-claude-serif text-[15.5px] leading-[1.75] text-[#ebebe5] select-text">
+        {/* Editorial Typography */}
+        <div className="font-roleflow-serif text-[15.5px] leading-[1.75] text-[#ebebe5] select-text">
           {renderFormattedContent(message.content)}
+          {isStreaming && (
+            <span className="inline-block w-2 h-4 ml-1 bg-[#d97706] animate-pulse align-middle rounded-sm" />
+          )}
         </div>
 
         {/* Artifact Slideout Card */}
@@ -417,7 +400,7 @@ export const MessageItem: React.FC<MessageItemProps> = ({
           </div>
         )}
 
-        {/* Claude Action Row: Copy, Thumbs Up, Thumbs Down, Regenerate */}
+        {/* Action Row: Copy, Thumbs Up, Thumbs Down, Regenerate */}
         <div className="flex items-center gap-1.5 pt-1 text-[#807f7b]">
           <button
             type="button"

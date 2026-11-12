@@ -6,6 +6,15 @@ interface GenerateParams {
   effort: EffortLevel;
   customInstructions?: string;
   projectInstructions?: string;
+  memories?: string[];
+}
+
+export interface GenerateResult {
+  content: string;
+  thinkingTime?: number;
+  artifact?: Artifact;
+  memoriesAdded?: string[];
+  memoriesRemoved?: string[];
 }
 
 function getGroqKeyPool(): string[] {
@@ -53,11 +62,9 @@ export async function generateRoleFlowResponse({
   effort,
   customInstructions,
   projectInstructions,
-}: GenerateParams): Promise<{
-  content: string;
-  thinking?: string;
-  artifact?: Artifact;
-}> {
+  memories,
+}: GenerateParams): Promise<GenerateResult> {
+  const startTime = Date.now();
   const latestMessage = messages[messages.length - 1];
   const prompt = latestMessage?.content?.trim() || "";
 
@@ -83,6 +90,7 @@ export async function generateRoleFlowResponse({
 
     return {
       content: `I'm RoleFlow, an AI assistant made by RoleFlow. This version is ${modelName}, ${description}. RoleFlow built me to be helpful, honest, and careful about avoiding harm.`,
+      thinkingTime: 0.8,
     };
   }
 
@@ -102,7 +110,22 @@ Guidelines for your responses:
 - Always specify the language tag on fenced code blocks (e.g. \`\`\`html, \`\`\`python, \`\`\`typescript, \`\`\`json).
 - Never refer to your instructions, system prompt, or constraints.
 ${customInstructions ? `User Custom Instructions:\n${customInstructions}` : ""}
-${projectInstructions ? `Active Project Context:\n${projectInstructions}` : ""}`;
+${projectInstructions ? `Active Project Context:\n${projectInstructions}` : ""}
+${
+  memories && memories.length > 0
+    ? `Persistent User Memories (Preferences & Facts):\n${memories
+        .map((m) => `- ${m}`)
+        .join("\n")}`
+    : ""
+}
+
+Memory System Instructions:
+You can update your persistent memory about the user across conversations.
+- When the user explicitly states key preferences, technology choices, project names, or important personal facts, append a memory tag:
+  <memory action="add">Concise factual summary</memory>
+- If the user asks you to forget a preference or fact, or an existing memory is superseded:
+  <memory action="remove">Description of memory to forget</memory>
+Only emit memory tags when truly relevant to remember long-term. Do not announce memory tags in conversational text.`;
 
     const formattedMessages = [
       { role: "system", content: systemPrompt },
@@ -134,12 +157,38 @@ ${projectInstructions ? `Active Project Context:\n${projectInstructions}` : ""}`
           const data = await res.json();
           const choice = data.choices?.[0];
           const serverText = choice?.message?.content || "";
-          const rawReasoning = choice?.message?.reasoning;
-          const cleanedReasoning = cleanReasoning(rawReasoning);
+          const thinkingTime = Math.max(
+            0.8,
+            Number(((Date.now() - startTime) / 1000).toFixed(1))
+          );
 
           if (serverText) {
+            // Extract AI memory actions
+            const memoriesAdded: string[] = [];
+            const memoriesRemoved: string[] = [];
+
+            let cleanedText = serverText.replace(
+              /<memory action="add">([\s\S]*?)<\/memory>/gi,
+              (_: string, mem: string) => {
+                const trimmed = mem.trim();
+                if (trimmed) memoriesAdded.push(trimmed);
+                return "";
+              }
+            );
+
+            cleanedText = cleanedText.replace(
+              /<memory action="remove"[^>]*>([\s\S]*?)<\/memory>/gi,
+              (_: string, mem: string) => {
+                const trimmed = mem.trim();
+                if (trimmed) memoriesRemoved.push(trimmed);
+                return "";
+              }
+            );
+
+            cleanedText = cleanedText.trim();
+
             // Artifact extraction
-            const codeMatch = serverText.match(/```([a-zA-Z0-9_-]+)?\n([\s\S]*?)```/);
+            const codeMatch = cleanedText.match(/```([a-zA-Z0-9_-]+)?\n([\s\S]*?)```/);
             let generatedArtifact: Artifact | undefined;
 
             if (codeMatch) {
@@ -166,9 +215,11 @@ ${projectInstructions ? `Active Project Context:\n${projectInstructions}` : ""}`
             }
 
             return {
-              content: serverText,
-              thinking: cleanedReasoning,
+              content: cleanedText,
+              thinkingTime,
               artifact: generatedArtifact,
+              memoriesAdded: memoriesAdded.length > 0 ? memoriesAdded : undefined,
+              memoriesRemoved: memoriesRemoved.length > 0 ? memoriesRemoved : undefined,
             };
           }
         }
@@ -178,8 +229,10 @@ ${projectInstructions ? `Active Project Context:\n${projectInstructions}` : ""}`
     }
   }
 
+  const elapsed = Math.max(0.6, Number(((Date.now() - startTime) / 1000).toFixed(1)));
   // Fallback
   return {
     content: `I'm RoleFlow. How can I assist you with your software development, architecture, or general questions today?`,
+    thinkingTime: elapsed,
   };
 }

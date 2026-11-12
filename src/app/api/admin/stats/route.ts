@@ -1,41 +1,15 @@
 import { NextRequest, NextResponse } from "next/server";
-import { db, ADMIN_EMAIL } from "@/lib/db";
+import { db } from "@/lib/db";
+import { getSessionFromRequest } from "@/lib/auth";
 
 export const dynamic = "force-dynamic";
 
 export async function GET(req: NextRequest) {
   try {
-    const userId = req.headers.get("x-user-id");
-    const userEmail = req.headers.get("x-user-email");
+    // Authenticate requester using cryptographically signed session
+    const session = getSessionFromRequest(req);
 
-    // Authenticate requester as admin
-    let isAdmin = false;
-    if (userEmail && userEmail.toLowerCase() === ADMIN_EMAIL.toLowerCase()) {
-      isAdmin = true;
-    } else if (userId) {
-      const u = await db.getUserById(userId);
-      if (u && (u.isAdmin || u.email.toLowerCase() === ADMIN_EMAIL.toLowerCase())) {
-        isAdmin = true;
-      }
-    }
-
-    // Also check cookie if not present in headers
-    if (!isAdmin) {
-      const cookie = req.cookies.get("roleflow_user");
-      if (cookie?.value) {
-        try {
-          const parsed = JSON.parse(decodeURIComponent(cookie.value));
-          if (
-            parsed.isAdmin ||
-            parsed.email?.toLowerCase() === ADMIN_EMAIL.toLowerCase()
-          ) {
-            isAdmin = true;
-          }
-        } catch {}
-      }
-    }
-
-    if (!isAdmin) {
+    if (!session || !session.isAdmin) {
       return NextResponse.json(
         { error: "Forbidden: Admin privileges required." },
         { status: 403 }

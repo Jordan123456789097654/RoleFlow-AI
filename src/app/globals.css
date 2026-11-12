@@ -21,7 +21,7 @@ body {
 }
 
 /* Luxury background depth */
-.claude-mesh-bg {
+.roleflow-mesh-bg {
   background: radial-gradient(circle at 50% 0%, rgba(217, 119, 6, 0.04) 0%, transparent 60%),
               radial-gradient(circle at 100% 100%, rgba(234, 88, 12, 0.03) 0%, transparent 40%),
               #141413;
@@ -43,8 +43,8 @@ body {
   background: #4a4845;
 }
 
-/* Claude Signature Editorial Typography */
-.font-claude-serif {
+/* RoleFlow Signature Editorial Typography */
+.font-roleflow-serif {
   font-family: Georgia, Cambria, "Times New Roman", Times, serif;
 }
 
