@@ -18,15 +18,28 @@ const MAX_TURNS_IN_CONTEXT = 12;
 
 /** Text that the keyword scanner should check for an attachment-bearing message. */
 export function buildAttachmentScanText(message?: Message): string {
+  // Only text attachments are keyword-scanned. Image filenames are excluded: leetspeak
+  // normalization turns names like "IMG_4015.jpg" into false matches, and the image
+  // pixels are checked by the vision classifier instead.
   if (!message?.attachments?.length) return "";
   return message.attachments
-    .map((a) => (isImageAttachment(a) ? a.name : `${a.name}\n${a.content.slice(0, MAX_SCAN_CHARS)}`))
+    .filter((a) => !isImageAttachment(a))
+    .map((a) => `${a.name}\n${a.content.slice(0, MAX_SCAN_CHARS)}`)
     .join("\n");
 }
 
-const SAFETY_SYSTEM_PROMPT = `You are a trust and safety classifier. Examine the attached image(s) and reply with JSON only, with no other text:
+const SAFETY_SYSTEM_PROMPT = `You are an image safety classifier for a general-purpose assistant. Most uploads are harmless: photos, screenshots, memes, documents, art, games, food, pets, selfies, medical or educational images, and fiction. Your default answer is NOT flagged.
+
+Reply with JSON only, no other text:
 {"flagged": boolean, "category": "CSAM" | "WEAPONS_MANUFACTURING" | "VIOLENT_EXTREMISM" | "SELF_HARM" | "NONE", "reason": "one short sentence"}
-Flag only clear, serious violations: sexual content involving minors, instructions or diagrams for weapons or explosives, extremist propaganda, or imagery promoting self-harm. Do not flag ordinary photos, screenshots, documents, art, or medical or educational content.`;
+
+Set "flagged": true ONLY when the image clearly shows one of these:
+- CSAM: sexual or sexualized depiction of a minor.
+- WEAPONS_MANUFACTURING: step-by-step build instructions, blueprints, or schematics for explosives, chemical or biological weapons, or illegal weapon conversions. Ordinary photos of firearms, knives, tools, or fireworks are NOT flagged.
+- VIOLENT_EXTREMISM: propaganda or recruitment material for a terrorist organization.
+- SELF_HARM: content that encourages or instructs self-harm or suicide. Wounds, scars, or medical photos without encouragement are NOT flagged.
+
+If you are not clearly confident, answer "flagged": false and "category": "NONE".`;
 
 const KNOWN_IMAGE_CATEGORIES: Record<string, ModerationCategory> = {
   CSAM: "CSAM",
@@ -96,10 +109,11 @@ export async function classifyImagesForSafety(images: Attachment[]): Promise<Mod
   } catch {
     parsed = null;
   }
-  if (!parsed?.flagged) return allow;
+  // A flag only counts with a known category. "NONE", a missing label, or an unrecognized
+  // label used to fall through to IMAGE_REVIEW, which blocked ordinary images.
+  const category = KNOWN_IMAGE_CATEGORIES[parsed?.category ?? ""];
+  if (!parsed?.flagged || !category) return allow;
 
-  const category: ModerationCategory =
-    KNOWN_IMAGE_CATEGORIES[parsed.category ?? ""] ?? "IMAGE_REVIEW";
   const tier: ModerationTier = category === "CSAM" ? 1 : 2;
 
   return {

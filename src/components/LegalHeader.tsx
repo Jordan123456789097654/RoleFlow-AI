@@ -4,13 +4,16 @@ import { Logo } from "./Logo";
 import { ArrowLeft } from "lucide-react";
 
 interface LegalHeaderProps {
-  currentPage?: "terms" | "privacy" | "acceptable-use";
+  currentPage?: "terms" | "privacy" | "acceptable-use" | "moderation" | "ai-output" | "cookies";
 }
 
 const LEGAL_LINKS = [
   { href: "/terms", label: "Terms", key: "terms" },
   { href: "/privacy", label: "Privacy", key: "privacy" },
   { href: "/acceptable-use", label: "Acceptable Use", key: "acceptable-use" },
+  { href: "/moderation", label: "Moderation", key: "moderation" },
+  { href: "/ai-output", label: "AI Output", key: "ai-output" },
+  { href: "/cookies", label: "Cookies", key: "cookies" },
 ] as const;
 
 export const LegalHeader: React.FC<LegalHeaderProps> = ({ currentPage }) => {

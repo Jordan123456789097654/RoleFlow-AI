@@ -7,7 +7,7 @@ export const Footer: React.FC = () => {
   return (
     <footer className="w-full border-t border-line bg-app text-muted">
       <div className="mx-auto max-w-6xl px-4 sm:px-6 lg:px-8 py-14">
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-10 md:gap-8">
+        <div className="grid grid-cols-2 md:grid-cols-5 gap-10 md:gap-8">
           <div className="col-span-2 space-y-4">
             <Link href="/" className="inline-block">
               <Logo size={28} />
@@ -44,6 +44,17 @@ export const Footer: React.FC = () => {
           </div>
 
           <div className="space-y-4">
+            <h4 className="text-xs font-medium text-ink">Developers</h4>
+            <ul className="space-y-3 text-sm">
+              <li>
+                <Link href="/docs/api-keys" className="inline-flex min-h-10 items-center hover:text-ink transition-colors">
+                  API Keys
+                </Link>
+              </li>
+            </ul>
+          </div>
+
+          <div className="space-y-4">
             <h4 className="text-xs font-medium text-ink">Legal</h4>
             <ul className="space-y-3 text-sm">
               <li>
@@ -59,6 +70,21 @@ export const Footer: React.FC = () => {
               <li>
                 <Link href="/acceptable-use" className="inline-flex min-h-10 items-center hover:text-ink transition-colors">
                   Acceptable Use
+                </Link>
+              </li>
+              <li>
+                <Link href="/moderation" className="inline-flex min-h-10 items-center hover:text-ink transition-colors">
+                  Moderation & Appeals
+                </Link>
+              </li>
+              <li>
+                <Link href="/ai-output" className="inline-flex min-h-10 items-center hover:text-ink transition-colors">
+                  AI Output Policy
+                </Link>
+              </li>
+              <li>
+                <Link href="/cookies" className="inline-flex min-h-10 items-center hover:text-ink transition-colors">
+                  Cookie Policy
                 </Link>
               </li>
             </ul>
