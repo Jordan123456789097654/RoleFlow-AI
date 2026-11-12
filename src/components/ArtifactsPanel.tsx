@@ -17,7 +17,10 @@ export const ArtifactsPanel: React.FC<ArtifactsPanelProps> = ({ artifact, onClos
 
   if (!artifact) return null;
 
-  const currentFile = artifact.files[activeFileIndex] || artifact.files[0];
+  const currentFile =
+    (artifact.files && artifact.files[activeFileIndex]) ||
+    (artifact.files && artifact.files[0]) ||
+    { filename: "artifact.txt", language: "text", content: "" };
   const canPreview = artifact.type === "web" || currentFile?.language === "html";
 
   const handleCopy = () => {

@@ -15,6 +15,7 @@ export interface GenerateResult {
   artifact?: Artifact;
   memoriesAdded?: string[];
   memoriesRemoved?: string[];
+  isFallback?: boolean;
 }
 
 function getGroqKeyPool(): string[] {
@@ -29,32 +30,6 @@ function getGroqKeyPool(): string[] {
 }
 
 let keyIndex = 0;
-
-// Filter out internal meta-talk and prompt-leak reasoning
-function cleanReasoning(rawReasoning?: string): string | undefined {
-  if (!rawReasoning) return undefined;
-
-  const lines = rawReasoning.split("\n");
-  const filtered = lines.filter((line) => {
-    const l = line.toLowerCase();
-    if (
-      l.includes("system is a roleplay") ||
-      l.includes("the system says") ||
-      l.includes("system instructions") ||
-      l.includes("roleplay:") ||
-      l.includes("we are roleflow") ||
-      l.includes("the prompt says") ||
-      l.includes("user says \"hi\"") ||
-      l.includes("respond politely. probably greeting")
-    ) {
-      return false;
-    }
-    return true;
-  });
-
-  const cleaned = filtered.join("\n").trim();
-  return cleaned.length > 15 ? cleaned : undefined;
-}
 
 export async function generateRoleFlowResponse({
   messages,
@@ -71,17 +46,9 @@ export async function generateRoleFlowResponse({
   const isGenesis = model === "roleflow-genesis-1";
   const modelName = isGenesis ? "RoleFlow Genesis 1.0" : "RoleFlow Flash 1.0";
 
-  // Check if user is asking "Who are you and who built you?"
-  const identityQueries = [
-    "who are you",
-    "who built you",
-    "who made you",
-    "what model are you",
-    "who created you",
-  ];
-  const isAskingIdentity = identityQueries.some((q) =>
-    prompt.toLowerCase().includes(q)
-  );
+  // Check if user is explicitly asking about assistant identity
+  const identityRegex = /^(?:who\s+(?:are\s+you|built\s+you|made\s+you|created\s+you)|what\s+model\s+are\s+you)[\s?.!]*$/i;
+  const isAskingIdentity = identityRegex.test(prompt);
 
   if (isAskingIdentity) {
     const description = isGenesis
@@ -97,8 +64,7 @@ export async function generateRoleFlowResponse({
   // Multi-Key Groq Pool with Automatic Failover
   const keyPool = getGroqKeyPool();
   if (keyPool.length > 0) {
-    // 120B for Genesis (Flagship reasoning), 27B for Flash (Ultra fast)
-    const backendModel = isGenesis ? "openai/gpt-oss-120b" : "qwen/qwen3.8-27b";
+    const backendModel = isGenesis ? "openai/gpt-oss-120b" : "llama-3.1-8b-instant";
 
     const systemPrompt = `You are RoleFlow, a frontier AI assistant developed by RoleFlow for software engineering, architecture, and general intelligence.
 Your model name is ${modelName}.
@@ -147,7 +113,7 @@ Only emit memory tags when truly relevant to remember long-term. Do not announce
             model: backendModel,
             messages: formattedMessages,
             temperature: effort === "low" ? 0.3 : effort === "max" ? 0.85 : 0.6,
-            max_tokens: effort === "max" ? 4096 : 2048,
+            max_tokens: effort === "max" || effort === "extra" ? 8192 : 4096,
           }),
         });
 
@@ -230,9 +196,10 @@ Only emit memory tags when truly relevant to remember long-term. Do not announce
   }
 
   const elapsed = Math.max(0.6, Number(((Date.now() - startTime) / 1000).toFixed(1)));
-  // Fallback
+  // Fallback when Groq is unavailable or unconfigured
   return {
     content: `I'm RoleFlow. How can I assist you with your software development, architecture, or general questions today?`,
     thinkingTime: elapsed,
+    isFallback: true,
   };
 }

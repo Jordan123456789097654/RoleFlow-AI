@@ -8,25 +8,35 @@ export const dynamic = "force-dynamic";
 export async function GET(req: NextRequest) {
   try {
     const session = getSessionFromRequest(req);
-    const searchParams = req.nextUrl.searchParams;
-    const email = searchParams.get("email") || session?.email;
-    const id = searchParams.get("id") || session?.userId;
+    if (!session || !session.userId) {
+      return NextResponse.json(
+        { error: "Unauthorized: Active session required." },
+        { status: 401 }
+      );
+    }
 
-    // Verify requester ownership if requesting specific user
-    if (session && !session.isAdmin) {
-      if (email && session.email.toLowerCase() !== email.toLowerCase()) {
-        return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+    const searchParams = req.nextUrl.searchParams;
+    const requestedEmail = searchParams.get("email");
+    const requestedId = searchParams.get("id");
+
+    // Non-admins can only view their own profile
+    if (!session.isAdmin) {
+      if (requestedEmail && requestedEmail.toLowerCase() !== session.email.toLowerCase()) {
+        return NextResponse.json({ error: "Forbidden: Access restricted." }, { status: 403 });
       }
-      if (id && session.userId !== id) {
-        return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+      if (requestedId && requestedId !== session.userId) {
+        return NextResponse.json({ error: "Forbidden: Access restricted." }, { status: 403 });
       }
     }
 
+    const targetEmail = requestedEmail || session.email;
+    const targetId = requestedId || session.userId;
+
     let user: UserProfile | null = null;
-    if (email) {
-      user = await db.getUserByEmail(email);
-    } else if (id) {
-      user = await db.getUserById(id);
+    if (targetEmail) {
+      user = await db.getUserByEmail(targetEmail);
+    } else if (targetId) {
+      user = await db.getUserById(targetId);
     }
 
     if (!user) {
@@ -48,18 +58,25 @@ export async function GET(req: NextRequest) {
 export async function PUT(req: NextRequest) {
   try {
     const session = getSessionFromRequest(req);
+    if (!session || !session.userId) {
+      return NextResponse.json(
+        { error: "Unauthorized: Active session required." },
+        { status: 401 }
+      );
+    }
+
     const body = await req.json();
     const { id, name, customInstructions, responseInstructions, email } = body;
 
-    // Strict ownership verification: Requester must have an active session and own the target account (or be admin)
-    if (session && !session.isAdmin) {
-      if (id && session.userId !== id) {
+    // Strict ownership verification: Requester must own target account unless admin
+    if (!session.isAdmin) {
+      if (id && id !== session.userId) {
         return NextResponse.json(
           { error: "Forbidden: You cannot modify another user's profile." },
           { status: 403 }
         );
       }
-      if (email && session.email.toLowerCase() !== email.toLowerCase()) {
+      if (email && email.toLowerCase() !== session.email.toLowerCase()) {
         return NextResponse.json(
           { error: "Forbidden: You cannot modify another user's profile." },
           { status: 403 }
@@ -67,39 +84,29 @@ export async function PUT(req: NextRequest) {
       }
     }
 
-    const targetUserId = session?.userId || id;
-    const targetEmail = session?.email || email;
+    const targetUserId = session.isAdmin && id ? id : session.userId;
+    const targetEmail = session.isAdmin && email ? email : session.email;
 
-    if (!targetUserId && !targetEmail) {
-      return NextResponse.json({ error: "User identity required" }, { status: 400 });
+    const existing = await db.getUserById(targetUserId) || await db.getUserByEmail(targetEmail);
+    if (!existing) {
+      return NextResponse.json({ error: "User not found" }, { status: 404 });
     }
 
-    const existing = targetEmail
-      ? await db.getUserByEmail(targetEmail)
-      : targetUserId
-      ? await db.getUserById(targetUserId)
-      : null;
-
-    const userEmail = targetEmail || existing?.email || "user@roleflow.site";
-    const isJordan = userEmail.toLowerCase() === ADMIN_EMAIL.toLowerCase();
+    const isJordan = Boolean(ADMIN_EMAIL && targetEmail.toLowerCase() === ADMIN_EMAIL);
 
     const updated: UserProfile = {
-      id: targetUserId || existing?.id || "usr-" + Date.now(),
-      email: userEmail,
-      name: name !== undefined ? name.trim() : (existing?.name || "Jordan Daniels"),
+      ...existing,
+      name: name !== undefined ? name.trim() : existing.name,
       customInstructions:
         customInstructions !== undefined
           ? customInstructions
-          : (existing?.customInstructions || ""),
+          : (existing.customInstructions || ""),
       responseInstructions:
         responseInstructions !== undefined
           ? responseInstructions
-          : (existing?.responseInstructions || ""),
-      isAdmin: isJordan ? true : (existing?.isAdmin ?? false),
-      plan: isJordan ? "ADMIN" : (existing?.plan || "FREE"),
-      messageCount: existing?.messageCount ?? 0,
-      lastResetDate: existing?.lastResetDate,
-      createdAt: existing?.createdAt || new Date().toISOString(),
+          : (existing.responseInstructions || ""),
+      isAdmin: isJordan ? true : Boolean(existing.isAdmin),
+      plan: isJordan ? "ADMIN" : (existing.plan || "FREE"),
     };
 
     const saved = await db.upsertUser(updated);

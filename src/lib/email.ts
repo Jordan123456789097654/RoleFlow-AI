@@ -133,6 +133,16 @@ export async function sendLoginEmail({
   }
 }
 
+function escapeHtml(str: string): string {
+  if (!str) return "";
+  return str
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&#039;");
+}
+
 export async function sendSecurityAlertEmail({
   userEmail,
   userId,
@@ -152,8 +162,14 @@ export async function sendSecurityAlertEmail({
   ipAddress?: string;
   logId: string;
 }) {
-  const alertRecipient = "jordanedanield13@gmail.com";
+  const alertRecipient = process.env.ADMIN_EMAIL || "security@roleflow.site";
   const subject = `🚨 [SECURITY CRITICAL] Tier ${tier} Violation Detected: ${category} (${userEmail || "Guest"})`;
+
+  const safePrompt = escapeHtml(flaggedPrompt);
+  const safeCategory = escapeHtml(category);
+  const safeUserEmail = escapeHtml(userEmail || "Guest User");
+  const safeUserId = escapeHtml(userId || "");
+  const safeIp = escapeHtml(ipAddress || "Unknown / Proxied");
 
   const htmlContent = `
 <!DOCTYPE html>
@@ -189,15 +205,15 @@ export async function sendSecurityAlertEmail({
           </tr>
           <tr>
             <td style="color: #71717a; font-weight: 500;">Violation Category:</td>
-            <td style="color: #f59e0b; font-weight: 600;">${category}</td>
+            <td style="color: #f59e0b; font-weight: 600;">${safeCategory}</td>
           </tr>
           <tr>
             <td style="color: #71717a; font-weight: 500;">User Account:</td>
-            <td style="color: #f4f4f0;">${userEmail || "Guest User"} ${userId ? `(${userId})` : ""}</td>
+            <td style="color: #f4f4f0;">${safeUserEmail} ${safeUserId ? `(${safeUserId})` : ""}</td>
           </tr>
           <tr>
             <td style="color: #71717a; font-weight: 500;">Originating IP Address:</td>
-            <td style="color: #f4f4f0; font-family: monospace;">${ipAddress || "Unknown / Proxied"}</td>
+            <td style="color: #f4f4f0; font-family: monospace;">${safeIp}</td>
           </tr>
           <tr>
             <td style="color: #71717a; font-weight: 500;">Timestamp (UTC):</td>
@@ -214,12 +230,12 @@ export async function sendSecurityAlertEmail({
             Intercepted Prompt Evidence:
           </div>
           <div style="background-color: #09090b; border: 1px solid #3f3f46; border-radius: 8px; padding: 14px; font-family: monospace; font-size: 13px; line-height: 20px; color: #e4e4e7; white-space: pre-wrap; word-break: break-word;">
-${flaggedPrompt}
+${safePrompt}
           </div>
         </div>
 
         <p style="margin: 0; font-size: 13px; color: #71717a; line-height: 20px;">
-          You can inspect this incident, review user appeals, or download the formal DHS/FBI IC3 legal dossier in the RoleFlow Admin Panel.
+          You can inspect this incident, review user appeals, or view the incident audit record in the RoleFlow Admin Panel.
         </p>
       </td>
     </tr>

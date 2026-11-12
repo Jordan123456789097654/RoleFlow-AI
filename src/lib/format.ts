@@ -2,20 +2,20 @@ export function formatCleanName(name?: string, email?: string): string {
   if (name && name.trim()) {
     const trimmed = name.trim();
     const rawLocal = email ? email.split("@")[0].toLowerCase() : "";
-    // If the name is a real customized name (not just raw email string like jordanedanield13)
+    // If the name is a real customized name
     if (trimmed.toLowerCase() !== rawLocal && trimmed.toLowerCase() !== rawLocal.replace(/[._]/g, " ")) {
       return trimmed;
     }
   }
 
-  if (!email) return "Jordan";
+  if (!email) return "Member";
 
-  const local = email.split("@")[0].toLowerCase();
-  if (local.startsWith("jordanedanield") || local.includes("jordan")) {
-    return "Jordan Daniels";
+  const adminEmail = (process.env.ADMIN_EMAIL || "").toLowerCase().trim();
+  if (adminEmail && email.toLowerCase() === adminEmail) {
+    return name && name !== email ? name : "Administrator";
   }
 
-  // Remove numbers: like jordanedanield13 -> jordanedanield
+  const local = email.split("@")[0].toLowerCase();
   const withoutDigits = local.replace(/[0-9]/g, "");
   const parts = withoutDigits.split(/[\._\-]+/).filter(Boolean);
   if (parts.length > 0) {
@@ -24,7 +24,7 @@ export function formatCleanName(name?: string, email?: string): string {
       .join(" ");
   }
 
-  return "Jordan";
+  return local || "Member";
 }
 
 export function getTimeGreeting(clientHour?: number): string {

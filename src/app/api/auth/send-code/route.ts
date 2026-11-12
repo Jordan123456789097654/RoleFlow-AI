@@ -21,11 +21,25 @@ function getClientIp(req: NextRequest): string {
   return "127.0.0.1";
 }
 
+function pruneRateLimitStore(store: Map<string, number[]>, now: number) {
+  if (store.size > 500) {
+    store.forEach((timestamps: number[], key: string) => {
+      const active = timestamps.filter((ts: number) => now - ts < WINDOW_MS);
+      if (active.length === 0) {
+        store.delete(key);
+      } else {
+        store.set(key, active);
+      }
+    });
+  }
+}
+
 function checkRateLimit(
   key: string,
   store: Map<string, number[]>
 ): { limited: boolean; retryAfterSeconds: number } {
   const now = Date.now();
+  pruneRateLimitStore(store, now);
   const existing = store.get(key) || [];
   const valid = existing.filter((ts) => now - ts < WINDOW_MS);
 

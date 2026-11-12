@@ -5,14 +5,25 @@ import { getSessionFromRequest } from "@/lib/auth";
 
 export const dynamic = "force-dynamic";
 
+function getClientIp(req: NextRequest): string {
+  const forwarded = req.headers.get("x-forwarded-for");
+  if (forwarded) {
+    const first = forwarded.split(",")[0].trim();
+    if (first) return first;
+  }
+  const realIp = req.headers.get("x-real-ip");
+  if (realIp) return realIp.trim();
+  return "127.0.0.1";
+}
+
 function extractUserId(req: NextRequest): string | undefined {
   const session = getSessionFromRequest(req);
   if (session?.userId) return session.userId;
 
-  const urlParam = req.nextUrl.searchParams.get("userId");
-  if (urlParam && urlParam.startsWith("guest_")) return urlParam;
-
-  return undefined;
+  // For unauthenticated guests, derive deterministic ID from IP hash
+  const clientIp = getClientIp(req);
+  const ipHash = clientIp.replace(/[^a-zA-Z0-9]/g, "");
+  return `guest_${ipHash.slice(0, 16)}`;
 }
 
 export async function GET(req: NextRequest) {
@@ -28,7 +39,11 @@ export async function GET(req: NextRequest) {
 export async function POST(req: NextRequest) {
   try {
     const body = await req.json();
-    const userId = body.userId || extractUserId(req);
+    const userId = extractUserId(req);
+
+    if (!userId) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    }
 
     const chat: Chat = {
       id: body.id || "chat-" + Date.now(),
@@ -43,7 +58,7 @@ export async function POST(req: NextRequest) {
       updatedAt: new Date().toISOString(),
     };
 
-    await db.saveChat(chat);
+    await db.saveChat(chat, userId);
     return NextResponse.json({ chat });
   } catch (error: any) {
     return NextResponse.json({ error: error.message }, { status: 500 });
@@ -52,9 +67,15 @@ export async function POST(req: NextRequest) {
 
 export async function DELETE(req: NextRequest) {
   try {
-    const userId = extractUserId(req);
-    await db.deleteAllChats(userId);
-    return NextResponse.json({ success: true, message: "All chats deleted successfully" });
+    const session = getSessionFromRequest(req);
+    if (!session || !session.userId) {
+      return NextResponse.json(
+        { error: "Unauthorized: You must be logged in to delete all chats." },
+        { status: 401 }
+      );
+    }
+    const success = await db.deleteAllChats(session.userId);
+    return NextResponse.json({ success, message: "All chats deleted successfully" });
   } catch (error: any) {
     return NextResponse.json({ error: error.message }, { status: 500 });
   }

@@ -12,6 +12,9 @@ import {
 function normalizeText(input: string): string {
   let text = input.toLowerCase();
 
+  // Preserve technical terms like "3d print" before leetspeak 3->e conversion
+  text = text.replace(/\b3d\b/g, "__3d__");
+
   // Leetspeak substitutions
   const leetMap: Record<string, string> = {
     "@": "a",
@@ -29,6 +32,7 @@ function normalizeText(input: string): string {
   };
 
   text = text.replace(/[@4831!|05$7+]/g, (m) => leetMap[m] || m);
+  text = text.replace(/__3d__/g, "3d");
 
   // Collapse spaced letters e.g. "b o m b" -> "bomb"
   text = text.replace(/\b([a-z])\s+([a-z])\s+([a-z])\s+([a-z]+)\b/g, "$1$2$3$4");
@@ -75,7 +79,7 @@ const SAFETY_RULES: PatternRule[] = [
     patterns: [
       /\b(?:synthesiz(?:e|ing)|how\s+to\s+make|recipe\s+for|produce|manufacture)\s+(?:tatp|anfo|rdx|nitroglycerin|c-?4\s+explosive|hexogen|petn)\b/i,
       /\b(?:build|make|construct|assemble)\s+(?:a\s+)?(?:pipe\s*bomb|pressure\s*cooker\s*bomb|fertilizer\s*bomb|nail\s*bomb|dirty\s*bomb|ied)\b/i,
-      /\b(?:synthesiz(?:e|ing)|how\s+to\s+make|weaponiz(?:e|ing)|culture)\s+(?:sarin|vx\s*nerve|mustard\s*gas|anthrax|ricin|botulinum\s*toxin)\b/i,
+      /\b(?:synthesiz(?:e|ing)|how\s+to\s+make|weaponiz(?:e|ing)|cultur(?:e|ing)\s+of)\s+(?:sarin|vx\s*nerve|mustard\s*gas|anthrax|ricin|botulinum\s*toxin)\b/i,
       /\b(?:3d\s*print(?:ing)?|blueprint\s*for)\s+(?:an?\s+)?(?:auto\s*sear|drop-in\s*auto\s*sear|lightning\s*link|glock\s*switch|suppressor\s*baffle)\b/i,
       /\b(?:convert|modifying)\s+(?:semi-?automatic|ar-?15|handgun)\s+to\s+(?:fully?\s*automatic|machine\s*gun)\b/i,
     ],
@@ -91,7 +95,7 @@ const SAFETY_RULES: PatternRule[] = [
     confidence: 0.96,
     patterns: [
       /\b(?:join|recruit\s*for|swear\s*(?:allegiance|bay'ah)\s*to)\s+(?:isis|isil|daesh|al-?qaeda|al-?nusra|boko\s*haram|al-?shabaab)\b/i,
-      /\b(?:atomwaffen|the\s*base|combat\s*18|aryan\s*brotherhood)\s+(?:manifesto|attack|propaganda|recruitment)\b/i,
+      /\b(?:atomwaffen|combat\s*18|aryan\s*brotherhood|the\s*base\s*terrorist|the\s*base\s*group)\s+(?:manifesto|attack|propaganda|recruitment)\b/i,
       /\b(?:siege\s*culture|james\s*mason\s*siege|race\s*war\s*tactics|day\s*of\s*the\s*rope)\b/i,
       /\b(?:manifesto\s*of|praise|glorify)\s+(?:brenton\s*tarrant|anders\s*breivik|dylann\s*roof|payton\s*gendron)\b/i,
     ],
@@ -258,7 +262,7 @@ export function scanMessage(prompt: string): ModerationVerdict {
 }
 
 /**
- * Generates an official legal incident dossier formatted for regulatory, DHS, FBI IC3, or NCMEC submission.
+ * Generates a factual Trust & Safety incident dossier for internal administrative records.
  */
 export function generateIncidentDossier(logEntry: ModerationLogEntry): string {
   const hashDigest = crypto
@@ -268,74 +272,32 @@ export function generateIncidentDossier(logEntry: ModerationLogEntry): string {
 
   const isoTime = logEntry.createdAt || new Date().toISOString();
   const utcFormatted = new Date(isoTime).toUTCString();
-
-  // Map category to statutory references
-  let statutoryReference = "18 U.S.C. (General Federal Criminal Statutes)";
-  let targetAgency = "Federal Bureau of Investigation (FBI IC3) & Department of Homeland Security (DHS)";
-
-  if (logEntry.category === "CSAM") {
-    statutoryReference =
-      "18 U.S.C. §§ 2251, 2252, 2258A (Child Sexual Exploitation & Mandatory Reporting)";
-    targetAgency = "National Center for Missing & Exploited Children (NCMEC CyberTipline) / FBI Innocent Images";
-  } else if (
-    logEntry.category === "VIOLENT_EXTREMISM" ||
-    logEntry.category === "DOMESTIC_TERRORISM"
-  ) {
-    statutoryReference =
-      "18 U.S.C. § 2332b (Acts of Terrorism), 18 U.S.C. § 2339A/B (Material Support)";
-    targetAgency = "FBI Counterterrorism Division (CTD) / DHS Office of Intelligence and Analysis (I&A)";
-  } else if (logEntry.category === "WEAPONS_MANUFACTURING") {
-    statutoryReference =
-      "18 U.S.C. §§ 842, 844 (Explosives), 18 U.S.C. § 229 (Chemical Weapons), 18 U.S.C. § 175 (Biological Agents)";
-    targetAgency = "ATF Joint Terrorism Task Force (JTTF) / DHS Homeland Security Investigations (HSI)";
-  } else if (
-    logEntry.category === "CYBERATTACK" ||
-    logEntry.category === "RANSOMWARE_MALWARE"
-  ) {
-    statutoryReference =
-      "18 U.S.C. § 1030 (Computer Fraud and Abuse Act - CFAA)";
-    targetAgency = "FBI Cyber Division / Internet Crime Complaint Center (IC3)";
-  } else if (
-    logEntry.category === "MASS_VIOLENCE" ||
-    logEntry.category === "IMMINENT_THREAT_TO_LIFE"
-  ) {
-    statutoryReference =
-      "18 U.S.C. § 875(c) (Interstate Transmission of Extortionate / Violent Threats)";
-    targetAgency = "FBI Field Office Threat Management Unit / Local Law Enforcement Rapid Response";
-  }
+  const adminContact = process.env.ADMIN_EMAIL || "security@roleflow.site";
 
   const divider = "=".repeat(78);
   const subDivider = "-".repeat(78);
 
   return `${divider}
-ROLEFLOW TRUST & SAFETY — OFFICIAL INCIDENT AUDIT DOSSIER
-CONFIDENTIAL // LAW ENFORCEMENT & REGULATORY REFERRAL DOCUMENT
+ROLEFLOW TRUST & SAFETY — INTERNAL INCIDENT AUDIT DOSSIER
+CONFIDENTIAL // COMPLIANCE & SAFETY AUDIT LOG
 ${divider}
 
 INCIDENT TRACKING NUMBER : RF-INC-${logEntry.id}
-REPORT GENERATED AT      : ${new Date().toISOString()} (${new Date().toUTCString()})
-CLASSIFICATION STATUS    : OFFICIAL LAW ENFORCEMENT EXHIBIT
-CUSTODIAN OF RECORDS     : RoleFlow Trust & Safety Operations (jordanedanield13@gmail.com)
+REPORT GENERATED AT      : ${new Date().toISOString()} (${utcFormatted})
+CLASSIFICATION STATUS    : INTERNAL AUDIT RECORD
+ADMIN CONTACT            : ${adminContact}
 
 ${subDivider}
-SECTION 1: STATUTORY AUTHORITY & RECIPIENT AGENCIES
+SECTION 1: INCIDENT SUMMARY & POLICY CLASSIFICATION
 ${subDivider}
-Primary Reviewing Agencies : ${targetAgency}
-Applicable Federal Codes   : ${statutoryReference}
-Data Preservation Notice   : Preserved pursuant to 18 U.S.C. § 2703(f) (Mandatory 90/180-Day Freeze)
-
-${subDivider}
-SECTION 2: INCIDENT SUMMARY & THREAT CLASSIFICATION
-${subDivider}
-Violation Severity Level   : TIER ${logEntry.tier} (${logEntry.tier === 1 ? "ZERO-TOLERANCE CRITICAL" : "HIGH SEVERITY"})
+Violation Severity Level   : TIER ${logEntry.tier} (${logEntry.tier === 1 ? "ZERO-TOLERANCE CRITICAL" : "POLICY WARNING"})
 Violation Category         : ${logEntry.category}
-Operational Action Taken   : ${logEntry.status === "BANNED" ? "ACCOUNT IMMEDIATELY BANNED & NETWORK FROZEN" : "REQUEST HARD-BLOCKED & INCIDENT LOGGED"}
+Operational Action Taken   : ${logEntry.status === "BANNED" ? "ACCOUNT PERMANENTLY BANNED" : "REQUEST BLOCKED & LOGGED"}
 Incident Resolution State  : ${logEntry.status}
-Automated Detection Engine : RoleFlow Multi-Vector Hybrid Safety Engine v2.4
-Detection Confidence Score : 0.985 / 1.000
+Automated Detection Engine : RoleFlow Multi-Vector Hybrid Safety Engine
 
 ${subDivider}
-SECTION 3: SUBJECT IDENTIFICATION & ORIGIN METADATA
+SECTION 2: SUBJECT IDENTIFICATION & ORIGIN METADATA
 ${subDivider}
 User Identifier (Internal) : ${logEntry.userId || "UNAUTHENTICATED_GUEST"}
 Subject Email Address      : ${logEntry.userEmail || "NO_EMAIL_PROVIDED"}
@@ -347,7 +309,7 @@ User Appeal Log Status     : ${logEntry.appealNote ? "APPEAL SUBMITTED" : "NO AP
 
 ${logEntry.appealNote ? `Subject Appeal Statement:\n"${logEntry.appealNote}"\n` : ""}
 ${subDivider}
-SECTION 4: FORENSIC EVIDENCE TRANSCRIPT
+SECTION 3: FORENSIC EVIDENCE TRANSCRIPT
 ${subDivider}
 CAUTION: The following raw prompt text contains hazardous or illicit material
 intercepted prior to large language model processing. The text below was never
@@ -360,26 +322,23 @@ ${logEntry.prompt}
 END RAW PROMPT EVIDENCE
 
 ${subDivider}
-SECTION 5: SYSTEM INTERVENTION & MITIGATION LOG
+SECTION 4: SYSTEM INTERVENTION LOG
 ${subDivider}
 1. Real-time pre-inference semantic intercept: TRIGGERED
 2. Model token pipeline halt: EXECUTED (0 tokens generated)
-3. Zero-tolerance account freeze: APPLIED (Account ID: ${logEntry.userId})
-4. Administrative escalation: DISPATCHED to jordanedanield13@gmail.com
-5. Evidence cryptographic hash lock: COMMITTED to immutable store
+3. Action applied: ${logEntry.status}
+4. Cryptographic hash recorded: VERIFIED
 
 ${subDivider}
-SECTION 6: CHAIN OF CUSTODY & CRYPTOGRAPHIC VERIFICATION
+SECTION 5: CHAIN OF CUSTODY & INTEGRITY VERIFICATION
 ${subDivider}
-Algorithm                  : SHA-256 (FIPS 180-4 Standard)
+Algorithm                  : SHA-256
 Cryptographic Hash         : ${hashDigest}
-Preservation Mandate       : Permanent record retained indefinitely in RoleFlow
-                             Compliance Archive for federal subpoena response.
+Record Status              : Preserved in RoleFlow Moderation Audit Store
 
 Authorized Sign-off:
-RoleFlow Legal, Safety & Security Operations
-Director of Platform Trust & Safety
-Contact: jordanedanield13@gmail.com
+RoleFlow Safety & Compliance Operations
+Contact: ${adminContact}
 ${divider}
 `;
 }

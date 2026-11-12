@@ -5,7 +5,9 @@ import { MemoryItem } from "@/types";
 
 const DATA_DIR = path.join(process.cwd(), ".data");
 const STORE_FILE = path.join(DATA_DIR, "store.json");
-const isPostgresConfigured = Boolean(process.env.POSTGRES_URL);
+const isPostgresConfigured = Boolean(
+  process.env.POSTGRES_URL || process.env.DATABASE_URL || process.env.STORAGE_URL
+);
 
 let isDbReady = false;
 async function ensureMemoryTable() {
@@ -147,24 +149,19 @@ export async function addMemory(userId: string, memory: string): Promise<MemoryI
  * Remove a specific memory item by memoryId for a user.
  */
 export async function removeMemory(userId: string, memoryId: string): Promise<boolean> {
-  if (!memoryId) return false;
-  const cleanUserId = userId ? userId.trim() : "";
+  if (!memoryId || !userId) return false;
+  const cleanUserId = userId.trim();
+  if (!cleanUserId) return false;
 
   if (isPostgresConfigured) {
     try {
       await ensureMemoryTable();
-      if (cleanUserId) {
-        await sql`
-          DELETE FROM roleflow_memories
-          WHERE id = ${memoryId} AND user_id = ${cleanUserId};
-        `;
-      } else {
-        await sql`
-          DELETE FROM roleflow_memories
-          WHERE id = ${memoryId};
-        `;
-      }
-      return true;
+      const res = await sql`
+        DELETE FROM roleflow_memories
+        WHERE (id = ${memoryId} OR memory = ${memoryId}) AND user_id = ${cleanUserId}
+        RETURNING id;
+      `;
+      return (res.rows?.length || 0) > 0;
     } catch (e) {
       console.error("Postgres delete memory error:", e);
     }
@@ -174,20 +171,13 @@ export async function removeMemory(userId: string, memoryId: string): Promise<bo
   if (!store.memories) return false;
 
   let removed = false;
-  if (cleanUserId && store.memories[cleanUserId]) {
+  if (store.memories[cleanUserId]) {
     const initialLen = store.memories[cleanUserId].length;
-    store.memories[cleanUserId] = store.memories[cleanUserId].filter((m) => m.id !== memoryId);
+    store.memories[cleanUserId] = store.memories[cleanUserId].filter(
+      (m) => m.id !== memoryId && m.memory !== memoryId
+    );
     if (store.memories[cleanUserId].length < initialLen) {
       removed = true;
-    }
-  } else {
-    // Search across all users if cleanUserId was not specified
-    for (const uKey of Object.keys(store.memories)) {
-      const initialLen = store.memories[uKey].length;
-      store.memories[uKey] = store.memories[uKey].filter((m) => m.id !== memoryId);
-      if (store.memories[uKey].length < initialLen) {
-        removed = true;
-      }
     }
   }
 

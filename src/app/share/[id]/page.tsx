@@ -7,7 +7,7 @@ import { ArrowLeft, MessageSquare } from "lucide-react";
 export const dynamic = "force-dynamic";
 
 export default async function SharePage({ params }: { params: { id: string } }) {
-  const chat = await db.getChat(params.id);
+  const chat = await db.getChat(params.id, undefined, true);
 
   if (!chat) {
     return (

@@ -1,37 +1,12 @@
 import { NextRequest, NextResponse } from "next/server";
 import { db, ADMIN_EMAIL } from "@/lib/db";
+import { getSessionFromRequest } from "@/lib/auth";
 
 export const dynamic = "force-dynamic";
 
 async function verifyAdminAuth(req: NextRequest): Promise<boolean> {
-  const userId = req.headers.get("x-user-id");
-  const userEmail = req.headers.get("x-user-email");
-
-  if (userEmail && userEmail.toLowerCase() === ADMIN_EMAIL.toLowerCase()) {
-    return true;
-  }
-
-  if (userId) {
-    const u = await db.getUserById(userId);
-    if (u && (u.isAdmin || u.email.toLowerCase() === ADMIN_EMAIL.toLowerCase())) {
-      return true;
-    }
-  }
-
-  const cookie = req.cookies.get("roleflow_user");
-  if (cookie?.value) {
-    try {
-      const parsed = JSON.parse(decodeURIComponent(cookie.value));
-      if (
-        parsed.isAdmin ||
-        parsed.email?.toLowerCase() === ADMIN_EMAIL.toLowerCase()
-      ) {
-        return true;
-      }
-    } catch {}
-  }
-
-  return false;
+  const session = getSessionFromRequest(req);
+  return Boolean(session && session.isAdmin);
 }
 
 export async function GET(req: NextRequest) {

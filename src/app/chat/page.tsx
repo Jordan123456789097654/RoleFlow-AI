@@ -258,7 +258,11 @@ export default function ChatPage() {
     }
   };
 
-  const handleSendMessage = async (content: string, attachments: Attachment[]) => {
+  const handleSendMessage = async (
+    content: string,
+    attachments: Attachment[],
+    overrideBaseMessages?: Message[]
+  ) => {
     if (!user && guestMessagesCount >= 5) {
       setGuestLimitReached(true);
       setAuthModalOpen(true);
@@ -273,7 +277,8 @@ export default function ChatPage() {
       createdAt: new Date().toISOString(),
     };
 
-    const newMessages = [...messages, userMessage];
+    const base = overrideBaseMessages || messages;
+    const newMessages = [...base, userMessage];
     setMessages(newMessages);
     setIsLoading(true);
     setThinkingSeconds(0);
@@ -394,7 +399,7 @@ export default function ChatPage() {
 
     const truncated = messages.slice(0, index);
     setMessages(truncated);
-    handleSendMessage(newContent, []);
+    handleSendMessage(newContent, [], truncated);
   };
 
   const handleRegenerate = () => {

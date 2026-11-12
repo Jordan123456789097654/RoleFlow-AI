@@ -43,16 +43,6 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "Messages array required" }, { status: 400 });
     }
 
-    const safeModel: ModelId = ALLOWED_MODELS.includes(model) ? model : "roleflow-genesis-1";
-    const safeEffort: EffortLevel = ALLOWED_EFFORTS.includes(effort) ? effort : "medium";
-
-    // Cap conversation history to 30 messages to prevent token budget abuse
-    const cappedMessages = messages.slice(-30);
-    const latestUserMsg = [...cappedMessages].reverse().find((m: Message) => m.role === "user");
-    if (latestUserMsg && latestUserMsg.content && latestUserMsg.content.length > 16000) {
-      latestUserMsg.content = latestUserMsg.content.slice(0, 16000);
-    }
-
     // Resolve user profile if user id provided without email
     if (!userEmail && userId && !userId.startsWith("guest_")) {
       const dbUser = await db.getUserById(userId);
@@ -63,6 +53,53 @@ export async function POST(req: NextRequest) {
 
     const isGuest = !userId || userId.startsWith("guest_");
     const identifier = userEmail || userId || "guest_default";
+
+    // System Maintenance & Feature Flag Enforcements
+    const sysConfig = await db.getSystemConfig();
+    const isAdmin = Boolean(
+      (userEmail && ADMIN_EMAIL && userEmail.toLowerCase() === ADMIN_EMAIL.toLowerCase()) ||
+      (session && session.isAdmin)
+    );
+
+    if (sysConfig.maintenanceMode && !isAdmin) {
+      return NextResponse.json(
+        { error: "RoleFlow is currently in scheduled maintenance. Please check back shortly." },
+        { status: 503 }
+      );
+    }
+
+    const safeModel: ModelId = ALLOWED_MODELS.includes(model) ? model : "roleflow-genesis-1";
+    let safeEffort: EffortLevel = ALLOWED_EFFORTS.includes(effort) ? effort : "medium";
+    if (!sysConfig.allowHighEffort && (safeEffort === "extra" || safeEffort === "max")) {
+      safeEffort = "high";
+    }
+
+    // Defense-in-depth: Verify chat ownership if existing chatId supplied
+    if (chatId) {
+      const existingChat = await db.getChat(chatId, undefined, true);
+      if (existingChat && existingChat.userId && existingChat.userId !== userId) {
+        return NextResponse.json(
+          { error: "Access denied. Cannot modify a conversation belonging to another user." },
+          { status: 403 }
+        );
+      }
+    }
+
+    // Prevent system prompt injection: Filter client-supplied messages strictly to user & assistant
+    const safeMessages = messages.filter(
+      (m: Message) => m && (m.role === "user" || m.role === "assistant")
+    );
+
+    if (safeMessages.length === 0) {
+      return NextResponse.json({ error: "Valid user or assistant messages required" }, { status: 400 });
+    }
+
+    // Cap conversation history to 30 messages to prevent token budget abuse
+    const cappedMessages = safeMessages.slice(-30);
+    const latestUserMsg = [...cappedMessages].reverse().find((m: Message) => m.role === "user");
+    if (latestUserMsg && latestUserMsg.content && latestUserMsg.content.length > 16000) {
+      latestUserMsg.content = latestUserMsg.content.slice(0, 16000);
+    }
 
     // 0. Check if User is Banned
     const banStatus = await db.getUserBanStatus(userEmail || userId || "");
@@ -77,14 +114,14 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    // Enforce Usage Limits
+    // Enforce Usage Limits using dynamic limits from system config
     const usageCheck = await db.getUsage(identifier, isGuest);
 
     if (!usageCheck.allowed) {
       if (isGuest) {
         return NextResponse.json(
           {
-            error: "Guest limit reached. You have used all 5 complimentary messages. Please sign in to continue using RoleFlow.",
+            error: `Guest limit reached. You have used all ${usageCheck.limit} complimentary messages. Please sign in to continue using RoleFlow.`,
             guestLimitReached: true,
             usage: usageCheck,
           },
@@ -93,7 +130,7 @@ export async function POST(req: NextRequest) {
       } else {
         return NextResponse.json(
           {
-            error: "Daily message limit reached. Free accounts include 25 messages per day. Your quota resets at midnight.",
+            error: `Daily message limit reached. Free accounts include ${usageCheck.limit} messages per day. Your quota resets at midnight.`,
             limitReached: true,
             usage: usageCheck,
           },
@@ -108,9 +145,21 @@ export async function POST(req: NextRequest) {
       req.headers.get("x-real-ip") ||
       "127.0.0.1";
 
-    // 1. Run Trust & Safety Hybrid Scanner Before Model Generation
+    // 1. Run Trust & Safety Hybrid Scanner across current prompt and recent user messages
     const promptToScan = latestUserMsg ? latestUserMsg.content : "";
-    const moderationVerdict = scanMessage(promptToScan);
+    let moderationVerdict = scanMessage(promptToScan);
+
+    if (!moderationVerdict.flagged && cappedMessages.length > 1) {
+      for (const m of cappedMessages) {
+        if (m.role === "user" && m !== latestUserMsg) {
+          const v = scanMessage(m.content || "");
+          if (v.flagged) {
+            moderationVerdict = v;
+            break;
+          }
+        }
+      }
+    }
 
     if (moderationVerdict.flagged) {
       if (moderationVerdict.tier === 1) {
@@ -168,11 +217,11 @@ export async function POST(req: NextRequest) {
           projectId,
           model,
           effort,
-          messages: [...messages, assistantMessage],
+          messages: [...safeMessages, assistantMessage],
           createdAt: new Date().toISOString(),
           updatedAt: new Date().toISOString(),
         };
-        await db.saveChat(chatToSave);
+        await db.saveChat(chatToSave, userId);
 
         return NextResponse.json({
           chatId: currentChatId,
@@ -185,7 +234,48 @@ export async function POST(req: NextRequest) {
           error: assistantMessage.content,
         });
       } else if (moderationVerdict.tier === 2) {
-        // Tier 2: Refuse response with warning banner. Increment user strike count.
+        // Special Wellbeing Handling: Self-harm requests receive compassionate crisis support, NOT strikes or bans
+        if (moderationVerdict.category === "SELF_HARM") {
+          const crisisContent =
+            "If you or someone you know is going through a tough time or having thoughts of self-harm, please know that you are not alone and compassionate support is available 24/7.\n\n" +
+            "• **US & Canada:** Call or text **988** to reach the Suicide & Crisis Lifeline (free, confidential).\n" +
+            "• **Crisis Text Line:** Text **HOME** to **741741** to connect with a crisis counselor.\n" +
+            "• **UK:** Call **111** (NHS) or call the Samaritans at **116 123**.\n" +
+            "• **International:** Find local resources in your region at [findahelpline.com](https://findahelpline.com).\n\n" +
+            "Please reach out to one of these services, a trusted loved one, or a professional who can help.";
+
+          const assistantMessage: Message = {
+            id: "msg-" + Date.now(),
+            role: "assistant",
+            content: crisisContent,
+            moderationBlocked: false,
+            createdAt: new Date().toISOString(),
+          };
+
+          const currentChatId = chatId || "chat-" + Date.now();
+          const chatToSave: Chat = {
+            id: currentChatId,
+            userId,
+            title: promptToScan.slice(0, 36) + (promptToScan.length > 36 ? "..." : ""),
+            projectId,
+            model,
+            effort,
+            messages: [...safeMessages, assistantMessage],
+            createdAt: new Date().toISOString(),
+            updatedAt: new Date().toISOString(),
+          };
+          await db.saveChat(chatToSave, userId);
+
+          return NextResponse.json({
+            chatId: currentChatId,
+            message: assistantMessage,
+            chat: chatToSave,
+            blocked: true,
+            isSelfHarmSupport: true,
+          });
+        }
+
+        // Tier 2 Security / Harm: Refuse response with warning banner. Increment user strike count.
         const newStrikes = await db.incrementStrikes(userEmail || userId || identifier);
         const logId =
           "mod-" + Date.now() + "-" + Math.random().toString(36).substring(2, 7);
@@ -229,11 +319,11 @@ export async function POST(req: NextRequest) {
           projectId,
           model,
           effort,
-          messages: [...messages, assistantMessage],
+          messages: [...safeMessages, assistantMessage],
           createdAt: new Date().toISOString(),
           updatedAt: new Date().toISOString(),
         };
-        await db.saveChat(chatToSave);
+        await db.saveChat(chatToSave, userId);
 
         return NextResponse.json({
           chatId: currentChatId,
@@ -340,10 +430,13 @@ export async function POST(req: NextRequest) {
       updatedAt: new Date().toISOString(),
     };
 
-    await db.saveChat(chatToSave);
+    await db.saveChat(chatToSave, userId);
 
-    // Increment Usage and return updated quota
-    const updatedUsage = await db.incrementUsage(identifier, isGuest);
+    // Increment Usage only on successful, non-fallback generations
+    let updatedUsage = usageCheck;
+    if (result.content && !result.isFallback) {
+      updatedUsage = await db.incrementUsage(identifier, isGuest);
+    }
 
     return NextResponse.json({
       chatId: currentChatId,

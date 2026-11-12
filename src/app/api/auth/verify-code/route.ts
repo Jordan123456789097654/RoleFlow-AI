@@ -58,19 +58,22 @@ export async function POST(req: NextRequest) {
     await db.deleteAuthCode(cleanEmail);
 
     // 5. Get or create user
-    const isJordanAdmin = cleanEmail === ADMIN_EMAIL.toLowerCase();
+    const isJordanAdmin = Boolean(ADMIN_EMAIL && cleanEmail === ADMIN_EMAIL);
     let user = await db.getUserByEmail(cleanEmail);
     if (!user) {
-      const defaultName = isJordanAdmin
-        ? "Jordan Daniels"
-        : cleanEmail.split("@")[0].replace(/[0-9]/g, "").replace(/[._]/g, " ");
-      const formattedName =
-        defaultName.charAt(0).toUpperCase() + defaultName.slice(1);
+      const cleanLocal = cleanEmail.split("@")[0].replace(/[0-9]/g, "").replace(/[._-]/g, " ").trim();
+      const formattedName = cleanLocal
+        ? cleanLocal
+            .split(" ")
+            .filter(Boolean)
+            .map((w: string) => w.charAt(0).toUpperCase() + w.slice(1).toLowerCase())
+            .join(" ")
+        : "RoleFlow Member";
 
       user = {
         id: "usr-" + Date.now(),
         email: cleanEmail,
-        name: formattedName || "Jordan Daniels",
+        name: formattedName || "RoleFlow Member",
         customInstructions: "",
         isAdmin: isJordanAdmin,
         plan: isJordanAdmin ? "ADMIN" : "FREE",

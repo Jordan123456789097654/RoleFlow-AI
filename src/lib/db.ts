@@ -6,7 +6,7 @@ import { Chat, Project, UserProfile, ModerationLogEntry, ModerationStatus, Syste
 const DATA_DIR = path.join(process.cwd(), ".data");
 const STORE_FILE = path.join(DATA_DIR, "store.json");
 
-export const ADMIN_EMAIL = process.env.ADMIN_EMAIL || "jordanedanield13@gmail.com";
+export const ADMIN_EMAIL = (process.env.ADMIN_EMAIL || "").toLowerCase().trim();
 export const FREE_DAILY_LIMIT = 25;
 export const GUEST_TOTAL_LIMIT = 5;
 
@@ -37,7 +37,7 @@ export function getTodayDateString(): string {
 }
 
 export function patchUserProfile(user: UserProfile): UserProfile {
-  const isJordanAdmin = user.email?.toLowerCase() === ADMIN_EMAIL.toLowerCase();
+  const isJordanAdmin = Boolean(ADMIN_EMAIL && user.email?.toLowerCase() === ADMIN_EMAIL);
   const isAdmin = isJordanAdmin || Boolean(user.isAdmin);
   const plan = isJordanAdmin ? "ADMIN" : (user.plan || "FREE");
   const today = getTodayDateString();
@@ -85,13 +85,17 @@ function saveLocalStore(store: LocalStore) {
     if (!fs.existsSync(DATA_DIR)) {
       fs.mkdirSync(DATA_DIR, { recursive: true });
     }
-    fs.writeFileSync(STORE_FILE, JSON.stringify(store, null, 2), "utf-8");
+    const tempFile = path.join(DATA_DIR, `store.${Date.now()}.${Math.random().toString(36).slice(2)}.tmp`);
+    fs.writeFileSync(tempFile, JSON.stringify(store, null, 2), "utf-8");
+    fs.renameSync(tempFile, STORE_FILE);
   } catch (err) {
     console.error("Local store save error:", err);
   }
 }
 
-const isPostgresConfigured = Boolean(process.env.POSTGRES_URL);
+const isPostgresConfigured = Boolean(
+  process.env.POSTGRES_URL || process.env.DATABASE_URL || process.env.STORAGE_URL
+);
 
 let isInitialized = false;
 async function ensureDb() {
@@ -621,10 +625,24 @@ export const db = {
   async getAdminStats() {
     await ensureDb();
     const store = getLocalStore();
-    const users = Object.values(store.users).map((u) => patchUserProfile(u));
-    const totalChats = Object.keys(store.chats).length;
+    let totalUsers = Object.keys(store.users).length;
+    let totalChats = Object.keys(store.chats).length;
+    let usersList = Object.values(store.users).map((u) => patchUserProfile(u));
 
-    // Check Groq pool keys
+    if (isPostgresConfigured) {
+      try {
+        const uRes = await sql`SELECT count(*)::int as count FROM roleflow_users;`;
+        const cRes = await sql`SELECT count(*)::int as count FROM roleflow_chats;`;
+        totalUsers = uRes.rows[0]?.count || 0;
+        totalChats = cRes.rows[0]?.count || 0;
+        const allUsers = await this.getAllUsers();
+        usersList = allUsers;
+      } catch (e) {
+        console.error("Postgres admin stats error:", e);
+      }
+    }
+
+    // Check Groq pool keys safely without exposing full prefix/suffix
     const envKeys = process.env.GROQ_API_KEYS || "";
     const keyList = envKeys
       .split(",")
@@ -632,14 +650,14 @@ export const db = {
       .filter((k) => k.startsWith("gsk_"));
 
     return {
-      totalUsers: users.length,
+      totalUsers,
       totalChats,
       modelKeys: {
         total: keyList.length,
         active: keyList.length,
-        keysMasked: keyList.map((k) => `${k.slice(0, 10)}...${k.slice(-4)}`),
+        keysMasked: keyList.map((k) => `${k.slice(0, 7)}...${k.slice(-3)}`),
       },
-      users: users.map((u) => ({
+      users: usersList.map((u) => ({
         id: u.id,
         email: u.email,
         name: u.name,
@@ -652,8 +670,10 @@ export const db = {
   },
 
   // Chats with User/Session Isolation
-  async getChat(chatId: string, userId?: string): Promise<Chat | null> {
+  async getChat(chatId: string, userId?: string, isShared: boolean = false): Promise<Chat | null> {
     await ensureDb();
+    if (!chatId) return null;
+
     if (isPostgresConfigured) {
       try {
         const { rows } = await sql`
@@ -662,7 +682,9 @@ export const db = {
         `;
         if (rows[0]) {
           const chat = rows[0] as unknown as Chat;
-          if (userId && chat.userId && chat.userId !== userId) {
+          if (isShared) return chat;
+          if (!userId) return null; // Private chat requires user
+          if (chat.userId && chat.userId !== userId) {
             return null; // Restricted
           }
           return chat;
@@ -674,7 +696,9 @@ export const db = {
     const store = getLocalStore();
     const chat = store.chats[chatId];
     if (chat) {
-      if (userId && chat.userId && chat.userId !== userId) {
+      if (isShared) return chat;
+      if (!userId) return null;
+      if (chat.userId && chat.userId !== userId) {
         return null; // Restricted
       }
       return chat;
@@ -682,15 +706,25 @@ export const db = {
     return null;
   },
 
-  async saveChat(chat: Chat): Promise<void> {
+  async saveChat(chat: Chat, requesterId?: string): Promise<void> {
     await ensureDb();
+    const existing = await this.getChat(chat.id, undefined, true);
+    if (existing && existing.userId) {
+      if (requesterId && existing.userId !== requesterId) {
+        throw new Error("Forbidden: You do not own this chat.");
+      }
+    }
+
+    const assignedUserId = existing?.userId || chat.userId || requesterId || null;
+
     if (isPostgresConfigured) {
       try {
         await sql`
           INSERT INTO roleflow_chats (id, user_id, title, project_id, pinned, model, effort, messages, updated_at)
-          VALUES (${chat.id}, ${chat.userId || null}, ${chat.title}, ${chat.projectId || null}, ${chat.pinned || false}, ${chat.model}, ${chat.effort}, ${JSON.stringify(chat.messages)}, NOW())
+          VALUES (${chat.id}, ${assignedUserId}, ${chat.title}, ${chat.projectId || null}, ${chat.pinned || false}, ${chat.model}, ${chat.effort}, ${JSON.stringify(chat.messages)}, NOW())
           ON CONFLICT (id) DO UPDATE
-          SET user_id = ${chat.userId || null}, title = ${chat.title}, project_id = ${chat.projectId || null}, pinned = ${chat.pinned || false}, model = ${chat.model}, effort = ${chat.effort}, messages = ${JSON.stringify(chat.messages)}, updated_at = NOW();
+          SET title = ${chat.title}, project_id = ${chat.projectId || null}, pinned = ${chat.pinned || false}, model = ${chat.model}, effort = ${chat.effort}, messages = ${JSON.stringify(chat.messages)}, updated_at = NOW()
+          WHERE roleflow_chats.user_id = ${assignedUserId} OR roleflow_chats.user_id IS NULL;
         `;
         return;
       } catch (e) {
@@ -698,20 +732,22 @@ export const db = {
       }
     }
     const store = getLocalStore();
-    store.chats[chat.id] = chat;
+    store.chats[chat.id] = { ...chat, userId: assignedUserId || undefined };
     saveLocalStore(store);
   },
 
   async deleteChat(chatId: string, userId?: string): Promise<boolean> {
+    if (!userId || !chatId) return false;
     await ensureDb();
+
     if (isPostgresConfigured) {
       try {
-        if (userId) {
-          await sql`DELETE FROM roleflow_chats WHERE id = ${chatId} AND (user_id = ${userId} OR user_id IS NULL);`;
-        } else {
-          await sql`DELETE FROM roleflow_chats WHERE id = ${chatId};`;
-        }
-        return true;
+        const result = await sql`
+          DELETE FROM roleflow_chats 
+          WHERE id = ${chatId} AND user_id = ${userId}
+          RETURNING id;
+        `;
+        return (result.rows?.length || 0) > 0;
       } catch (e) {
         console.error("Postgres delete chat error:", e);
       }
@@ -719,7 +755,7 @@ export const db = {
     const store = getLocalStore();
     const chat = store.chats[chatId];
     if (chat) {
-      if (userId && chat.userId && chat.userId !== userId) {
+      if (chat.userId !== userId) {
         return false;
       }
       delete store.chats[chatId];
@@ -730,30 +766,31 @@ export const db = {
   },
 
   async deleteAllChats(userId?: string): Promise<boolean> {
+    if (!userId || typeof userId !== "string" || !userId.trim()) {
+      return false; // NEVER delete all chats across the whole database
+    }
     await ensureDb();
+    const cleanUserId = userId.trim();
+
     if (isPostgresConfigured) {
       try {
-        if (userId) {
-          await sql`DELETE FROM roleflow_chats WHERE user_id = ${userId} OR user_id IS NULL;`;
-        } else {
-          await sql`DELETE FROM roleflow_chats;`;
-        }
+        await sql`DELETE FROM roleflow_chats WHERE user_id = ${cleanUserId};`;
         return true;
       } catch (e) {
         console.error("Postgres delete all chats error:", e);
       }
     }
     const store = getLocalStore();
-    if (userId) {
-      for (const id of Object.keys(store.chats)) {
-        if (!store.chats[id].userId || store.chats[id].userId === userId) {
-          delete store.chats[id];
-        }
+    let changed = false;
+    for (const id of Object.keys(store.chats)) {
+      if (store.chats[id].userId === cleanUserId) {
+        delete store.chats[id];
+        changed = true;
       }
-    } else {
-      store.chats = {};
     }
-    saveLocalStore(store);
+    if (changed) {
+      saveLocalStore(store);
+    }
     return true;
   },
 
@@ -798,19 +835,13 @@ export const db = {
 
   // Projects
   async getProjects(userId?: string): Promise<Project[]> {
+    if (!userId) return [];
     await ensureDb();
     if (isPostgresConfigured) {
       try {
-        if (userId) {
-          const { rows } = await sql`
-            SELECT id, name, description, custom_instructions as "customInstructions", created_at as "createdAt"
-            FROM roleflow_projects WHERE user_id = ${userId} OR user_id IS NULL ORDER BY created_at DESC;
-          `;
-          return rows as unknown as Project[];
-        }
         const { rows } = await sql`
-          SELECT id, name, description, custom_instructions as "customInstructions", created_at as "createdAt"
-          FROM roleflow_projects ORDER BY created_at DESC;
+          SELECT id, user_id as "userId", name, description, custom_instructions as "customInstructions", created_at as "createdAt"
+          FROM roleflow_projects WHERE user_id = ${userId} ORDER BY created_at DESC;
         `;
         return rows as unknown as Project[];
       } catch (e) {
@@ -818,18 +849,24 @@ export const db = {
       }
     }
     const store = getLocalStore();
-    return Object.values(store.projects);
+    return Object.values(store.projects).filter((p) => p.userId === userId);
   },
 
-  async saveProject(project: Project): Promise<void> {
+  async saveProject(project: Project, requesterId?: string): Promise<void> {
     await ensureDb();
+    const assignedUserId = project.userId || requesterId;
+    if (!assignedUserId) {
+      throw new Error("Unauthorized: Project must belong to an authenticated user.");
+    }
+
     if (isPostgresConfigured) {
       try {
         await sql`
           INSERT INTO roleflow_projects (id, user_id, name, description, custom_instructions)
-          VALUES (${project.id}, ${project.userId || null}, ${project.name}, ${project.description || ""}, ${project.customInstructions || ""})
+          VALUES (${project.id}, ${assignedUserId}, ${project.name}, ${project.description || ""}, ${project.customInstructions || ""})
           ON CONFLICT (id) DO UPDATE
-          SET name = ${project.name}, description = ${project.description || ""}, custom_instructions = ${project.customInstructions || ""};
+          SET name = ${project.name}, description = ${project.description || ""}, custom_instructions = ${project.customInstructions || ""}
+          WHERE roleflow_projects.user_id = ${assignedUserId};
         `;
         return;
       } catch (e) {
@@ -837,7 +874,11 @@ export const db = {
       }
     }
     const store = getLocalStore();
-    store.projects[project.id] = project;
+    const existing = store.projects[project.id];
+    if (existing && existing.userId && existing.userId !== assignedUserId) {
+      throw new Error("Forbidden: You do not own this project.");
+    }
+    store.projects[project.id] = { ...project, userId: assignedUserId };
     saveLocalStore(store);
   },
 
@@ -1030,6 +1071,7 @@ export const db = {
       newStrikes = (user.strikes || 0) + 1;
       user.strikes = newStrikes;
       await this.upsertUser(user);
+      return newStrikes;
     } else {
       const store = getLocalStore();
       for (const [key, u] of Object.entries(store.users)) {

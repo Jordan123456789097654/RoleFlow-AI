@@ -1,38 +1,20 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getMemories, addMemory, removeMemory, clearAllMemories } from "@/lib/memory";
-import { db } from "@/lib/db";
+import { getSessionFromRequest } from "@/lib/auth";
 
 export const dynamic = "force-dynamic";
 
-function resolveUserIdentifier(req: NextRequest, body?: any): { userId?: string; userEmail?: string } {
-  let userId = body?.userId || req.headers.get("x-user-id") || req.nextUrl.searchParams.get("userId") || undefined;
-  let userEmail = body?.userEmail || req.headers.get("x-user-email") || req.nextUrl.searchParams.get("email") || undefined;
-
-  const cookie = req.cookies.get("roleflow_user");
-  if (cookie?.value) {
-    try {
-      const parsed = JSON.parse(decodeURIComponent(cookie.value));
-      if (!userId && parsed?.id) userId = parsed.id;
-      if (!userEmail && parsed?.email) userEmail = parsed.email;
-    } catch {}
-  }
-
-  return { userId, userEmail };
-}
-
 export async function GET(req: NextRequest) {
   try {
-    const { userId, userEmail } = resolveUserIdentifier(req);
-    const identifier = userId || userEmail;
-
-    if (!identifier || identifier.startsWith("guest_")) {
+    const session = getSessionFromRequest(req);
+    if (!session || !session.userId) {
       return NextResponse.json(
         { error: "Unauthorized: Please sign in to access personalized AI memories." },
         { status: 401 }
       );
     }
 
-    const memories = await getMemories(identifier);
+    const memories = await getMemories(session.userId);
     return NextResponse.json({
       success: true,
       count: memories.length,
@@ -49,17 +31,15 @@ export async function GET(req: NextRequest) {
 
 export async function POST(req: NextRequest) {
   try {
-    const body = await req.json().catch(() => ({}));
-    const { userId, userEmail } = resolveUserIdentifier(req, body);
-    const identifier = userId || userEmail;
-
-    if (!identifier || identifier.startsWith("guest_")) {
+    const session = getSessionFromRequest(req);
+    if (!session || !session.userId) {
       return NextResponse.json(
         { error: "Unauthorized: Please sign in to save memories." },
         { status: 401 }
       );
     }
 
+    const body = await req.json().catch(() => ({}));
     const memoryText = body.memory?.trim();
     if (!memoryText) {
       return NextResponse.json(
@@ -75,7 +55,7 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    const createdMemory = await addMemory(identifier, memoryText);
+    const createdMemory = await addMemory(session.userId, memoryText);
 
     return NextResponse.json({
       success: true,
@@ -93,6 +73,14 @@ export async function POST(req: NextRequest) {
 
 export async function DELETE(req: NextRequest) {
   try {
+    const session = getSessionFromRequest(req);
+    if (!session || !session.userId) {
+      return NextResponse.json(
+        { error: "Unauthorized: Please sign in to manage memories." },
+        { status: 401 }
+      );
+    }
+
     const { searchParams } = new URL(req.url);
     const queryId = searchParams.get("id") || searchParams.get("memoryId");
     const isClearAll = searchParams.get("clearAll") === "true";
@@ -104,14 +92,8 @@ export async function DELETE(req: NextRequest) {
       bodyId = body.id || body.memoryId;
     } catch {}
 
-    const { userId, userEmail } = resolveUserIdentifier(req, body);
-    const identifier = userId || userEmail || "";
-
     if (isClearAll || body.clearAll) {
-      if (!identifier || identifier.startsWith("guest_")) {
-        return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-      }
-      await clearAllMemories(identifier);
+      await clearAllMemories(session.userId);
       return NextResponse.json({
         success: true,
         message: "All memories cleared successfully.",
@@ -126,7 +108,7 @@ export async function DELETE(req: NextRequest) {
       );
     }
 
-    const success = await removeMemory(identifier, memoryId);
+    const success = await removeMemory(session.userId, memoryId);
 
     return NextResponse.json({
       success: true,

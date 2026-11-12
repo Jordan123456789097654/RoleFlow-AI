@@ -3,10 +3,45 @@ import { NextRequest, NextResponse } from "next/server";
 
 export const SESSION_COOKIE_NAME = "roleflow_session";
 
-// Fallback secure secret if process.env.SESSION_SECRET is not configured
-const SESSION_SECRET =
-  process.env.SESSION_SECRET ||
-  "roleflow-secure-session-hmac-sha256-secret-fallback-key-2026";
+// Secure session secret: use process.env.SESSION_SECRET or an ephemeral random key per process to prevent forge attacks
+const EPHEMERAL_SECRET = crypto.randomBytes(32).toString("hex");
+const SESSION_SECRET = process.env.SESSION_SECRET || EPHEMERAL_SECRET;
+if (!process.env.SESSION_SECRET && process.env.NODE_ENV === "production") {
+  console.warn("SECURITY WARNING: SESSION_SECRET is not set in environment variables. Using ephemeral runtime key.");
+}
+
+export const GUEST_COOKIE_NAME = "roleflow_guest_sig";
+
+/**
+ * Creates a signed guest token binding guestId and client IP
+ */
+export function createGuestToken(guestId: string, ip: string): string {
+  const data = `${guestId}:${ip}`;
+  const sig = crypto.createHmac("sha256", SESSION_SECRET).update(data).digest("base64url");
+  return `${Buffer.from(data).toString("base64url")}.${sig}`;
+}
+
+/**
+ * Verifies signed guest token
+ */
+export function verifyGuestToken(token: string, ip: string): string | null {
+  if (!token || typeof token !== "string") return null;
+  const parts = token.split(".");
+  if (parts.length !== 2) return null;
+  const [b64Data, sig] = parts;
+  try {
+    const data = Buffer.from(b64Data, "base64url").toString("utf-8");
+    const expectedSig = crypto.createHmac("sha256", SESSION_SECRET).update(data).digest("base64url");
+    const bufA = Buffer.from(sig);
+    const bufB = Buffer.from(expectedSig);
+    if (bufA.length !== bufB.length || !crypto.timingSafeEqual(bufA, bufB)) return null;
+    const [guestId, tokenIp] = data.split(":");
+    if (!guestId || !guestId.startsWith("guest_")) return null;
+    return guestId;
+  } catch {
+    return null;
+  }
+}
 
 export interface SessionPayload {
   userId: string;
