@@ -6,41 +6,44 @@ interface LogoProps {
   className?: string;
 }
 
-/**
- * RoleFlow mark: a rounded accent tile with a single flowing wave.
- * Colors come from design tokens (fill-accent, stroke-app), so it adapts to light and dark themes.
- */
 export const Logo: React.FC<LogoProps> = ({ size = 28, showText = true, className = "" }) => {
   return (
     <div className={`flex items-center gap-2.5 select-none ${className}`}>
+      {/* Flow Wave: stylized dual flowing harmonic wave in gradient amber/coral */}
       <svg
         width={size}
         height={size}
         viewBox="0 0 32 32"
         fill="none"
         xmlns="http://www.w3.org/2000/svg"
-        aria-hidden="true"
-        className="shrink-0"
+        className="transition-transform duration-300 hover:scale-105"
       >
-        <rect width="32" height="32" rx="9" className="fill-accent" />
+        <defs>
+          <linearGradient id="roleflow-grad" x1="0%" y1="0%" x2="100%" y2="100%">
+            <stop offset="0%" stopColor="#f59e0b" />
+            <stop offset="50%" stopColor="#d97706" />
+            <stop offset="100%" stopColor="#ea580c" />
+          </linearGradient>
+        </defs>
         <path
-          d="M6.5 18.5C9.5 12.5 12 12.5 15.5 18.5S21.5 24.5 25.5 13.5"
-          className="stroke-app"
-          strokeWidth="2.75"
+          d="M4 16C8 7 12 7 16 16C20 25 24 25 28 16"
+          stroke="url(#roleflow-grad)"
+          strokeWidth="3.5"
           strokeLinecap="round"
           strokeLinejoin="round"
         />
         <path
-          d="M6.5 23.5C9.5 17.5 12 17.5 15.5 23.5S21.5 29.5 25.5 18.5"
-          className="stroke-app"
-          strokeOpacity="0.45"
-          strokeWidth="1.75"
+          d="M4 22C8 13 12 13 16 22C20 31 24 31 28 22"
+          stroke="url(#roleflow-grad)"
+          strokeWidth="2.5"
           strokeLinecap="round"
-          strokeLinejoin="round"
+          strokeOpacity="0.45"
         />
       </svg>
       {showText && (
-        <span className="font-display text-xl font-medium tracking-tight text-ink">RoleFlow</span>
+        <span className="font-serif text-xl tracking-tight text-[#f3f3ee] font-medium">
+          RoleFlow
+        </span>
       )}
     </div>
   );
