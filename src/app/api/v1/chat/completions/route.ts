@@ -7,10 +7,11 @@ import { sendSecurityAlertEmail } from "@/lib/email";
 import { checkRateLimit } from "@/lib/rate-limit";
 import { authenticateApiKey, getKeyDailyCount } from "@/lib/api-keys";
 import { buildIncidentContext } from "@/lib/attachments";
+import { DEFAULT_MODEL, MODEL_IDS, resolveModelId } from "@/lib/models";
 
 export const dynamic = "force-dynamic";
 
-const ALLOWED_MODELS: ModelId[] = ["roleflow-genesis-1", "roleflow-flash-1"];
+const ALLOWED_MODELS: ModelId[] = [...MODEL_IDS];
 const ALLOWED_EFFORTS: EffortLevel[] = ["low", "medium", "high", "extra", "max"];
 const MAX_MESSAGE_CHARS = 16000;
 const MAX_HISTORY_MESSAGES = 30;
@@ -180,9 +181,14 @@ export async function POST(req: NextRequest) {
       }
     }
 
-    const model: ModelId = body.model === undefined ? "roleflow-genesis-1" : body.model;
-    if (!ALLOWED_MODELS.includes(model)) {
-      return apiError(400, "'model' must be 'roleflow-genesis-1' or 'roleflow-flash-1'.", "invalid_model");
+    // Retired IDs such as roleflow-flash-1 resolve to their successor (roleflow-flash-2).
+    const model: ModelId | null = body.model === undefined ? DEFAULT_MODEL : resolveModelId(body.model);
+    if (!model || !ALLOWED_MODELS.includes(model)) {
+      return apiError(
+        400,
+        "'model' must be one of 'roleflow-omni-1', 'roleflow-genesis-1', or 'roleflow-flash-2'.",
+        "invalid_model"
+      );
     }
     const allowedModels = record.allowedModels ?? ALLOWED_MODELS;
     if (!allowedModels.includes(model)) {

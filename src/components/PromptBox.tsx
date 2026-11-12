@@ -5,6 +5,7 @@ import { Plus, ArrowUp, X, FileText, ChevronDown, FolderKanban, Check } from "lu
 import { Attachment, EffortLevel, ModelId, Project } from "@/types";
 import { EffortDropdown } from "./EffortDropdown";
 import { ModelSelector } from "./ModelSelector";
+import { IMAGE_UPLOADS_ENABLED, IMAGE_UPLOADS_PAUSED_MESSAGE, isImageMimeType } from "@/lib/features";
 
 interface PromptBoxProps {
   onSend: (content: string, attachments: Attachment[]) => void;
@@ -24,6 +25,12 @@ const MAX_TEXT_BYTES = 512 * 1024;
 const MAX_PDF_BYTES = 4 * 1024 * 1024;
 const TEXT_FILE_PATTERN =
   /\.(txt|md|csv|tsv|json|ya?ml|xml|html?|css|scss|js|jsx|ts|tsx|py|java|c|cpp|h|rs|go|rb|php|sh|sql|log|env|toml|ini)$/i;
+const IMAGE_FILE_PATTERN = /\.(png|jpe?g|gif|webp|bmp|svg|avif|heic|heif|tiff?|ico)$/i;
+
+/** Picker filter. Images are left out while image uploads are paused. */
+const PICKER_ACCEPT = IMAGE_UPLOADS_ENABLED
+  ? ".pdf,.txt,.json,.md,.csv,.ts,.tsx,.js,.jsx,.py,.html,.css,image/*"
+  : ".pdf,.txt,.json,.md,.csv,.ts,.tsx,.js,.jsx,.py,.html,.css";
 
 export const PromptBox: React.FC<PromptBoxProps> = ({
   onSend,
@@ -43,6 +50,8 @@ export const PromptBox: React.FC<PromptBoxProps> = ({
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const projectMenuRef = useRef<HTMLDivElement>(null);
+  const [isDragging, setIsDragging] = useState(false);
+  const dragDepth = useRef(0);
 
   // Grow the textarea with its content, up to a cap.
   useEffect(() => {
@@ -89,12 +98,18 @@ export const PromptBox: React.FC<PromptBoxProps> = ({
     }
   };
 
-  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const files = e.target.files;
-    if (!files) return;
+  /** Shared by the file picker and drag-and-drop, so both follow the same rules. */
+  const addFiles = (files: File[]) => {
+    let imageBlocked = false;
 
-    Array.from(files).forEach((file) => {
-      const isImage = file.type.startsWith("image/");
+    files.forEach((file) => {
+      const looksLikeImage = isImageMimeType(file.type) || IMAGE_FILE_PATTERN.test(file.name);
+      if (looksLikeImage && !IMAGE_UPLOADS_ENABLED) {
+        imageBlocked = true;
+        return;
+      }
+
+      const isImage = looksLikeImage;
       const isPdf = file.type === "application/pdf" || /\.pdf$/i.test(file.name);
       const isText =
         !isImage &&
@@ -104,7 +119,11 @@ export const PromptBox: React.FC<PromptBoxProps> = ({
 
       if (!isImage && !isText && !isPdf) {
         window.alert(
-          `"${file.name}" can't be read yet. Attach images (PNG, JPG, WEBP, GIF), PDFs, or text and code files.`
+          `"${file.name}" can't be read yet. ${
+            IMAGE_UPLOADS_ENABLED
+              ? "Attach images (PNG, JPG, WEBP, GIF), PDFs, or text and code files."
+              : "Attach PDFs or text and code files."
+          }`
         );
         return;
       }
@@ -140,7 +159,46 @@ export const PromptBox: React.FC<PromptBoxProps> = ({
         reader.readAsText(file);
       }
     });
+
+    if (imageBlocked) {
+      window.alert(IMAGE_UPLOADS_PAUSED_MESSAGE);
+    }
+  };
+
+  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (e.target.files) addFiles(Array.from(e.target.files));
     if (fileInputRef.current) fileInputRef.current.value = "";
+  };
+
+  // Drag-and-drop. A depth counter keeps the highlight steady while the pointer crosses child elements.
+  const dragCarriesFiles = (e: React.DragEvent) =>
+    Array.from(e.dataTransfer?.types ?? []).includes("Files");
+
+  const handleDragEnter = (e: React.DragEvent<HTMLDivElement>) => {
+    if (!dragCarriesFiles(e)) return;
+    e.preventDefault();
+    dragDepth.current += 1;
+    setIsDragging(true);
+  };
+
+  const handleDragOver = (e: React.DragEvent<HTMLDivElement>) => {
+    if (!dragCarriesFiles(e)) return;
+    e.preventDefault();
+    e.dataTransfer.dropEffect = "copy";
+  };
+
+  const handleDragLeave = (e: React.DragEvent<HTMLDivElement>) => {
+    if (!dragCarriesFiles(e)) return;
+    dragDepth.current = Math.max(0, dragDepth.current - 1);
+    if (dragDepth.current === 0) setIsDragging(false);
+  };
+
+  const handleDrop = (e: React.DragEvent<HTMLDivElement>) => {
+    if (!dragCarriesFiles(e)) return;
+    e.preventDefault();
+    dragDepth.current = 0;
+    setIsDragging(false);
+    addFiles(Array.from(e.dataTransfer.files));
   };
 
   const removeAttachment = (index: number) => {
@@ -150,8 +208,18 @@ export const PromptBox: React.FC<PromptBoxProps> = ({
   const activeProject = projects.find((p) => p.id === selectedProjectId);
 
   return (
-    <div className="w-full">
-      <div className="bg-card rounded-2xl border border-line shadow-[0_4px_24px_rgb(0_0_0/0.04)] focus-within:border-accent/40 transition-colors duration-200">
+    <div
+      className="w-full"
+      onDragEnter={handleDragEnter}
+      onDragOver={handleDragOver}
+      onDragLeave={handleDragLeave}
+      onDrop={handleDrop}
+    >
+      <div
+        className={`bg-card rounded-2xl border shadow-[0_4px_24px_rgb(0_0_0/0.04)] focus-within:border-accent/40 transition-colors duration-200 ${
+          isDragging ? "border-accent ring-2 ring-accent/30" : "border-line"
+        }`}
+      >
         {/* Attached files */}
         {attachments.length > 0 && (
           <div className="flex flex-wrap gap-2 px-3.5 pt-3">
@@ -196,6 +264,7 @@ export const PromptBox: React.FC<PromptBoxProps> = ({
               type="file"
               ref={fileInputRef}
               onChange={handleFileChange}
+              accept={PICKER_ACCEPT}
               multiple
               className="hidden"
             />

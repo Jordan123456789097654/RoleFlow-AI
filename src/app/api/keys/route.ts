@@ -4,10 +4,11 @@ import { getSessionFromRequest } from "@/lib/auth";
 import { generateApiKey, newApiKeyId } from "@/lib/api-keys";
 import { ApiKey, ApiKeyRateLimit, ModelId } from "@/types";
 import { apiKeyCreatedNotice, notifyUser } from "@/lib/notify";
+import { MODEL_IDS } from "@/lib/models";
 
 export const dynamic = "force-dynamic";
 
-const ALL_MODELS: ModelId[] = ["roleflow-genesis-1", "roleflow-flash-1"];
+const ALL_MODELS: ModelId[] = [...MODEL_IDS];
 const ALLOWED_EXPIRY_DAYS = [7, 30, 90] as const;
 
 /** Strips the hash so a key record can be sent to the client safely. */

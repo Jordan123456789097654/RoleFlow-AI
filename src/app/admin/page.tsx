@@ -17,6 +17,8 @@ import {
   RotateCcw,
   Search,
   Check,
+  Brain,
+  Crown,
   Cpu,
   Zap,
   Lock,
@@ -617,11 +619,31 @@ export default function AdminPage() {
                 <p className="mt-1.5 text-sm text-muted">Model health, usage, and safety at a glance.</p>
               </div>
 
-              <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
+              <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-4">
+                <ModelCard
+                  icon={<Crown className="h-4 w-4" />}
+                  name="RoleFlow Apex 1.0"
+                  description="Highest-intelligence frontier model for proofs, systems architecture, and exhaustive reviews."
+                  status={<Badge tone="success">Online</Badge>}
+                  stats={[
+                    { label: "Avg latency", value: "Not measured yet" },
+                    { label: "Backend", value: "gpt-oss-120b, max reasoning" },
+                  ]}
+                />
+                <ModelCard
+                  icon={<Brain className="h-4 w-4" />}
+                  name="RoleFlow Omni 1.0"
+                  description="Frontier reasoning model for multi-step logic, advanced math, and enterprise engineering."
+                  status={<Badge tone="success">Online</Badge>}
+                  stats={[
+                    { label: "Avg latency", value: "Not measured yet" },
+                    { label: "Backend", value: "gpt-oss-120b, deep reasoning" },
+                  ]}
+                />
                 <ModelCard
                   icon={<Cpu className="h-4 w-4" />}
-                  name="RoleFlow Genesis 1.0"
-                  description="Flagship model for software engineering, architecture, and multi-step reasoning."
+                  name="RoleFlow Genesis 1.5"
+                  description="Balanced flagship for general intelligence, system architecture, and creative writing."
                   status={<Badge tone="success">Online</Badge>}
                   stats={[
                     { label: "Avg latency", value: "~840 ms" },
@@ -630,11 +652,11 @@ export default function AdminPage() {
                 />
                 <ModelCard
                   icon={<Zap className="h-4 w-4" />}
-                  name="RoleFlow Flash 1.0"
-                  description="Fast model for quick questions and rapid iteration."
+                  name="RoleFlow Flash 2.0"
+                  description="Ultra-fast model for quick questions, rapid coding, and higher reasoning throughput."
                   status={<Badge tone="success">Online</Badge>}
                   stats={[
-                    { label: "Avg latency", value: "~185 ms" },
+                    { label: "Avg latency", value: "Not measured yet" },
                     { label: "Context window", value: "128k tokens" },
                   ]}
                 />

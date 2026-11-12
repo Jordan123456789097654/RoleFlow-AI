@@ -1,4 +1,5 @@
 import { db } from "@/lib/db";
+import { DEFAULT_MODEL, getModelSpec, resolveModelId } from "@/lib/models";
 import { Logo } from "@/components/Logo";
 import { MessageItem } from "@/components/MessageItem";
 import Link from "next/link";
@@ -27,7 +28,7 @@ export default async function SharePage({ params }: { params: { id: string } }) 
     );
   }
 
-  const modelName = chat.model === "roleflow-genesis-1" ? "RoleFlow Genesis 1.0" : "RoleFlow Flash 1.0";
+  const modelName = getModelSpec(resolveModelId(chat.model) ?? DEFAULT_MODEL).name;
 
   return (
     <div className="flex min-h-screen flex-col bg-app text-ink">

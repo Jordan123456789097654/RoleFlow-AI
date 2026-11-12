@@ -94,7 +94,7 @@ Content-Type: application/json
 | Field | Required | Description |
 |---|---|---|
 | `messages` | yes | Non-empty array of objects with `role` (`user` or `assistant`) and `content` (non-empty string, up to 16,000 characters per message). The last message must have role `user`. |
-| `model` | no | `roleflow-genesis-1` (flagship, default) or `roleflow-flash-1` (fastest). |
+| `model` | no | `roleflow-apex-1` (highest-intelligence frontier), `roleflow-omni-1` (frontier reasoning), `roleflow-genesis-1` (balanced flagship, Genesis 1.5, default), or `roleflow-flash-2` (ultra-fast). `roleflow-flash-1` is still accepted and is served by `roleflow-flash-2`. |
 | `effort` | no | `low`, `medium` (default), `high`, `extra`, or `max`. |
 
 Notes on the request:
@@ -137,7 +137,7 @@ curl https://roleflow.site/api/v1/chat/completions \
   -H "Authorization: Bearer $ROLEFLOW_API_KEY" \
   -H "Content-Type: application/json" \
   -d '{
-    "model": "roleflow-flash-1",
+    "model": "roleflow-flash-2",
     "messages": [{ "role": "user", "content": "Give me three synonyms for happy." }]
   }'
 ```

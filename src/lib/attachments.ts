@@ -9,6 +9,7 @@ import {
   ModerationVerdict,
 } from "@/types";
 import { groqChatCompletion, isImageAttachment, VISION_MODEL } from "@/lib/ai-engine";
+import { IMAGE_UPLOADS_ENABLED } from "@/lib/features";
 
 const MAX_SCAN_CHARS = 60_000;
 const MAX_TURN_CHARS = 4_000;
@@ -56,6 +57,19 @@ const KNOWN_IMAGE_CATEGORIES: Record<string, ModerationCategory> = {
  * image uploads. Failures are logged; the keyword scanner still runs on text.
  */
 export async function classifyImagesForSafety(images: Attachment[]): Promise<ModerationVerdict> {
+  // Image uploads are paused. Nothing reaches the vision model and no image can raise a flag,
+  // so the review queue and the "image held" notices never fire for paused uploads.
+  if (!IMAGE_UPLOADS_ENABLED) {
+    return {
+      flagged: false,
+      tier: null,
+      category: null,
+      reason: null,
+      confidence: 0,
+      action: "ALLOW",
+    };
+  }
+
   // No vision model means images can't be checked. Fail closed: route them to review
   // instead of letting unchecked images through.
   if (!VISION_MODEL) {

@@ -9,6 +9,7 @@ import { AuthModal } from "@/components/AuthModal";
 import { UserProfile } from "@/types";
 import {
   ArrowRight,
+  Brain,
   Check,
   ChevronDown,
   Code2,
@@ -16,6 +17,7 @@ import {
   FolderKanban,
   Share2,
   Sliders,
+  Crown,
   Sparkles,
   Zap,
 } from "lucide-react";
@@ -174,7 +176,7 @@ export default function MarketingLandingPage() {
           <div className="mx-auto max-w-3xl">
             <div className="mb-7 inline-flex items-center gap-2 rounded-full border border-line bg-card px-3.5 py-1.5 text-xs text-muted">
               <Sparkles className="h-3.5 w-3.5 text-accent" />
-              <span>RoleFlow Genesis 1.0 and Flash 1.0</span>
+              <span>RoleFlow Apex 1.0, Omni 1.0, Genesis 1.5, and Flash 2.0</span>
             </div>
 
             <h1 className="font-display text-4xl font-normal leading-[1.12] tracking-tight text-ink sm:text-5xl lg:text-6xl">
@@ -310,14 +312,62 @@ export default function MarketingLandingPage() {
           <div className="mx-auto max-w-6xl">
             <div className="mx-auto mb-14 max-w-2xl text-center">
               <h2 className="font-display text-3xl font-normal tracking-tight text-ink sm:text-4xl">
-                Two models, one chat
+                Four models, one chat
               </h2>
               <p className="mt-4 text-base leading-relaxed text-muted">
                 Pick the model in the chat. Switch at any time.
               </p>
             </div>
 
-            <div className="grid grid-cols-1 gap-5 lg:grid-cols-2">
+            <div className="grid grid-cols-1 gap-5 md:grid-cols-2 xl:grid-cols-4">
+              <div className="flex flex-col justify-between rounded-2xl border border-line bg-card p-7 sm:p-8">
+                <div>
+                  <div className="mb-5 flex items-center gap-3">
+                    <div className="flex h-10 w-10 items-center justify-center rounded-full bg-ink text-app">
+                      <Crown className="h-5 w-5" />
+                    </div>
+                    <div>
+                      <h3 className="font-display text-xl text-ink">RoleFlow Apex 1.0</h3>
+                      <p className="text-xs text-muted">Our highest-intelligence model</p>
+                    </div>
+                  </div>
+                  <p className="text-sm leading-relaxed text-muted">
+                    Built for the most demanding work: deep multi-step reasoning, advanced mathematical proofs, complex systems architecture, and exhaustive code reviews.
+                  </p>
+                </div>
+                <Link
+                  href="/chat"
+                  className="mt-8 inline-flex min-h-11 items-center justify-center gap-2 rounded-lg border border-line bg-app text-sm font-medium text-ink transition-colors hover:bg-hover"
+                >
+                  <span>Use Apex 1.0</span>
+                  <ArrowRight className="h-4 w-4" />
+                </Link>
+              </div>
+
+              <div className="flex flex-col justify-between rounded-2xl border border-line bg-card p-7 sm:p-8">
+                <div>
+                  <div className="mb-5 flex items-center gap-3">
+                    <div className="flex h-10 w-10 items-center justify-center rounded-full bg-ink text-app">
+                      <Brain className="h-5 w-5" />
+                    </div>
+                    <div>
+                      <h3 className="font-display text-xl text-ink">RoleFlow Omni 1.0</h3>
+                      <p className="text-xs text-muted">Our frontier reasoning model</p>
+                    </div>
+                  </div>
+                  <p className="text-sm leading-relaxed text-muted">
+                    Use it for the hardest problems: deep multi-step reasoning, advanced math, and enterprise-grade software engineering. It takes longer, and it checks its work.
+                  </p>
+                </div>
+                <Link
+                  href="/chat"
+                  className="mt-8 inline-flex min-h-11 items-center justify-center gap-2 rounded-lg border border-line bg-app text-sm font-medium text-ink transition-colors hover:bg-hover"
+                >
+                  <span>Use Omni 1.0</span>
+                  <ArrowRight className="h-4 w-4" />
+                </Link>
+              </div>
+
               <div className="flex flex-col justify-between rounded-2xl border border-line bg-card p-7 sm:p-8">
                 <div>
                   <div className="mb-5 flex items-center gap-3">
@@ -325,19 +375,19 @@ export default function MarketingLandingPage() {
                       <Sparkles className="h-5 w-5" />
                     </div>
                     <div>
-                      <h3 className="font-display text-xl text-ink">RoleFlow Genesis 1.0</h3>
-                      <p className="text-xs text-muted">Our most capable model</p>
+                      <h3 className="font-display text-xl text-ink">RoleFlow Genesis 1.5</h3>
+                      <p className="text-xs text-muted">Our balanced flagship</p>
                     </div>
                   </div>
                   <p className="text-sm leading-relaxed text-muted">
-                    Use it for multi-file architecture, careful reasoning, and longer, harder problems. It supports the full range of effort levels.
+                    Use it for general questions, system architecture, and creative writing. It supports the full range of effort levels.
                   </p>
                 </div>
                 <Link
                   href="/chat"
                   className="mt-8 inline-flex min-h-11 items-center justify-center gap-2 rounded-lg bg-accent text-sm font-medium text-white transition-colors hover:bg-accent-hover"
                 >
-                  <span>Use Genesis 1.0</span>
+                  <span>Use Genesis 1.5</span>
                   <ArrowRight className="h-4 w-4" />
                 </Link>
               </div>
@@ -349,19 +399,19 @@ export default function MarketingLandingPage() {
                       <Zap className="h-5 w-5" />
                     </div>
                     <div>
-                      <h3 className="font-display text-xl text-ink">RoleFlow Flash 1.0</h3>
+                      <h3 className="font-display text-xl text-ink">RoleFlow Flash 2.0</h3>
                       <p className="text-xs text-muted">Built for speed</p>
                     </div>
                   </div>
                   <p className="text-sm leading-relaxed text-muted">
-                    A faster model for quick questions, small fixes, and rapid back-and-forth. Low and Medium effort work best.
+                    Our fastest model for quick questions, small fixes, and rapid coding, with stronger reasoning than before. Low and Medium effort work best.
                   </p>
                 </div>
                 <Link
                   href="/chat"
                   className="mt-8 inline-flex min-h-11 items-center justify-center gap-2 rounded-lg border border-line bg-app text-sm font-medium text-ink transition-colors hover:bg-hover"
                 >
-                  <span>Use Flash 1.0</span>
+                  <span>Use Flash 2.0</span>
                   <ArrowRight className="h-4 w-4" />
                 </Link>
               </div>
@@ -372,18 +422,24 @@ export default function MarketingLandingPage() {
                 <thead className="border-b border-line text-xs text-muted">
                   <tr>
                     <th scope="col" className="px-6 py-4 font-medium">Capability</th>
-                    <th scope="col" className="px-6 py-4 font-medium text-ink">Genesis 1.0</th>
-                    <th scope="col" className="px-6 py-4 font-medium text-ink">Flash 1.0</th>
+                    <th scope="col" className="px-6 py-4 font-medium text-ink">Apex 1.0</th>
+                    <th scope="col" className="px-6 py-4 font-medium text-ink">Omni 1.0</th>
+                    <th scope="col" className="px-6 py-4 font-medium text-ink">Genesis 1.5</th>
+                    <th scope="col" className="px-6 py-4 font-medium text-ink">Flash 2.0</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-line text-muted">
                   <tr>
                     <td className="px-6 py-4 font-medium text-ink">Best for</td>
-                    <td className="px-6 py-4">Architecture and complex problems</td>
+                    <td className="px-6 py-4">Proofs, systems architecture, and exhaustive reviews</td>
+                    <td className="px-6 py-4">Deep reasoning, advanced math, and hard engineering</td>
+                    <td className="px-6 py-4">General intelligence, architecture, and writing</td>
                     <td className="px-6 py-4">Quick questions and fast iteration</td>
                   </tr>
                   <tr>
                     <td className="px-6 py-4 font-medium text-ink">Effort levels</td>
+                    <td className="px-6 py-4">Low, Medium, High, Extra, Max. Medium and above recommended</td>
+                    <td className="px-6 py-4">Low, Medium, High, Extra, Max. Medium and above recommended</td>
                     <td className="px-6 py-4">Low, Medium, High, Extra, Max</td>
                     <td className="px-6 py-4">Low and Medium recommended</td>
                   </tr>
@@ -391,9 +447,13 @@ export default function MarketingLandingPage() {
                     <td className="px-6 py-4 font-medium text-ink">Artifacts and ZIP download</td>
                     <td className="px-6 py-4">Yes</td>
                     <td className="px-6 py-4">Yes</td>
+                    <td className="px-6 py-4">Yes</td>
+                    <td className="px-6 py-4">Yes</td>
                   </tr>
                   <tr>
                     <td className="px-6 py-4 font-medium text-ink">Project workspaces</td>
+                    <td className="px-6 py-4">Yes</td>
+                    <td className="px-6 py-4">Yes</td>
                     <td className="px-6 py-4">Yes</td>
                     <td className="px-6 py-4">Yes</td>
                   </tr>

@@ -9,6 +9,7 @@ import { ArtifactsPanel } from "@/components/ArtifactsPanel";
 import { AuthModal } from "@/components/AuthModal";
 import { SettingsModal } from "@/components/SettingsModal";
 import { formatCleanName, getTimeGreeting } from "@/lib/format";
+import { DEFAULT_MODEL, resolveModelId } from "@/lib/models";
 import { CreateProjectModal } from "@/components/CreateProjectModal";
 import { ShareModal } from "@/components/ShareModal";
 import { Logo } from "@/components/Logo";
@@ -32,7 +33,7 @@ export default function ChatPage() {
   useEffect(() => {
     if (window.innerWidth >= 768) setSidebarOpen(true);
   }, []);
-  const [model, setModel] = useState<ModelId>("roleflow-genesis-1");
+  const [model, setModel] = useState<ModelId>(DEFAULT_MODEL);
   const [effort, setEffort] = useState<EffortLevel>("medium");
 
   // User & Session Identity
@@ -208,7 +209,8 @@ export default function ChatPage() {
     if (chat) {
       setCurrentChatId(chat.id);
       setMessages(chat.messages);
-      setModel(chat.model);
+      // Chats saved under a retired model ID open on its successor.
+      setModel(resolveModelId(chat.model) ?? DEFAULT_MODEL);
       setEffort(chat.effort);
       setSelectedProjectId(chat.projectId);
 

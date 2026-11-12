@@ -19,7 +19,8 @@ export interface SystemConfig {
 
 export type EffortLevel = "low" | "medium" | "high" | "extra" | "max";
 
-export type ModelId = "roleflow-genesis-1" | "roleflow-flash-1";
+/** Current model IDs. Retired IDs such as "roleflow-flash-1" are resolved through lib/models.ts. */
+export type ModelId = "roleflow-apex-1" | "roleflow-omni-1" | "roleflow-genesis-1" | "roleflow-flash-2";
 
 export interface ModelInfo {
   id: ModelId;

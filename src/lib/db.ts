@@ -3,6 +3,7 @@ import path from "path";
 import os from "os";
 import { sql } from "@vercel/postgres";
 import { Chat, Project, UserProfile, ModerationLogEntry, ModerationStatus, SystemConfig, MemoryItem, ApiKey, ModelId } from "@/types";
+import { MODEL_IDS, resolveModelList } from "@/lib/models";
 
 const DATA_DIR = process.env.VERCEL ? path.join(os.tmpdir(), "roleflow-data") : path.join(process.cwd(), ".data");
 const STORE_FILE = path.join(DATA_DIR, "store.json");
@@ -42,14 +43,15 @@ export function getTodayDateString(): string {
   return new Date().toISOString().slice(0, 10);
 }
 
-const ALL_API_MODELS: ModelId[] = ["roleflow-genesis-1", "roleflow-flash-1"];
+const ALL_API_MODELS: ModelId[] = [...MODEL_IDS];
 
 /** Maps a roleflow_api_keys row (snake_case) to the ApiKey shape. */
 function rowToApiKey(r: any): ApiKey {
   let allowedModels: ModelId[] = ALL_API_MODELS;
   if (typeof r.allowed_models === "string" && r.allowed_models) {
     try {
-      allowedModels = JSON.parse(r.allowed_models) as ModelId[];
+      // Keys created before a model rename store retired IDs. Resolve them to current IDs.
+      allowedModels = resolveModelList(JSON.parse(r.allowed_models));
     } catch {
       allowedModels = ALL_API_MODELS;
     }

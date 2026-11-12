@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/lib/db";
 import { Chat } from "@/types";
 import { getSessionFromRequest } from "@/lib/auth";
+import { DEFAULT_MODEL, resolveModelId } from "@/lib/models";
 
 export const dynamic = "force-dynamic";
 
@@ -51,7 +52,7 @@ export async function POST(req: NextRequest) {
       title: body.title || "New Chat",
       projectId: body.projectId,
       pinned: body.pinned || false,
-      model: body.model || "roleflow-genesis-1",
+      model: resolveModelId(body.model) ?? DEFAULT_MODEL,
       effort: body.effort || "medium",
       messages: body.messages || [],
       createdAt: new Date().toISOString(),

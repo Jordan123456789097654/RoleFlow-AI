@@ -7,7 +7,7 @@ An independent, fully custom AI assistant platform engineered with a clean, inte
 - **Brand Identity**: Dual harmonic "Flow Wave" logo with warm terracotta/amber accents and deep charcoal dark mode (`#18181b`).
 - **RoleFlow Architecture**:
   - Time-of-day greeting (`"Afternoon, Jordan Daniels"`) on a minimalist home dashboard.
-  - Multi-tier model selector: **RoleFlow Genesis 1.0** (flagship) & **RoleFlow Flash 1.0** (ultra-fast).
+  - Four-tier model selector: **RoleFlow Apex 1.0** (highest-intelligence frontier), **RoleFlow Omni 1.0** (frontier reasoning), **RoleFlow Genesis 1.5** (balanced flagship), & **RoleFlow Flash 2.0** (ultra-fast). `roleflow-flash-1` requests resolve to Flash 2.0. Genesis 1.5 keeps the `roleflow-genesis-1` ID.
   - Exact Effort Dropdown (`Low`, `Medium [Recommended]`, `High`, `Extra`, `Max [⚠️ 8× or more usage]`).
   - Action row under every assistant answer: **Copy**, **Thumbs Up**, **Thumbs Down**, and **Regenerate**.
   - Simple user message editing with inline re-generation.

@@ -1,8 +1,10 @@
 "use client";
 
 import React, { useState, useRef, useEffect } from "react";
-import { ChevronDown, Sparkles, Zap, Check } from "lucide-react";
+import { Brain, ChevronDown, Crown, Sparkles, Zap, Check } from "lucide-react";
+import type { LucideIcon } from "lucide-react";
 import { ModelId } from "@/types";
+import { DEFAULT_MODEL, MODEL_IDS, getModelSpec } from "@/lib/models";
 
 interface ModelSelectorProps {
   currentModel: ModelId;
@@ -11,22 +13,24 @@ interface ModelSelectorProps {
   placement?: "up" | "down";
 }
 
-const MODELS = [
-  {
-    id: "roleflow-genesis-1" as ModelId,
-    name: "RoleFlow Genesis 1.0",
-    badge: "Flagship",
-    description: "Best for complex reasoning, architecture, and coding.",
-    icon: Sparkles,
-  },
-  {
-    id: "roleflow-flash-1" as ModelId,
-    name: "RoleFlow Flash 1.0",
-    badge: "Fast",
-    description: "Quick answers and fast edits.",
-    icon: Zap,
-  },
-];
+const MODEL_ICONS: Record<ModelId, LucideIcon> = {
+  "roleflow-apex-1": Crown,
+  "roleflow-omni-1": Brain,
+  "roleflow-genesis-1": Sparkles,
+  "roleflow-flash-2": Zap,
+};
+
+// Ordered top tier first: Apex, Omni, Genesis (balanced flagship), Flash (ultra-fast).
+const MODELS = MODEL_IDS.map((id) => {
+  const spec = getModelSpec(id);
+  return {
+    id,
+    name: spec.name,
+    badge: spec.badge,
+    description: spec.description,
+    icon: MODEL_ICONS[id],
+  };
+});
 
 export const ModelSelector: React.FC<ModelSelectorProps> = ({
   currentModel,
@@ -53,7 +57,7 @@ export const ModelSelector: React.FC<ModelSelectorProps> = ({
     };
   }, []);
 
-  const activeModel = MODELS.find((m) => m.id === currentModel) || MODELS[0];
+  const activeModel = MODELS.find((m) => m.id === currentModel) || MODELS.find((m) => m.id === DEFAULT_MODEL)!;
 
   return (
     <div className="relative inline-block text-left" ref={dropdownRef}>

@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { generateRoleFlowResponse } from "@/lib/ai-engine";
 import { db, ADMIN_EMAIL } from "@/lib/db";
-import { Chat, Message, ModerationLogEntry, ModelId, EffortLevel } from "@/types";
+import { Attachment, Chat, Message, ModerationLogEntry, ModelId, EffortLevel } from "@/types";
 import { scanMessage } from "@/lib/moderation";
 import { sendSecurityAlertEmail } from "@/lib/email";
 import { getMemories, addMemory, removeMemory } from "@/lib/memory";
@@ -11,8 +11,10 @@ import { isImageAttachment } from "@/lib/ai-engine";
 import { convertPdfAttachments } from "@/lib/pdf";
 import { buildAttachmentScanText, buildIncidentContext, classifyImagesForSafety } from "@/lib/attachments";
 import { imageHeldNotice, moderationRefusalNotice, notifyUser, suspensionNotice, usageWarningNotice } from "@/lib/notify";
+import { DEFAULT_MODEL, MODEL_IDS, resolveModelId } from "@/lib/models";
+import { IMAGE_UPLOADS_ENABLED, IMAGE_UPLOADS_PAUSED_MESSAGE, isImageMimeType } from "@/lib/features";
 
-const ALLOWED_MODELS: ModelId[] = ["roleflow-genesis-1", "roleflow-flash-1"];
+const ALLOWED_MODELS: ModelId[] = [...MODEL_IDS];
 const ALLOWED_EFFORTS: EffortLevel[] = ["low", "medium", "high", "extra", "max"];
 
 export async function POST(req: NextRequest) {
@@ -38,11 +40,13 @@ export async function POST(req: NextRequest) {
     const {
       chatId,
       messages,
-      model = "roleflow-genesis-1",
+      model: rawModel = DEFAULT_MODEL,
       effort = "medium",
       projectId,
       customInstructions,
     } = body;
+    // Retired IDs (e.g. roleflow-flash-1) resolve to their successor before any other check.
+    const model: ModelId = resolveModelId(rawModel) ?? DEFAULT_MODEL;
 
     if (!messages || !Array.isArray(messages) || messages.length === 0) {
       return NextResponse.json({ error: "Messages array required" }, { status: 400 });
@@ -94,7 +98,7 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    const safeModel: ModelId = ALLOWED_MODELS.includes(model) ? model : "roleflow-genesis-1";
+    const safeModel: ModelId = ALLOWED_MODELS.includes(model) ? model : DEFAULT_MODEL;
     let safeEffort: EffortLevel = ALLOWED_EFFORTS.includes(effort) ? effort : "medium";
     if (!sysConfig.allowHighEffort && (safeEffort === "extra" || safeEffort === "max")) {
       safeEffort = "high";
@@ -118,6 +122,23 @@ export async function POST(req: NextRequest) {
 
     if (safeMessages.length === 0) {
       return NextResponse.json({ error: "Valid user or assistant messages required" }, { status: 400 });
+    }
+
+    // Image uploads are paused. A new image on the latest turn is refused before any other work.
+    // Images in earlier turns (saved before the pause) are not refused, so existing chats keep
+    // working; buildModelMessages reduces them to filenames for the model.
+    if (!IMAGE_UPLOADS_ENABLED) {
+      const latestTurn = [...safeMessages].reverse().find((m: Message) => m.role === "user");
+      const hasNewImage = (latestTurn?.attachments || []).some(
+        (a: Attachment) =>
+          isImageMimeType(a.type) || (typeof a.content === "string" && a.content.startsWith("data:image/"))
+      );
+      if (hasNewImage) {
+        return NextResponse.json(
+          { error: IMAGE_UPLOADS_PAUSED_MESSAGE, code: "image_uploads_disabled" },
+          { status: 400 }
+        );
+      }
     }
 
     // PDFs become extracted text here, so every later step handles them like any text file.

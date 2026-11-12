@@ -702,7 +702,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                       <div className="text-sm text-muted">
                         {isAdmin
                           ? "Unlimited model inference tokens and priority server routing."
-                          : "25 daily messages with full access to Genesis and Flash."}
+                          : "25 daily messages with full access to Apex, Omni, Genesis, and Flash."}
                       </div>
                     </div>
                   </div>

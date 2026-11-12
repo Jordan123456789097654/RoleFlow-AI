@@ -180,7 +180,7 @@ export function ApiKeysPanel() {
   const curlExample = `curl ${origin}/api/v1/chat/completions \\
   -H "Authorization: Bearer YOUR_API_KEY" \\
   -H "Content-Type: application/json" \\
-  -d '{"model":"roleflow-flash-1","messages":[{"role":"user","content":"Hello"}]}'`;
+  -d '{"model":"roleflow-flash-2","messages":[{"role":"user","content":"Hello"}]}'`;
 
   if (loadState === "loading") {
     return <p className="text-sm text-muted">Loading your API keys…</p>;
