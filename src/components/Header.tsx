@@ -22,6 +22,9 @@ interface HeaderProps {
   onSignOut?: () => void;
   /** Opens the sidebar drawer. Shown on small screens only. */
   onToggleSidebar?: () => void;
+  /** Signed-out users see other models locked. */
+  guest?: boolean;
+  onRequireAccount?: () => void;
 }
 
 export const Header: React.FC<HeaderProps> = ({
@@ -38,6 +41,8 @@ export const Header: React.FC<HeaderProps> = ({
   onClearConversation,
   onSignOut,
   onToggleSidebar,
+  guest,
+  onRequireAccount,
 }) => {
   return (
     <header className="h-14 px-3 sm:px-4 flex items-center justify-between gap-2 shrink-0 z-20 bg-app/90 backdrop-blur-sm">
@@ -53,7 +58,13 @@ export const Header: React.FC<HeaderProps> = ({
           </button>
         )}
 
-        <ModelSelector currentModel={model} onSelect={onModelChange} placement="down" />
+        <ModelSelector
+          currentModel={model}
+          onSelect={onModelChange}
+          placement="down"
+          guest={guest}
+          onRequireAccount={onRequireAccount}
+        />
 
         {currentProject && (
           <span className="hidden sm:inline-flex text-xs px-2.5 py-1 rounded-full bg-accent-soft text-accent font-medium truncate max-w-[160px]">

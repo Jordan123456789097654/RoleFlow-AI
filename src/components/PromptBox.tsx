@@ -18,6 +18,8 @@ interface PromptBoxProps {
   selectedProjectId?: string;
   onProjectChange: (projectId?: string) => void;
   onCreateProject?: () => void;
+  guest?: boolean;
+  onRequireAccount?: () => void;
 }
 
 const MAX_IMAGE_BYTES = 4 * 1024 * 1024;
@@ -43,6 +45,8 @@ export const PromptBox: React.FC<PromptBoxProps> = ({
   selectedProjectId,
   onProjectChange,
   onCreateProject,
+  guest,
+  onRequireAccount,
 }) => {
   const [content, setContent] = useState("");
   const [attachments, setAttachments] = useState<Attachment[]>([]);
@@ -351,7 +355,13 @@ export const PromptBox: React.FC<PromptBoxProps> = ({
 
           {/* Model, effort, send */}
           <div className="flex items-center gap-0.5 sm:gap-1 shrink-0">
-            <ModelSelector currentModel={model} onSelect={onModelChange} placement="up" />
+            <ModelSelector
+              currentModel={model}
+              onSelect={onModelChange}
+              placement="up"
+              guest={guest}
+              onRequireAccount={onRequireAccount}
+            />
             <EffortDropdown effort={effort} onChange={onEffortChange} placement="up" />
 
             <button

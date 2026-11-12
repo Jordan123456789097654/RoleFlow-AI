@@ -9,7 +9,7 @@ import { ArtifactsPanel } from "@/components/ArtifactsPanel";
 import { AuthModal } from "@/components/AuthModal";
 import { SettingsModal } from "@/components/SettingsModal";
 import { formatCleanName, getTimeGreeting } from "@/lib/format";
-import { DEFAULT_MODEL, resolveModelId } from "@/lib/models";
+import { DEFAULT_MODEL, GUEST_MODEL, isGuestAllowedModel, resolveModelId } from "@/lib/models";
 import { CreateProjectModal } from "@/components/CreateProjectModal";
 import { ShareModal } from "@/components/ShareModal";
 import { Logo } from "@/components/Logo";
@@ -38,6 +38,9 @@ export default function ChatPage() {
 
   // User & Session Identity
   const [user, setUser] = useState<UserProfile | null>(null);
+  // Signed-out users always run the guest model, whatever the selector last showed.
+  const isGuest = !user;
+  const activeModel: ModelId = isGuest && !isGuestAllowedModel(model) ? GUEST_MODEL : model;
   const [guestSessionId, setGuestSessionId] = useState<string>("");
   const [guestMessagesCount, setGuestMessagesCount] = useState(0);
   const [authModalOpen, setAuthModalOpen] = useState(false);
@@ -318,7 +321,7 @@ export default function ChatPage() {
           userEmail: user?.email,
           chatId: currentChatId,
           messages: newMessages,
-          model,
+          model: activeModel,
           effort,
           projectId: selectedProjectId,
           customInstructions:
@@ -436,7 +439,7 @@ export default function ChatPage() {
         userEmail: user?.email,
         chatId: currentChatId,
         messages: trimmed,
-        model,
+        model: activeModel,
         effort,
         projectId: selectedProjectId,
         customInstructions: user?.customInstructions,
@@ -497,8 +500,10 @@ export default function ChatPage() {
     <PromptBox
       onSend={handleSendMessage}
       isLoading={isLoading}
-      model={model}
+      model={activeModel}
       onModelChange={setModel}
+      guest={isGuest}
+      onRequireAccount={() => setAuthModalOpen(true)}
       effort={effort}
       onEffortChange={setEffort}
       projects={projects}
@@ -541,8 +546,10 @@ export default function ChatPage() {
       {/* Main column */}
       <div className="flex-1 flex flex-col h-full min-w-0 overflow-hidden relative">
         <Header
-          model={model}
+          model={activeModel}
           onModelChange={setModel}
+          guest={isGuest}
+          onRequireAccount={() => setAuthModalOpen(true)}
           effort={effort}
           onEffortChange={setEffort}
           currentProject={activeProject}

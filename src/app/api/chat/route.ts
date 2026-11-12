@@ -11,7 +11,7 @@ import { isImageAttachment } from "@/lib/ai-engine";
 import { convertPdfAttachments } from "@/lib/pdf";
 import { buildAttachmentScanText, buildIncidentContext, classifyImagesForSafety } from "@/lib/attachments";
 import { imageHeldNotice, moderationRefusalNotice, notifyUser, suspensionNotice, usageWarningNotice } from "@/lib/notify";
-import { DEFAULT_MODEL, MODEL_IDS, resolveModelId } from "@/lib/models";
+import { DEFAULT_MODEL, GUEST_MODEL, MODEL_IDS, isGuestAllowedModel, resolveModelId } from "@/lib/models";
 import { IMAGE_UPLOADS_ENABLED, IMAGE_UPLOADS_PAUSED_MESSAGE, isImageMimeType } from "@/lib/features";
 
 const ALLOWED_MODELS: ModelId[] = [...MODEL_IDS];
@@ -46,7 +46,7 @@ export async function POST(req: NextRequest) {
       customInstructions,
     } = body;
     // Retired IDs (e.g. roleflow-flash-1) resolve to their successor before any other check.
-    const model: ModelId = resolveModelId(rawModel) ?? DEFAULT_MODEL;
+    let model: ModelId = resolveModelId(rawModel) ?? DEFAULT_MODEL;
 
     if (!messages || !Array.isArray(messages) || messages.length === 0) {
       return NextResponse.json({ error: "Messages array required" }, { status: 400 });
@@ -62,6 +62,12 @@ export async function POST(req: NextRequest) {
 
     const isGuest = !userId || userId.startsWith("guest_");
     const identifier = userEmail || userId || "guest_default";
+
+    // Guests can use only the guest model. Substituting here, before generation and before the
+    // chat is saved, means the reply and the stored chat both show the model that actually ran.
+    if (isGuest && !isGuestAllowedModel(model)) {
+      model = GUEST_MODEL;
+    }
 
     // Per-minute abuse limits, separate from daily quotas. Guest IDs come from the client,
     // so guests are limited per IP. Signed-in accounts are also capped per user.

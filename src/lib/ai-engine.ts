@@ -83,7 +83,7 @@ export async function generateRoleFlowResponse({
     // Image turns go to the vision model with Genesis sampling, since tier-specific
     // gpt-oss parameters do not apply to a vision model.
     const backendModel = hasImages ? VISION_MODEL : spec.backend;
-    const sampling = hasImages ? getModelSpec(DEFAULT_MODEL) : spec;
+    const sampling = hasImages ? getModelSpec("roleflow-genesis-1") : spec;
 
     const systemPrompt = buildSystemPrompt(spec, {
       effort,

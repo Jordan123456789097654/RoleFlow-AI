@@ -19,7 +19,15 @@ export const MODEL_IDS: readonly ModelId[] = [
   "roleflow-flash-2",
 ];
 
-export const DEFAULT_MODEL: ModelId = "roleflow-genesis-1";
+/** Default for new chats and for API requests that omit `model`. */
+export const DEFAULT_MODEL: ModelId = "roleflow-flash-2";
+
+/** The only model guests (signed-out users) can use. Enforced on the server, not just in the UI. */
+export const GUEST_MODEL: ModelId = "roleflow-flash-2";
+
+export function isGuestAllowedModel(id: ModelId): boolean {
+  return id === GUEST_MODEL;
+}
 
 /** Retired IDs and the model that now serves them. Saved chats and API keys keep working. */
 export const MODEL_ALIASES: Readonly<Record<string, ModelId>> = {
@@ -91,6 +99,7 @@ const SPECS: Record<ModelId, ModelSpec> = {
     backend: "openai/gpt-oss-120b",
     temperature: { low: 0.3, medium: 0.6, high: 0.6, extra: 0.6, max: 0.85 },
     maxTokens: { low: 4096, medium: 4096, high: 4096, extra: 8192, max: 8192 },
+    reasoningEffort: "medium",
   },
   "roleflow-flash-2": {
     id: "roleflow-flash-2",
@@ -105,7 +114,8 @@ const SPECS: Record<ModelId, ModelSpec> = {
     temperature: { low: 0.2, medium: 0.5, high: 0.6, extra: 0.6, max: 0.7 },
     topP: 0.95,
     maxTokens: { low: 4096, medium: 4096, high: 8192, extra: 8192, max: 8192 },
-    reasoningEffort: "medium",
+    // Flash answers quickly: the least reasoning of any tier.
+    reasoningEffort: "low",
   },
 };
 

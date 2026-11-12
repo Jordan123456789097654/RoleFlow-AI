@@ -2,16 +2,20 @@
 
 import React, { useState, useRef, useEffect, useLayoutEffect, useCallback } from "react";
 import { createPortal } from "react-dom";
-import { Brain, ChevronDown, Crown, Sparkles, Zap, Check } from "lucide-react";
+import { Brain, ChevronDown, Crown, Lock, Sparkles, Zap, Check } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
 import { ModelId } from "@/types";
-import { DEFAULT_MODEL, MODEL_IDS, getModelSpec } from "@/lib/models";
+import { DEFAULT_MODEL, MODEL_IDS, getModelSpec, isGuestAllowedModel } from "@/lib/models";
 
 interface ModelSelectorProps {
   currentModel: ModelId;
   onSelect: (model: ModelId) => void;
   /** Where the menu opens when there is room. "down" for the header, "up" for the composer. */
   placement?: "up" | "down";
+  /** Signed-out users can pick only the guest model. Other models show a lock. */
+  guest?: boolean;
+  /** Called when a guest picks a locked model. The chat page opens the sign-in modal here. */
+  onRequireAccount?: () => void;
 }
 
 const MODEL_ICONS: Record<ModelId, LucideIcon> = {
@@ -53,6 +57,8 @@ export const ModelSelector: React.FC<ModelSelectorProps> = ({
   currentModel,
   onSelect,
   placement = "down",
+  guest = false,
+  onRequireAccount,
 }) => {
   const [isOpen, setIsOpen] = useState(false);
   const [menuPos, setMenuPos] = useState<MenuPosition | null>(null);
@@ -152,17 +158,25 @@ export const ModelSelector: React.FC<ModelSelectorProps> = ({
             {MODELS.map((model) => {
               const Icon = model.icon;
               const isSelected = model.id === currentModel;
+              const locked = guest && !isGuestAllowedModel(model.id);
               return (
                 <button
                   key={model.id}
                   type="button"
                   role="option"
                   aria-selected={isSelected}
+                  aria-disabled={locked || undefined}
                   onClick={() => {
-                    onSelect(model.id);
                     setIsOpen(false);
+                    if (locked) {
+                      onRequireAccount?.();
+                      return;
+                    }
+                    onSelect(model.id);
                   }}
-                  className="w-full flex items-start gap-3 p-2.5 rounded-lg text-left hover:bg-hover transition-colors duration-150"
+                  className={`w-full flex items-start gap-3 p-2.5 rounded-lg text-left transition-colors duration-150 hover:bg-hover ${
+                    locked ? "opacity-70" : ""
+                  }`}
                 >
                   <Icon className="w-[18px] h-[18px] mt-0.5 shrink-0 text-accent" strokeWidth={1.75} />
                   <div className="flex-1 min-w-0">
@@ -172,9 +186,12 @@ export const ModelSelector: React.FC<ModelSelectorProps> = ({
                         {model.badge}
                       </span>
                     </div>
-                    <p className="text-xs text-muted mt-0.5 leading-relaxed">{model.description}</p>
+                    <p className="text-xs text-muted mt-0.5 leading-relaxed">
+                      {locked ? "Sign in to use this model." : model.description}
+                    </p>
                   </div>
-                  {isSelected && <Check className="w-4 h-4 text-accent shrink-0 mt-1" strokeWidth={2} />}
+                  {locked && <Lock className="w-4 h-4 text-muted shrink-0 mt-1" strokeWidth={1.75} />}
+                  {!locked && isSelected && <Check className="w-4 h-4 text-accent shrink-0 mt-1" strokeWidth={2} />}
                 </button>
               );
             })}
