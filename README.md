@@ -1,0 +1,66 @@
+# RoleFlow · Custom AI Platform
+
+An independent, fully custom AI assistant platform inspired by Claude's clean, intellectual design and built for general inquiry and high-precision software engineering.
+
+## ✨ Features
+
+- **Brand Identity**: Dual harmonic "Flow Wave" logo with warm terracotta/amber accents and deep charcoal dark mode (`#18181b`).
+- **Claude-style Architecture**:
+  - Time-of-day greeting (`"Afternoon, Jordan Daniels"`) on a minimalist home dashboard.
+  - Multi-tier model selector: **RoleFlow Genesis 1.0** (flagship) & **RoleFlow Flash 1.0** (ultra-fast).
+  - Exact Effort Dropdown replica (`Low`, `Medium [Recommended]`, `High`, `Extra`, `Max [⚠️ 8× or more usage]`).
+  - Action row under every assistant answer: **Copy**, **Thumbs Up**, **Thumbs Down**, and **Regenerate**.
+  - Simple user message editing with inline re-generation.
+- **Claude Artifacts (Slideout Panel)**:
+  - Multi-file tab support.
+  - Live interactive sandboxed iframe preview for HTML/CSS/JS web applications.
+  - 1-click **Download File** (`.html`, `.py`, `.js`, etc.).
+  - 1-click **Download .ZIP** bundling all files in the project.
+- **Email Authentication (Claude-style)**:
+  - Powered by **Resend** using `noreply@roleflow.site`.
+  - Sends a clean sign-in email with waving hand graphic (`👋`), magic link button, and 6-digit OTP code.
+  - Guest mode with free message limit before sign-in prompt.
+- **Workspaces & Projects**:
+  - `Project ⌵` workspace switcher in the prompt bar.
+  - Custom instructions per project and persistent global custom instructions in settings.
+- **Database & Storage**:
+  - Vercel Postgres / Neon integration ready.
+  - Automatic zero-config local storage fallback for offline development.
+- **Public Chat Sharing**:
+  - Instant read-only shareable links (`/share/[id]`).
+
+---
+
+## 🚀 Getting Started
+
+### 1. Run Locally
+```bash
+npm install
+npm run dev
+```
+
+### 2. Environment Variables (`.env.local`)
+```env
+RESEND_API_KEY=your_resend_api_key
+RESEND_FROM_EMAIL=RoleFlow <noreply@roleflow.site>
+NEXT_PUBLIC_APP_URL=https://roleflow.site
+GROQ_API_KEYS=key1,key2,key3,key4,key5
+
+# When deployed to Vercel, link Vercel Postgres to automatically populate:
+# POSTGRES_URL=
+```
+
+---
+
+## 🌐 Deploy to Vercel with Custom Domain (`roleflow.site`)
+
+1. Push this project to GitHub.
+2. Import the repository into [Vercel](https://vercel.com).
+3. In **Project Settings** → **Domains**, add `roleflow.site`.
+4. In **Storage**, create a **Postgres** database and link it to your project.
+5. In **Environment Variables**, add:
+   - `RESEND_API_KEY`
+   - `RESEND_FROM_EMAIL` = `RoleFlow <noreply@roleflow.site>`
+   - `NEXT_PUBLIC_APP_URL` = `https://roleflow.site`
+   - `GROQ_API_KEYS`
+6. Click **Deploy**!
