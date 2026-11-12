@@ -1,76 +1,56 @@
 import React from "react";
 import Link from "next/link";
 import { Logo } from "./Logo";
-import { ArrowLeft, ArrowRight, Shield } from "lucide-react";
+import { ArrowLeft } from "lucide-react";
 
 interface LegalHeaderProps {
   currentPage?: "terms" | "privacy" | "acceptable-use";
 }
 
+const LEGAL_LINKS = [
+  { href: "/terms", label: "Terms", key: "terms" },
+  { href: "/privacy", label: "Privacy", key: "privacy" },
+  { href: "/acceptable-use", label: "Acceptable Use", key: "acceptable-use" },
+] as const;
+
 export const LegalHeader: React.FC<LegalHeaderProps> = ({ currentPage }) => {
   return (
-    <header className="sticky top-0 z-50 w-full bg-[#141413]/90 backdrop-blur-md border-b border-[#242321]">
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between">
-        <div className="flex items-center gap-6">
+    <header className="sticky top-0 z-50 w-full border-b border-line bg-app/90 backdrop-blur-md">
+      <div className="mx-auto flex h-16 max-w-6xl items-center justify-between gap-4 px-4 sm:px-6 lg:px-8">
+        <div className="flex items-center gap-3">
           <Link
             href="/"
-            className="flex items-center gap-2 text-xs font-medium text-[#9b9a97] hover:text-[#f4f4f0] transition-colors py-1 px-2.5 rounded-lg hover:bg-[#1f1e1d] border border-transparent hover:border-[#2d2c2a]"
+            aria-label="Back to home"
+            className="inline-flex min-h-10 min-w-10 items-center justify-center rounded-lg text-muted transition-colors hover:bg-hover hover:text-ink"
           >
-            <ArrowLeft className="w-3.5 h-3.5" />
-            <span>Back to Home</span>
+            <ArrowLeft className="h-4 w-4" />
           </Link>
-
-          <div className="h-4 w-px bg-[#2b2a28] hidden sm:block" />
-
-          <Link href="/" className="flex items-center gap-2 hover:opacity-90 transition-opacity">
+          <Link href="/" className="inline-flex items-center">
             <Logo size={24} />
           </Link>
         </div>
 
-        {/* Center navigation among legal docs */}
-        <nav className="hidden md:flex items-center gap-1 bg-[#1a1918] p-1 rounded-xl border border-[#2b2a28] text-xs">
-          <Link
-            href="/terms"
-            className={`px-3 py-1.5 rounded-lg transition-colors font-medium ${
-              currentPage === "terms"
-                ? "bg-[#282725] text-[#f4f4f0] shadow-sm"
-                : "text-[#8e8d89] hover:text-[#d4d3ce]"
-            }`}
-          >
-            Terms of Service
-          </Link>
-          <Link
-            href="/privacy"
-            className={`px-3 py-1.5 rounded-lg transition-colors font-medium ${
-              currentPage === "privacy"
-                ? "bg-[#282725] text-[#f4f4f0] shadow-sm"
-                : "text-[#8e8d89] hover:text-[#d4d3ce]"
-            }`}
-          >
-            Privacy Policy
-          </Link>
-          <Link
-            href="/acceptable-use"
-            className={`px-3 py-1.5 rounded-lg transition-colors font-medium ${
-              currentPage === "acceptable-use"
-                ? "bg-[#282725] text-[#f4f4f0] shadow-sm"
-                : "text-[#8e8d89] hover:text-[#d4d3ce]"
-            }`}
-          >
-            Acceptable Use
-          </Link>
+        <nav className="hidden items-center gap-1 md:flex">
+          {LEGAL_LINKS.map((item) => (
+            <Link
+              key={item.key}
+              href={item.href}
+              aria-current={currentPage === item.key ? "page" : undefined}
+              className={`rounded-lg px-3 py-2 text-sm transition-colors ${
+                currentPage === item.key ? "bg-hover text-ink" : "text-muted hover:text-ink"
+              }`}
+            >
+              {item.label}
+            </Link>
+          ))}
         </nav>
 
-        {/* Right CTA */}
-        <div className="flex items-center gap-3">
-          <Link
-            href="/chat"
-            className="flex items-center gap-1.5 px-3.5 py-1.5 rounded-lg bg-[#d97706] hover:bg-[#b45309] text-white text-xs font-medium transition-colors shadow-sm"
-          >
-            <span>Launch RoleFlow</span>
-            <ArrowRight className="w-3.5 h-3.5" />
-          </Link>
-        </div>
+        <Link
+          href="/chat"
+          className="inline-flex min-h-10 items-center rounded-lg bg-accent px-4 text-sm font-medium text-white transition-colors hover:bg-accent-hover"
+        >
+          Open RoleFlow
+        </Link>
       </div>
     </header>
   );

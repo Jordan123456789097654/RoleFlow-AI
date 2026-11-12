@@ -11,20 +11,20 @@ export const metadata = {
 
 export default function AcceptableUsePage() {
   return (
-    <div className="min-h-screen flex flex-col bg-[#141413] text-[#f4f4f0]">
+    <div className="min-h-screen flex flex-col bg-app text-ink">
       <LegalHeader currentPage="acceptable-use" />
 
-      <main className="flex-1 py-16 px-4 sm:px-6 lg:px-8 max-w-4xl mx-auto w-full">
+      <main className="flex-1 mx-auto w-full max-w-2xl px-4 py-14 sm:px-6 sm:py-20">
         {/* Header Badge */}
-        <div className="mb-10 pb-8 border-b border-[#262523]">
-          <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-[#1e1d1b] border border-[#2e2d2a] text-xs text-[#d97706] mb-4">
+        <div className="mb-10 pb-8 border-b border-line">
+          <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-panel border border-line text-xs text-accent mb-4">
             <AlertTriangle className="w-3.5 h-3.5" />
             <span>Effective Date: January 1, 2026</span>
           </div>
-          <h1 className="font-serif text-3xl sm:text-4xl text-[#f4f4f0] font-normal tracking-tight mb-4">
+          <h1 className="font-display text-3xl sm:text-4xl text-ink font-normal tracking-tight mb-4">
             Acceptable Use Policy
           </h1>
-          <p className="text-sm sm:text-base text-[#9b9a97] leading-relaxed">
+          <p className="text-sm sm:text-base text-ink/75 leading-relaxed">
             RoleFlow is engineered to empower developers, system architects, and researchers with cutting-edge
             computational intelligence. This Acceptable Use Policy outlines the guidelines that ensure our platform
             remains safe, reliable, and respectful for everyone.
@@ -33,12 +33,12 @@ export default function AcceptableUsePage() {
 
         {/* Core Principles */}
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-12">
-          <div className="p-5 rounded-xl bg-[#191817] border border-[#262523]">
-            <div className="flex items-center gap-2.5 text-emerald-400 mb-2">
+          <div className="p-5 rounded-xl bg-app border border-line">
+            <div className="flex items-center gap-2.5 text-accent mb-2">
               <CheckCircle2 className="w-4 h-4" />
-              <h3 className="text-sm font-medium text-[#f4f4f0]">Permitted & Encouraged Uses</h3>
+              <h3 className="text-sm font-medium text-ink">Permitted & Encouraged Uses</h3>
             </div>
-            <ul className="text-xs text-[#9b9a97] space-y-2 leading-relaxed">
+            <ul className="text-xs text-ink/75 space-y-2 leading-relaxed">
               <li>• Building, optimizing, and auditing production software architectures.</li>
               <li>• Interactive prototyping of web applications, mini-games, and UI widgets via Artifacts.</li>
               <li>• Analyzing mathematical proofs, scientific papers, and system logic.</li>
@@ -46,12 +46,12 @@ export default function AcceptableUsePage() {
             </ul>
           </div>
 
-          <div className="p-5 rounded-xl bg-[#191817] border border-[#262523]">
-            <div className="flex items-center gap-2.5 text-rose-400 mb-2">
+          <div className="p-5 rounded-xl bg-app border border-line">
+            <div className="flex items-center gap-2.5 text-danger mb-2">
               <Ban className="w-4 h-4" />
-              <h3 className="text-sm font-medium text-[#f4f4f0]">Strictly Prohibited Uses</h3>
+              <h3 className="text-sm font-medium text-ink">Strictly Prohibited Uses</h3>
             </div>
-            <ul className="text-xs text-[#9b9a97] space-y-2 leading-relaxed">
+            <ul className="text-xs text-ink/75 space-y-2 leading-relaxed">
               <li>• Developing ransomware, keyloggers, exploit payloads, or automated attack scripts.</li>
               <li>• Generating deceptive disinformation, fraudulent credentials, or deepfakes.</li>
               <li>• Circumventing rate limits, guest allowances, or multi-tenant cluster boundaries.</li>
@@ -61,18 +61,18 @@ export default function AcceptableUsePage() {
         </div>
 
         {/* Detailed Guidelines */}
-        <div className="space-y-12 text-[#c7c6c1] leading-relaxed text-sm sm:text-[15px]">
+        <div className="space-y-12 text-ink leading-relaxed text-sm sm:text-[15px]">
           {/* Section 1 */}
           <section className="space-y-3">
-            <h2 className="text-xl font-serif text-[#f4f4f0] font-medium tracking-tight flex items-center gap-2">
-              <span className="text-[#d97706] font-mono text-sm">01.</span>
+            <h2 className="text-xl font-display text-ink font-medium tracking-tight flex items-center gap-2">
+              <span className="text-accent font-mono text-sm">01.</span>
               System Security & Infrastructure Integrity
             </h2>
             <p>
               You must not interfere with or disrupt the integrity or performance of RoleFlow infrastructure,
               our inference servers, or the data contained therein. Specifically, you agree not to:
             </p>
-            <ul className="list-disc list-inside space-y-1.5 pl-2 text-[#b5b4ae]">
+            <ul className="list-disc list-inside space-y-1.5 pl-2 text-ink/75">
               <li>Launch Denial-of-Service (DoS) attacks or generate high-volume automated requests without prior written authorization.</li>
               <li>Probe, scan, or test the vulnerability of our APIs, endpoints, or network topology.</li>
               <li>Bypass or tamper with our guest message counter or authentication gatekeeper mechanisms.</li>
@@ -82,15 +82,15 @@ export default function AcceptableUsePage() {
 
           {/* Section 2 */}
           <section className="space-y-3">
-            <h2 className="text-xl font-serif text-[#f4f4f0] font-medium tracking-tight flex items-center gap-2">
-              <span className="text-[#d97706] font-mono text-sm">02.</span>
+            <h2 className="text-xl font-display text-ink font-medium tracking-tight flex items-center gap-2">
+              <span className="text-accent font-mono text-sm">02.</span>
               Interactive Artifacts & Sandboxed Safety
             </h2>
             <p>
               RoleFlow enables real-time dynamic rendering of HTML, JavaScript, and WebGL code inside isolated
               Artifact containers. When using or sharing artifacts, you agree:
             </p>
-            <ul className="list-disc list-inside space-y-1.5 pl-2 text-[#b5b4ae]">
+            <ul className="list-disc list-inside space-y-1.5 pl-2 text-ink/75">
               <li>Not to craft artifacts intended to execute cross-site scripting (XSS) attacks or hijack browser sessions.</li>
               <li>Not to embed cryptocurrency mining scripts or covert tracking beacons into interactive artifacts.</li>
               <li>Not to simulate deceptive login interfaces or phishing portals designed to harvest end-user credentials.</li>
@@ -99,8 +99,8 @@ export default function AcceptableUsePage() {
 
           {/* Section 3 */}
           <section className="space-y-3">
-            <h2 className="text-xl font-serif text-[#f4f4f0] font-medium tracking-tight flex items-center gap-2">
-              <span className="text-[#d97706] font-mono text-sm">03.</span>
+            <h2 className="text-xl font-display text-ink font-medium tracking-tight flex items-center gap-2">
+              <span className="text-accent font-mono text-sm">03.</span>
               Cybersecurity & Exploit Research Boundaries
             </h2>
             <p>
@@ -116,8 +116,8 @@ export default function AcceptableUsePage() {
 
           {/* Section 4 */}
           <section className="space-y-3">
-            <h2 className="text-xl font-serif text-[#f4f4f0] font-medium tracking-tight flex items-center gap-2">
-              <span className="text-[#d97706] font-mono text-sm">04.</span>
+            <h2 className="text-xl font-display text-ink font-medium tracking-tight flex items-center gap-2">
+              <span className="text-accent font-mono text-sm">04.</span>
               Harassment, Hate Speech & Illegal Material
             </h2>
             <p>
@@ -129,8 +129,8 @@ export default function AcceptableUsePage() {
 
           {/* Section 5 */}
           <section className="space-y-3 pb-8">
-            <h2 className="text-xl font-serif text-[#f4f4f0] font-medium tracking-tight flex items-center gap-2">
-              <span className="text-[#d97706] font-mono text-sm">05.</span>
+            <h2 className="text-xl font-display text-ink font-medium tracking-tight flex items-center gap-2">
+              <span className="text-accent font-mono text-sm">05.</span>
               Enforcement & Reporting Violations
             </h2>
             <p>
@@ -138,14 +138,14 @@ export default function AcceptableUsePage() {
               If you identify an artifact or chat output that violates this Acceptable Use Policy, please report it
               immediately with the session URL or artifact details to:
             </p>
-            <div className="p-4 rounded-xl bg-[#191817] border border-[#2b2a28] flex items-center justify-between">
+            <div className="p-4 rounded-xl bg-app border border-line flex items-center justify-between">
               <div>
-                <p className="text-sm font-medium text-[#f4f4f0]">RoleFlow Trust & Safety</p>
-                <p className="text-xs text-[#8e8d89]">Email: support@roleflow.site</p>
+                <p className="text-sm font-medium text-ink">RoleFlow Trust & Safety</p>
+                <p className="text-xs text-ink/75">Email: support@roleflow.site</p>
               </div>
               <a
                 href="mailto:support@roleflow.site?subject=AUP%20Violation%20Report"
-                className="text-xs px-3 py-1.5 rounded-lg bg-[#252422] hover:bg-[#2f2e2c] text-[#f4f4f0] transition-colors border border-[#383734]"
+                className="text-xs px-3 py-1.5 rounded-lg bg-card hover:bg-card text-ink transition-colors border border-line"
               >
                 Report Violation
               </a>

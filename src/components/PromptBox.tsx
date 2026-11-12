@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useState, useRef, useEffect } from "react";
-import { Plus, ArrowUp, X, FileText, ChevronDown } from "lucide-react";
+import { Plus, ArrowUp, X, FileText, ChevronDown, FolderKanban, Check } from "lucide-react";
 import { Attachment, EffortLevel, ModelId, Project } from "@/types";
 import { EffortDropdown } from "./EffortDropdown";
 import { ModelSelector } from "./ModelSelector";
@@ -18,6 +18,12 @@ interface PromptBoxProps {
   onProjectChange: (projectId?: string) => void;
   onCreateProject?: () => void;
 }
+
+const MAX_IMAGE_BYTES = 4 * 1024 * 1024;
+const MAX_TEXT_BYTES = 512 * 1024;
+const MAX_PDF_BYTES = 4 * 1024 * 1024;
+const TEXT_FILE_PATTERN =
+  /\.(txt|md|csv|tsv|json|ya?ml|xml|html?|css|scss|js|jsx|ts|tsx|py|java|c|cpp|h|rs|go|rb|php|sh|sql|log|env|toml|ini)$/i;
 
 export const PromptBox: React.FC<PromptBoxProps> = ({
   onSend,
@@ -38,38 +44,35 @@ export const PromptBox: React.FC<PromptBoxProps> = ({
   const fileInputRef = useRef<HTMLInputElement>(null);
   const projectMenuRef = useRef<HTMLDivElement>(null);
 
+  // Grow the textarea with its content, up to a cap.
   useEffect(() => {
     if (textareaRef.current) {
       textareaRef.current.style.height = "auto";
-      textareaRef.current.style.height = `${Math.min(
-        textareaRef.current.scrollHeight,
-        220
-      )}px`;
+      textareaRef.current.style.height = `${Math.min(textareaRef.current.scrollHeight, 220)}px`;
     }
   }, [content]);
 
   useEffect(() => {
     function handleClickOutside(e: MouseEvent) {
-      if (
-        projectMenuRef.current &&
-        !projectMenuRef.current.contains(e.target as Node)
-      ) {
+      if (projectMenuRef.current && !projectMenuRef.current.contains(e.target as Node)) {
         setIsProjectMenuOpen(false);
       }
     }
+    function handleEscape(e: KeyboardEvent) {
+      if (e.key === "Escape") setIsProjectMenuOpen(false);
+    }
     document.addEventListener("mousedown", handleClickOutside);
-    return () => document.removeEventListener("mousedown", handleClickOutside);
+    document.addEventListener("keydown", handleEscape);
+    return () => {
+      document.removeEventListener("mousedown", handleClickOutside);
+      document.removeEventListener("keydown", handleEscape);
+    };
   }, []);
 
-  const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
-    if (e.key === "Enter" && !e.shiftKey) {
-      e.preventDefault();
-      handleSubmit();
-    }
-  };
+  const canSend = (content.trim().length > 0 || attachments.length > 0) && !isLoading;
 
   const handleSubmit = () => {
-    if ((!content.trim() && attachments.length === 0) || isLoading) return;
+    if (!canSend) return;
     onSend(content.trim(), attachments);
     setContent("");
     setAttachments([]);
@@ -78,11 +81,13 @@ export const PromptBox: React.FC<PromptBoxProps> = ({
     }
   };
 
-  const MAX_IMAGE_BYTES = 4 * 1024 * 1024;
-  const MAX_TEXT_BYTES = 512 * 1024;
-  const MAX_PDF_BYTES = 4 * 1024 * 1024;
-  const TEXT_FILE_PATTERN =
-    /\.(txt|md|csv|tsv|json|ya?ml|xml|html?|css|scss|js|jsx|ts|tsx|py|java|c|cpp|h|rs|go|rb|php|sh|sql|log|env|toml|ini)$/i;
+  const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
+    // Enter sends. Shift+Enter inserts a newline. Ignore Enter while an IME is composing.
+    if (e.key === "Enter" && !e.shiftKey && !e.nativeEvent.isComposing) {
+      e.preventDefault();
+      handleSubmit();
+    }
+  };
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = e.target.files;
@@ -145,47 +150,48 @@ export const PromptBox: React.FC<PromptBoxProps> = ({
   const activeProject = projects.find((p) => p.id === selectedProjectId);
 
   return (
-    <div className="w-full max-w-3xl mx-auto px-4">
-      <div className="bg-[#1f1e1d] border border-[#33312e] hover:border-[#42403c] focus-within:border-[#d97706]/70 rounded-2xl shadow-2xl transition-all duration-200">
-        {/* Attached files pills */}
+    <div className="w-full">
+      <div className="bg-card rounded-2xl border border-line shadow-[0_4px_24px_rgb(0_0_0/0.04)] focus-within:border-accent/40 transition-colors duration-200">
+        {/* Attached files */}
         {attachments.length > 0 && (
-          <div className="flex flex-wrap gap-2 p-3 pb-0">
+          <div className="flex flex-wrap gap-2 px-3.5 pt-3">
             {attachments.map((att, i) => (
               <div
                 key={i}
-                className="flex items-center gap-1.5 px-3 py-1 rounded-xl bg-[#282725] border border-[#3d3b37] text-xs text-[#e4e4e7] shadow-sm"
+                className="flex items-center gap-1.5 pl-2.5 pr-1 py-1 rounded-lg bg-app border border-line text-xs text-ink max-w-full"
               >
-                <FileText className="w-3.5 h-3.5 text-[#d97706]" />
-                <span className="truncate max-w-[140px] font-mono">{att.name}</span>
+                <FileText className="w-3.5 h-3.5 text-accent shrink-0" strokeWidth={1.75} />
+                <span className="truncate max-w-[160px] font-mono">{att.name}</span>
                 <button
                   type="button"
                   onClick={() => removeAttachment(i)}
-                  className="p-0.5 text-[#8f8e8a] hover:text-[#f4f4f0]"
+                  aria-label={`Remove ${att.name}`}
+                  className="p-1 rounded text-muted hover:text-ink hover:bg-hover transition-colors duration-150"
                 >
-                  <X className="w-3 h-3" />
+                  <X className="w-3 h-3" strokeWidth={2} />
                 </button>
               </div>
             ))}
           </div>
         )}
 
-        {/* Input Text Area */}
-        <div className="p-3.5">
+        {/* Text input */}
+        <div className="px-4 pt-3.5 pb-1">
           <textarea
             ref={textareaRef}
             value={content}
             onChange={(e) => setContent(e.target.value)}
             onKeyDown={handleKeyDown}
             placeholder="How can I help you today?"
+            aria-label="Message RoleFlow"
             rows={1}
-            className="w-full bg-transparent text-[#f4f4f0] text-[15.5px] placeholder-[#807f7b] focus:outline-none resize-none leading-relaxed min-h-[46px] max-h-[220px]"
+            className="w-full bg-transparent text-[16px] text-ink placeholder:text-muted outline-none resize-none leading-relaxed min-h-[44px] max-h-[220px]"
           />
         </div>
 
-        {/* Bottom Actions Row */}
-        <div className="px-3 pb-3 flex items-center justify-between">
-          <div className="flex items-center gap-2">
-            {/* Attachment Button */}
+        {/* Bottom row */}
+        <div className="px-2.5 pb-2.5 pt-1 flex items-center justify-between gap-2">
+          <div className="flex items-center gap-1 min-w-0">
             <input
               type="file"
               ref={fileInputRef}
@@ -196,58 +202,63 @@ export const PromptBox: React.FC<PromptBoxProps> = ({
             <button
               type="button"
               onClick={() => fileInputRef.current?.click()}
-              className="p-1.5 rounded-xl text-[#8f8e8a] hover:text-[#f4f4f0] hover:bg-[#282725] transition-colors"
+              className="w-9 h-9 flex items-center justify-center rounded-lg text-muted hover:text-ink hover:bg-hover transition-colors duration-150 outline-none focus-visible:ring-2 focus-visible:ring-accent/40 shrink-0"
               title="Attach files or code"
+              aria-label="Attach files or code"
             >
-              <Plus className="w-5 h-5" />
+              <Plus className="w-5 h-5" strokeWidth={1.75} />
             </button>
 
-            {/* Project Dropdown Selector */}
-            <div className="relative" ref={projectMenuRef}>
+            {/* Project picker */}
+            <div className="relative min-w-0" ref={projectMenuRef}>
               <button
                 type="button"
                 onClick={() => setIsProjectMenuOpen(!isProjectMenuOpen)}
-                className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl text-xs font-medium text-[#8f8e8a] hover:text-[#f4f4f0] hover:bg-[#282725] transition-colors border border-transparent hover:border-[#383633]"
+                aria-haspopup="listbox"
+                aria-expanded={isProjectMenuOpen}
+                className="flex items-center gap-1.5 min-h-[36px] px-2 rounded-lg text-sm text-muted hover:text-ink hover:bg-hover transition-colors duration-150 outline-none focus-visible:ring-2 focus-visible:ring-accent/40 min-w-0"
               >
-                <span>{activeProject ? activeProject.name : "Project"}</span>
-                <ChevronDown className="w-3.5 h-3.5" />
+                <FolderKanban className="w-4 h-4 shrink-0" strokeWidth={1.75} />
+                <span className="hidden sm:inline truncate max-w-[140px]">
+                  {activeProject ? activeProject.name : "Project"}
+                </span>
+                <ChevronDown className="w-3.5 h-3.5 shrink-0" strokeWidth={1.75} />
               </button>
 
               {isProjectMenuOpen && (
-                <div className="absolute left-0 bottom-full mb-2 w-60 rounded-2xl bg-[#1f1e1d] border border-[#383633] shadow-2xl p-2 z-50 animate-in fade-in zoom-in-95 duration-150">
-                  <div className="text-[11px] font-semibold text-[#807f7b] px-2.5 py-1 uppercase tracking-wider">
-                    Workspaces
-                  </div>
+                <div
+                  role="listbox"
+                  className="absolute left-0 bottom-full mb-2 w-60 max-w-[calc(100vw-2rem)] rounded-xl bg-card shadow-menu p-1.5 z-50 animate-message"
+                >
+                  <div className="text-xs font-medium text-muted px-2.5 py-1.5">Workspaces</div>
                   <button
                     type="button"
+                    role="option"
+                    aria-selected={!selectedProjectId}
                     onClick={() => {
                       onProjectChange(undefined);
                       setIsProjectMenuOpen(false);
                     }}
-                    className={`w-full text-left px-3 py-1.5 rounded-xl text-xs transition-colors ${
-                      !selectedProjectId
-                        ? "bg-[#2b2a28] text-[#f4f4f0] font-medium"
-                        : "text-[#8f8e8a] hover:bg-[#262523]"
-                    }`}
+                    className="w-full flex items-center justify-between gap-2 px-2.5 py-2 rounded-lg text-sm text-left text-ink hover:bg-hover transition-colors duration-150"
                   >
-                    No Project (General)
+                    <span>No project (general)</span>
+                    {!selectedProjectId && <Check className="w-4 h-4 text-accent" strokeWidth={2} />}
                   </button>
 
                   {projects.map((proj) => (
                     <button
                       key={proj.id}
                       type="button"
+                      role="option"
+                      aria-selected={selectedProjectId === proj.id}
                       onClick={() => {
                         onProjectChange(proj.id);
                         setIsProjectMenuOpen(false);
                       }}
-                      className={`w-full text-left px-3 py-1.5 rounded-xl text-xs transition-colors truncate ${
-                        selectedProjectId === proj.id
-                          ? "bg-[#2b2a28] text-[#f4f4f0] font-medium"
-                          : "text-[#8f8e8a] hover:bg-[#262523]"
-                      }`}
+                      className="w-full flex items-center justify-between gap-2 px-2.5 py-2 rounded-lg text-sm text-left text-ink hover:bg-hover transition-colors duration-150"
                     >
-                      {proj.name}
+                      <span className="truncate">{proj.name}</span>
+                      {selectedProjectId === proj.id && <Check className="w-4 h-4 text-accent shrink-0" strokeWidth={2} />}
                     </button>
                   ))}
 
@@ -258,10 +269,10 @@ export const PromptBox: React.FC<PromptBoxProps> = ({
                         setIsProjectMenuOpen(false);
                         onCreateProject();
                       }}
-                      className="w-full text-left px-3 py-1.5 mt-1 pt-1.5 border-t border-[#2e2d2b] rounded-xl text-xs text-[#d97706] hover:bg-[#262523] transition-colors flex items-center gap-1.5"
+                      className="w-full flex items-center gap-2 px-2.5 py-2 mt-1 pt-2 border-t border-line rounded-lg text-sm text-accent hover:bg-hover transition-colors duration-150"
                     >
-                      <Plus className="w-3.5 h-3.5" />
-                      <span>Create New Project</span>
+                      <Plus className="w-4 h-4" strokeWidth={1.75} />
+                      <span>Create new project</span>
                     </button>
                   )}
                 </div>
@@ -269,25 +280,23 @@ export const PromptBox: React.FC<PromptBoxProps> = ({
             </div>
           </div>
 
-          {/* Right Controls: Model, Effort & Send button */}
-          <div className="flex items-center gap-2">
-            <div className="flex items-center bg-[#181716] px-2.5 py-1 rounded-xl border border-[#2f2e2c] gap-1.5">
-              <ModelSelector currentModel={model} onSelect={onModelChange} />
-              <span className="text-[#3d3b37]">•</span>
-              <EffortDropdown effort={effort} onChange={onEffortChange} />
-            </div>
+          {/* Model, effort, send */}
+          <div className="flex items-center gap-0.5 sm:gap-1 shrink-0">
+            <ModelSelector currentModel={model} onSelect={onModelChange} placement="up" />
+            <EffortDropdown effort={effort} onChange={onEffortChange} placement="up" />
 
             <button
               type="button"
               onClick={handleSubmit}
-              disabled={(!content.trim() && attachments.length === 0) || isLoading}
-              className={`p-2 rounded-xl transition-all ${
-                (!content.trim() && attachments.length === 0) || isLoading
-                  ? "bg-[#2d2c2a] text-[#63625f] cursor-not-allowed"
-                  : "bg-[#f4f4f0] hover:bg-white text-[#141413] shadow-lg hover:scale-105 active:scale-95"
+              disabled={!canSend}
+              aria-label="Send message"
+              className={`ml-1 w-9 h-9 flex items-center justify-center rounded-full transition-colors duration-150 outline-none focus-visible:ring-2 focus-visible:ring-accent/40 ${
+                canSend
+                  ? "bg-accent hover:bg-accent-hover text-white"
+                  : "bg-hover text-muted cursor-not-allowed"
               }`}
             >
-              <ArrowUp className="w-4 h-4 stroke-[2.5]" />
+              <ArrowUp className="w-[18px] h-[18px]" strokeWidth={2} />
             </button>
           </div>
         </div>

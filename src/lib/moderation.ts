@@ -83,6 +83,10 @@ const SAFETY_RULES: PatternRule[] = [
       /\b(?:synthesiz(?:e|ing)|how\s+to\s+make|weaponiz(?:e|ing)|cultur(?:e|ing)\s+of)\s+(?:sarin|vx\s*nerve|mustard\s*gas|anthrax|ricin|botulinum\s*toxin)\b/i,
       /\b(?:3d\s*print(?:ing)?|blueprint\s*for)\s+(?:an?\s+)?(?:auto\s*sear|drop-in\s*auto\s*sear|lightning\s*link|glock\s*switch|suppressor\s*baffle)\b/i,
       /\b(?:convert|modifying)\s+(?:semi-?automatic|ar-?15|handgun)\s+to\s+(?:fully?\s*automatic|machine\s*gun)\b/i,
+      // Generic bomb and explosive manufacturing requests. The negative lookahead keeps
+      // benign phrases such as "bomb shelter", "bomb-proof", or "bomb disposal" from matching.
+      /\b(?:how\s+to\s+(?:make|build|construct|assemble|detonate|synthesize)|recipe\s+for|instructions\s+for)\s+(?:an?\s+)?(?:bomb|explosive(?:s)?|ied|pipe\s*bomb|fertilizer\s*bomb|pressure\s*cooker\s*bomb)\b(?![-\s]?(?:proof|shelter|squad|disposal|detector|threat|scare))/i,
+      /\b(?:making|building|constructing|assembling)\s+(?:an?\s+)?(?:bomb|explosive\s*device)\b(?![-\s]?(?:proof|shelter|squad|disposal|detector|threat|scare))/i,
     ],
   },
 

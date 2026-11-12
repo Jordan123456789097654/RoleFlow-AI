@@ -7,7 +7,6 @@ import {
   Save,
   User,
   Brain,
-  Sliders,
   Shield,
   ShieldAlert,
   Database,
@@ -20,7 +19,6 @@ import {
   Sun,
   Moon,
   Laptop,
-  AlertTriangle,
   RotateCw,
   Plus,
   ExternalLink,
@@ -30,10 +28,14 @@ import {
   Globe,
   UserCheck,
   Ban,
+  Settings as SettingsIcon,
 } from "lucide-react";
 import { UserProfile, ModerationLogEntry, UsageStats, MemoryItem } from "@/types";
 
 const ADMIN_EMAIL = "jordanedanield13@gmail.com";
+
+/** localStorage key for the theme choice. Values: "light" | "dark" | "system". */
+const THEME_STORAGE_KEY = "roleflow_theme";
 
 export type SettingsTab =
   | "general"
@@ -43,6 +45,8 @@ export type SettingsTab =
   | "privacy"
   | "admin";
 
+type ThemeChoice = "light" | "dark" | "system";
+
 interface SettingsModalProps {
   isOpen: boolean;
   onClose: () => void;
@@ -51,6 +55,94 @@ interface SettingsModalProps {
   defaultTab?: SettingsTab;
   usage?: UsageStats;
   onAllChatsDeleted?: () => void;
+}
+
+// ─────────────────────────────────────────────────────────────
+// Shared styles
+// ─────────────────────────────────────────────────────────────
+
+const focusRing =
+  "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/40";
+
+const inputClass = `w-full bg-app text-sm text-ink placeholder:text-muted/70 px-3.5 py-2.5 rounded-xl border border-line focus:outline-none focus:border-accent/60 transition-colors ${focusRing}`;
+
+const labelClass = "block text-sm font-medium text-ink mb-1.5";
+
+const hintClass = "block text-xs text-muted mt-1.5";
+
+const primaryButtonClass = `inline-flex items-center gap-1.5 px-4 py-2 rounded-xl bg-accent hover:bg-accent-hover text-white text-sm font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed ${focusRing}`;
+
+const secondaryButtonClass = `inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-card hover:bg-hover text-ink text-sm font-medium border border-line transition-colors disabled:opacity-50 disabled:cursor-not-allowed ${focusRing}`;
+
+const dangerButtonClass = `inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-danger-soft hover:bg-danger/20 text-danger text-sm font-medium border border-danger/30 transition-colors disabled:opacity-50 disabled:cursor-not-allowed ${focusRing}`;
+
+const cardClass = "rounded-2xl border border-line bg-card";
+
+const successTextClass =
+  "text-sm font-medium text-emerald-600 dark:text-emerald-400 flex items-center gap-1.5";
+
+const notice = (text: string) => (
+  <div className="flex items-center gap-2 rounded-xl border border-emerald-500/20 bg-emerald-500/10 px-3.5 py-2.5 text-sm text-emerald-700 dark:text-emerald-400">
+    <Check className="w-4 h-4 shrink-0" />
+    <span>{text}</span>
+  </div>
+);
+
+/** Section heading used at the top of each settings pane. */
+const SectionHeader: React.FC<{
+  title: string;
+  description: string;
+  icon?: React.ReactNode;
+}> = ({ title, description, icon }) => (
+  <div className="space-y-1.5">
+    <h3 className="flex items-center gap-2 font-display text-2xl text-ink">
+      {icon}
+      <span>{title}</span>
+    </h3>
+    <p className="text-sm text-muted leading-relaxed">{description}</p>
+  </div>
+);
+
+/** Thin-divided row inside a settings pane. */
+const SettingRow: React.FC<{
+  title: string;
+  description?: React.ReactNode;
+  children?: React.ReactNode;
+  danger?: boolean;
+}> = ({ title, description, children, danger }) => (
+  <div className="flex flex-col gap-3 py-4 sm:flex-row sm:items-center sm:justify-between">
+    <div className="min-w-0">
+      <div className={`text-sm font-medium ${danger ? "text-danger" : "text-ink"}`}>{title}</div>
+      {description && <div className="mt-0.5 text-sm text-muted leading-relaxed">{description}</div>}
+    </div>
+    {children && <div className="shrink-0">{children}</div>}
+  </div>
+);
+
+const NAV_ITEMS: { id: SettingsTab; label: string; icon: React.ReactNode; adminOnly?: boolean }[] = [
+  { id: "general", label: "General", icon: <User className="w-4 h-4" /> },
+  { id: "account", label: "Account & quota", icon: <Clock className="w-4 h-4" /> },
+  { id: "memory", label: "Memory", icon: <Brain className="w-4 h-4" /> },
+  { id: "instructions", label: "Custom instructions", icon: <Sparkles className="w-4 h-4" /> },
+  { id: "privacy", label: "Data & privacy", icon: <Database className="w-4 h-4" /> },
+  { id: "admin", label: "Admin queue", icon: <ShieldAlert className="w-4 h-4" />, adminOnly: true },
+];
+
+function readStoredTheme(): ThemeChoice {
+  try {
+    const value = localStorage.getItem(THEME_STORAGE_KEY);
+    if (value === "light" || value === "dark" || value === "system") return value;
+  } catch (e) {
+    // Storage can be blocked (private mode). Fall back to the system setting.
+  }
+  return "system";
+}
+
+function applyTheme(choice: ThemeChoice) {
+  const prefersDark =
+    typeof window !== "undefined" && window.matchMedia("(prefers-color-scheme: dark)").matches;
+  const dark = choice === "dark" || (choice === "system" && prefersDark);
+  document.documentElement.classList.toggle("dark", dark);
 }
 
 export const SettingsModal: React.FC<SettingsModalProps> = ({
@@ -70,7 +162,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
 
   // Tab 1: General (Name, Email, Theme)
   const [name, setName] = useState(user.name);
-  const [theme, setTheme] = useState<"dark" | "system" | "amber">("dark");
+  const [theme, setTheme] = useState<ThemeChoice>(readStoredTheme);
 
   // Tab 2: Account & Quota
   const [copiedId, setCopiedId] = useState(false);
@@ -133,6 +225,15 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
     return () => clearInterval(timer);
   }, []);
 
+  // Follow the OS setting live while the "System" theme is selected
+  useEffect(() => {
+    if (theme !== "system" || typeof window === "undefined") return;
+    const media = window.matchMedia("(prefers-color-scheme: dark)");
+    const onChange = () => applyTheme("system");
+    media.addEventListener("change", onChange);
+    return () => media.removeEventListener("change", onChange);
+  }, [theme]);
+
   // Fetch memories when memory tab opened
   useEffect(() => {
     if (isOpen && activeTab === "memory") {
@@ -148,6 +249,16 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
   }, [isOpen, isAdmin, activeTab]);
 
   if (!isOpen) return null;
+
+  const chooseTheme = (choice: ThemeChoice) => {
+    setTheme(choice);
+    try {
+      localStorage.setItem(THEME_STORAGE_KEY, choice);
+    } catch (e) {
+      // Ignore: the theme still applies for this session.
+    }
+    applyTheme(choice);
+  };
 
   const handleCopyId = () => {
     navigator.clipboard.writeText(user.id);
@@ -384,809 +495,646 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
     return log.status === logFilter;
   });
 
+  const pendingLogCount = logs.filter((l) => l.status === "FLAGGED" || l.status === "APPEALED").length;
+
   const dailyUsed = usage ? usage.used : (user.messageCount || 0);
-  const dailyLimit = isAdmin ? Infinity : 25;
-  const dailyRemaining = isAdmin ? "Unlimited" : Math.max(0, 25 - dailyUsed);
   const usagePercentage = isAdmin ? 0 : Math.min(100, Math.round((dailyUsed / 25) * 100));
 
+  const visibleNav = NAV_ITEMS.filter((item) => !item.adminOnly || isAdmin);
+
+  const themeOptions: { id: ThemeChoice; label: string; hint: string; icon: React.ReactNode }[] = [
+    { id: "light", label: "Light", hint: "Warm paper", icon: <Sun className="w-4 h-4" /> },
+    { id: "dark", label: "Dark", hint: "Warm charcoal", icon: <Moon className="w-4 h-4" /> },
+    { id: "system", label: "System", hint: "Match your device", icon: <Laptop className="w-4 h-4" /> },
+  ];
+
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-black/80 backdrop-blur-sm animate-in fade-in duration-200">
-      <div className="relative w-full max-w-4xl max-h-[92vh] flex flex-col bg-[#171615] border border-[#2e2d2b] rounded-2xl shadow-2xl overflow-hidden">
-        {/* Top Header */}
-        <div className="flex items-center justify-between px-6 py-4 border-b border-[#282725] bg-[#1a1918]">
-          <div className="flex items-center gap-2.5">
-            <Sliders className="w-4 h-4 text-[#d97706]" />
-            <h3 className="text-base font-semibold text-[#f4f4f0]">
-              Settings
-            </h3>
+    <div
+      className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-6 bg-ink/30 backdrop-blur-[2px] animate-message"
+      onMouseDown={(e) => {
+        if (e.target === e.currentTarget) onClose();
+      }}
+    >
+      <div
+        role="dialog"
+        aria-modal="true"
+        aria-label="Settings"
+        className="relative flex w-full max-w-3xl h-[min(640px,90vh)] flex-col overflow-hidden rounded-2xl border border-line bg-card text-ink shadow-menu md:flex-row"
+      >
+        {/* Left navigation (becomes a horizontal tab row on small screens) */}
+        <nav
+          aria-label="Settings sections"
+          className="flex shrink-0 gap-1 overflow-x-auto border-b border-line bg-panel p-2 md:w-52 md:flex-col md:overflow-y-auto md:border-b-0 md:border-r"
+        >
+          <div className="hidden items-center gap-2 px-2.5 pb-3 pt-2 md:flex">
+            <SettingsIcon className="w-4 h-4 text-muted" />
+            <span className="font-display text-base text-ink">Settings</span>
             {isAdmin && (
-              <span className="text-[10px] font-mono font-semibold px-2 py-0.5 rounded-full bg-amber-500/20 text-amber-300 border border-amber-500/30">
-                ADMIN ACCESS
+              <span className="ml-auto rounded-full border border-amber-500/30 bg-amber-500/15 px-1.5 py-0.5 text-[10px] font-medium text-amber-700 dark:text-amber-300">
+                Admin
               </span>
             )}
           </div>
-          <button
-            type="button"
-            onClick={onClose}
-            className="p-1.5 rounded-lg text-[#9b9a97] hover:text-[#f4f4f0] hover:bg-[#252422] transition-colors"
-          >
-            <X className="w-4 h-4" />
-          </button>
-        </div>
 
-        {/* Tabbed Navigation Structure */}
-        <div className="flex items-center gap-1 px-6 pt-2 border-b border-[#242321] bg-[#131312] overflow-x-auto select-none">
-          <button
-            type="button"
-            onClick={() => setActiveTab("general")}
-            className={`flex items-center gap-2 px-3.5 py-2.5 text-xs font-medium border-b-2 transition-colors whitespace-nowrap ${
-              activeTab === "general"
-                ? "border-[#d97706] text-[#f4f4f0]"
-                : "border-transparent text-[#8a8984] hover:text-[#c4c3be]"
-            }`}
-          >
-            <User className="w-3.5 h-3.5" />
-            <span>General</span>
-          </button>
+          {visibleNav.map((item) => {
+            const isActive = activeTab === item.id;
+            const badge =
+              item.id === "memory" && memories.length > 0
+                ? memories.length
+                : item.id === "admin" && pendingLogCount > 0
+                ? pendingLogCount
+                : null;
+            return (
+              <button
+                key={item.id}
+                type="button"
+                onClick={() => setActiveTab(item.id)}
+                aria-current={isActive ? "page" : undefined}
+                className={`flex shrink-0 items-center gap-2.5 whitespace-nowrap rounded-lg px-2.5 py-2 text-sm transition-colors ${focusRing} ${
+                  isActive
+                    ? "bg-hover text-ink font-medium"
+                    : "text-muted hover:bg-hover/60 hover:text-ink"
+                }`}
+              >
+                <span className={isActive ? "text-accent" : ""}>{item.icon}</span>
+                <span>{item.label}</span>
+                {badge !== null && (
+                  <span className="ml-auto rounded-full border border-line bg-app px-1.5 py-0.5 text-[10px] font-medium text-muted">
+                    {badge}
+                  </span>
+                )}
+              </button>
+            );
+          })}
+        </nav>
 
-          <button
-            type="button"
-            onClick={() => setActiveTab("account")}
-            className={`flex items-center gap-2 px-3.5 py-2.5 text-xs font-medium border-b-2 transition-colors whitespace-nowrap ${
-              activeTab === "account"
-                ? "border-[#d97706] text-[#f4f4f0]"
-                : "border-transparent text-[#8a8984] hover:text-[#c4c3be]"
-            }`}
-          >
-            <Clock className="w-3.5 h-3.5" />
-            <span>Account &amp; Quota</span>
-          </button>
-
-          <button
-            type="button"
-            onClick={() => setActiveTab("memory")}
-            className={`flex items-center gap-2 px-3.5 py-2.5 text-xs font-medium border-b-2 transition-colors whitespace-nowrap ${
-              activeTab === "memory"
-                ? "border-[#d97706] text-[#f4f4f0]"
-                : "border-transparent text-[#8a8984] hover:text-[#c4c3be]"
-            }`}
-          >
-            <Brain className="w-3.5 h-3.5" />
-            <span>Memory System</span>
-            {memories.length > 0 && (
-              <span className="px-1.5 py-0.2 rounded-full text-[10px] bg-[#272624] text-[#d97706] border border-[#3b3a36]">
-                {memories.length}
-              </span>
-            )}
-          </button>
-
-          <button
-            type="button"
-            onClick={() => setActiveTab("instructions")}
-            className={`flex items-center gap-2 px-3.5 py-2.5 text-xs font-medium border-b-2 transition-colors whitespace-nowrap ${
-              activeTab === "instructions"
-                ? "border-[#d97706] text-[#f4f4f0]"
-                : "border-transparent text-[#8a8984] hover:text-[#c4c3be]"
-            }`}
-          >
-            <Sparkles className="w-3.5 h-3.5" />
-            <span>Custom Instructions</span>
-          </button>
-
-          <button
-            type="button"
-            onClick={() => setActiveTab("privacy")}
-            className={`flex items-center gap-2 px-3.5 py-2.5 text-xs font-medium border-b-2 transition-colors whitespace-nowrap ${
-              activeTab === "privacy"
-                ? "border-[#d97706] text-[#f4f4f0]"
-                : "border-transparent text-[#8a8984] hover:text-[#c4c3be]"
-            }`}
-          >
-            <Database className="w-3.5 h-3.5" />
-            <span>Data &amp; Privacy</span>
-          </button>
-
-          {isAdmin && (
+        {/* Right pane */}
+        <div className="relative flex min-w-0 flex-1 flex-col">
+          <div className="flex items-center justify-end px-4 pt-3 sm:px-6">
             <button
               type="button"
-              onClick={() => setActiveTab("admin")}
-              className={`flex items-center gap-2 px-3.5 py-2.5 text-xs font-medium border-b-2 transition-colors whitespace-nowrap ${
-                activeTab === "admin"
-                  ? "border-red-500 text-red-400"
-                  : "border-transparent text-[#8a8984] hover:text-red-300"
-              }`}
+              onClick={onClose}
+              aria-label="Close settings"
+              className={`rounded-lg p-1.5 text-muted transition-colors hover:bg-hover hover:text-ink ${focusRing}`}
             >
-              <ShieldAlert className="w-3.5 h-3.5 text-red-400" />
-              <span>Admin Queue</span>
-              {logs.filter((l) => l.status === "FLAGGED" || l.status === "APPEALED").length >
-                0 && (
-                <span className="ml-1 px-1.5 py-0.2 rounded-full text-[10px] bg-red-500/20 text-red-400 border border-red-500/30">
-                  {
-                    logs.filter((l) => l.status === "FLAGGED" || l.status === "APPEALED")
-                      .length
-                  }
-                </span>
-              )}
+              <X className="w-4 h-4" />
             </button>
-          )}
-        </div>
+          </div>
 
-        {/* Tab Body */}
-        <div className="flex-1 overflow-y-auto p-6 space-y-6">
-          {/* TAB 1: GENERAL */}
-          {activeTab === "general" && (
-            <div className="space-y-6 max-w-2xl">
-              <div>
-                <h4 className="text-sm font-medium text-[#f4f4f0] mb-1">
-                  General Preferences
-                </h4>
-                <p className="text-xs text-[#9b9a97]">
-                  Manage your public persona, identity, and application visual theme.
-                </p>
-              </div>
+          <div className="flex-1 overflow-y-auto px-5 pb-8 pt-1 sm:px-8">
+            {/* TAB 1: GENERAL */}
+            {activeTab === "general" && (
+              <div className="space-y-8">
+                <SectionHeader
+                  title="General"
+                  description="Manage your display name and how RoleFlow looks on this device."
+                />
 
-              <div className="space-y-4">
-                <div>
-                  <label className="block text-xs font-medium text-[#c4c3be] mb-1.5 flex items-center gap-1.5">
-                    <User className="w-3.5 h-3.5 text-[#d97706]" />
-                    <span>Display Name</span>
-                  </label>
-                  <input
-                    type="text"
-                    value={name}
-                    onChange={(e) => setName(e.target.value)}
-                    placeholder="e.g. Jordan Daniels"
-                    className="w-full bg-[#1f1e1d] text-sm text-[#f4f4f0] placeholder-[#7d7c78] px-3.5 py-2.5 rounded-xl border border-[#302f2d] focus:outline-none focus:border-[#d97706]"
-                  />
-                </div>
+                <div className="space-y-5">
+                  <div>
+                    <label htmlFor="settings-name" className={labelClass}>
+                      Display name
+                    </label>
+                    <input
+                      id="settings-name"
+                      type="text"
+                      value={name}
+                      onChange={(e) => setName(e.target.value)}
+                      placeholder="e.g. Jordan Daniels"
+                      className={inputClass}
+                    />
+                  </div>
 
-                <div>
-                  <label className="block text-xs font-medium text-[#c4c3be] mb-1.5 flex items-center gap-1.5">
-                    <Mail className="w-3.5 h-3.5 text-[#d97706]" />
-                    <span>Email Address</span>
-                  </label>
-                  <input
-                    type="email"
-                    value={user.email}
-                    disabled
-                    className="w-full bg-[#181716] text-sm text-[#888782] px-3.5 py-2.5 rounded-xl border border-[#282725] cursor-not-allowed"
-                  />
-                  <span className="text-[11px] text-[#787772] mt-1 block">
-                    Verified account authentication email.
-                  </span>
-                </div>
-
-                <div>
-                  <label className="block text-xs font-medium text-[#c4c3be] mb-2 flex items-center gap-1.5">
-                    <Moon className="w-3.5 h-3.5 text-[#d97706]" />
-                    <span>Color Theme</span>
-                  </label>
-                  <div className="grid grid-cols-3 gap-3">
-                    <button
-                      type="button"
-                      onClick={() => setTheme("dark")}
-                      className={`p-3 rounded-xl border text-left flex items-center gap-2.5 transition-all ${
-                        theme === "dark"
-                          ? "bg-[#252422] border-[#d97706] text-[#f4f4f0]"
-                          : "bg-[#1d1c1b] border-[#2f2e2c] text-[#8e8d89] hover:text-[#d0cfcb]"
-                      }`}
-                    >
-                      <Moon className="w-4 h-4 text-[#d97706]" />
-                      <div>
-                        <div className="text-xs font-medium">Dark (Default)</div>
-                        <div className="text-[10px] text-[#777672]">Rich charcoal</div>
-                      </div>
-                    </button>
-
-                    <button
-                      type="button"
-                      onClick={() => setTheme("amber")}
-                      className={`p-3 rounded-xl border text-left flex items-center gap-2.5 transition-all ${
-                        theme === "amber"
-                          ? "bg-[#252422] border-[#d97706] text-[#f4f4f0]"
-                          : "bg-[#1d1c1b] border-[#2f2e2c] text-[#8e8d89] hover:text-[#d0cfcb]"
-                      }`}
-                    >
-                      <Sun className="w-4 h-4 text-[#f59e0b]" />
-                      <div>
-                        <div className="text-xs font-medium">Warm Terracotta</div>
-                        <div className="text-[10px] text-[#777672]">Warm ambient</div>
-                      </div>
-                    </button>
-
-                    <button
-                      type="button"
-                      onClick={() => setTheme("system")}
-                      className={`p-3 rounded-xl border text-left flex items-center gap-2.5 transition-all ${
-                        theme === "system"
-                          ? "bg-[#252422] border-[#d97706] text-[#f4f4f0]"
-                          : "bg-[#1d1c1b] border-[#2f2e2c] text-[#8e8d89] hover:text-[#d0cfcb]"
-                      }`}
-                    >
-                      <Laptop className="w-4 h-4 text-sky-400" />
-                      <div>
-                        <div className="text-xs font-medium">System</div>
-                        <div className="text-[10px] text-[#777672]">Match OS</div>
-                      </div>
-                    </button>
+                  <div>
+                    <label htmlFor="settings-email" className={labelClass}>
+                      Email address
+                    </label>
+                    <input
+                      id="settings-email"
+                      type="email"
+                      value={user.email}
+                      disabled
+                      className={`${inputClass} cursor-not-allowed text-muted`}
+                    />
+                    <span className={hintClass}>Verified account authentication email.</span>
                   </div>
                 </div>
-              </div>
 
-              <div className="pt-4 border-t border-[#262523] flex items-center justify-between">
-                {saveSuccess ? (
-                  <span className="text-xs text-emerald-400 font-medium flex items-center gap-1.5">
-                    <Check className="w-3.5 h-3.5" />
-                    Changes saved successfully
-                  </span>
-                ) : (
-                  <span />
-                )}
-                <button
-                  type="button"
-                  onClick={() => handleSaveAllPreferences()}
-                  disabled={saving}
-                  className="flex items-center gap-1.5 px-4 py-2 rounded-xl bg-[#f4f4f0] hover:bg-white text-[#141413] text-xs font-semibold transition-colors shadow"
-                >
-                  <Save className="w-3.5 h-3.5" />
-                  <span>{saving ? "Saving..." : "Save Preferences"}</span>
-                </button>
-              </div>
-            </div>
-          )}
+                <div>
+                  <div className="mb-2.5 flex items-center gap-2 text-sm font-medium text-ink">
+                    <Laptop className="w-4 h-4 text-muted" />
+                    <span>Theme</span>
+                  </div>
+                  <div role="radiogroup" aria-label="Theme" className="grid grid-cols-1 gap-2.5 sm:grid-cols-3">
+                    {themeOptions.map((option) => {
+                      const selected = theme === option.id;
+                      return (
+                        <button
+                          key={option.id}
+                          type="button"
+                          role="radio"
+                          aria-checked={selected}
+                          onClick={() => chooseTheme(option.id)}
+                          className={`flex items-center gap-3 rounded-xl border p-3 text-left transition-colors ${focusRing} ${
+                            selected
+                              ? "border-accent bg-accent-soft text-ink"
+                              : "border-line bg-app text-muted hover:border-muted/50 hover:text-ink"
+                          }`}
+                        >
+                          <span className={selected ? "text-accent" : "text-muted"}>{option.icon}</span>
+                          <span className="min-w-0">
+                            <span className="block text-sm font-medium">{option.label}</span>
+                            <span className="block text-xs text-muted">{option.hint}</span>
+                          </span>
+                        </button>
+                      );
+                    })}
+                  </div>
+                  <span className={hintClass}>Saved on this device and applied immediately.</span>
+                </div>
 
-          {/* TAB 2: ACCOUNT & QUOTA */}
-          {activeTab === "account" && (
-            <div className="space-y-6 max-w-2xl">
-              <div>
-                <h4 className="text-sm font-medium text-[#f4f4f0] mb-1">
-                  Account Plan &amp; Quota
-                </h4>
-                <p className="text-xs text-[#9b9a97]">
-                  Monitor your daily message consumption, plan status, and identity credentials.
-                </p>
+                <div className="flex items-center justify-between gap-4 border-t border-line pt-5">
+                  <div className="min-h-[1.25rem]">
+                    {saveSuccess && (
+                      <span className={successTextClass}>
+                        <Check className="w-4 h-4" />
+                        Changes saved
+                      </span>
+                    )}
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => handleSaveAllPreferences()}
+                    disabled={saving}
+                    className={primaryButtonClass}
+                  >
+                    <Save className="w-4 h-4" />
+                    <span>{saving ? "Saving..." : "Save preferences"}</span>
+                  </button>
+                </div>
               </div>
+            )}
 
-              {/* Plan Banner */}
-              <div className="p-5 rounded-2xl bg-gradient-to-br from-[#1e1d1b] to-[#161514] border border-[#2f2e2c] space-y-4">
-                <div className="flex items-center justify-between">
+            {/* TAB 2: ACCOUNT & QUOTA */}
+            {activeTab === "account" && (
+              <div className="space-y-8">
+                <SectionHeader
+                  title="Account & quota"
+                  description="Track your daily message usage, plan status, and account identifier."
+                />
+
+                {/* Plan */}
+                <div className={`${cardClass} space-y-5 p-5`}>
                   <div className="flex items-center gap-3">
-                    <div className="w-10 h-10 rounded-xl bg-[#282725] border border-[#3b3a37] flex items-center justify-center text-[#d97706]">
+                    <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-accent-soft text-accent">
                       <Shield className="w-5 h-5" />
                     </div>
-                    <div>
-                      <div className="text-sm font-semibold text-[#f4f4f0] flex items-center gap-2">
-                        <span>{isAdmin ? "Admin Enterprise Plan" : "Community Free Plan"}</span>
-                        <span className="text-[10px] font-mono px-2 py-0.5 rounded-full bg-emerald-500/20 text-emerald-400 border border-emerald-500/30">
-                          ACTIVE
+                    <div className="min-w-0">
+                      <div className="flex flex-wrap items-center gap-2 text-sm font-medium text-ink">
+                        <span>{isAdmin ? "Admin enterprise plan" : "Free plan"}</span>
+                        <span className="rounded-full border border-emerald-500/30 bg-emerald-500/10 px-2 py-0.5 text-[10px] font-medium text-emerald-700 dark:text-emerald-400">
+                          Active
                         </span>
                       </div>
-                      <div className="text-xs text-[#8a8985]">
+                      <div className="text-sm text-muted">
                         {isAdmin
                           ? "Unlimited model inference tokens and priority server routing."
-                          : "25 daily high-precision messages with full access to Genesis & Flash."}
+                          : "25 daily messages with full access to Genesis and Flash."}
                       </div>
                     </div>
+                  </div>
+
+                  {/* Quota progress */}
+                  <div className="space-y-2 border-t border-line pt-5">
+                    <div className="flex items-center justify-between text-sm">
+                      <span className="text-muted">Daily usage</span>
+                      <span className="font-medium tabular-nums text-ink">
+                        {isAdmin ? "Unlimited" : `${dailyUsed} / 25 messages`}
+                      </span>
+                    </div>
+                    {!isAdmin && (
+                      <div className="h-1.5 w-full overflow-hidden rounded-full bg-hover">
+                        <div
+                          className="h-full rounded-full bg-accent transition-all duration-500"
+                          style={{ width: `${usagePercentage}%` }}
+                        />
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Reset countdown */}
+                  <div className="flex items-center justify-between text-sm">
+                    <div className="flex items-center gap-2 text-muted">
+                      <Clock className="w-4 h-4" />
+                      <span>Quota resets at midnight UTC</span>
+                    </div>
+                    <span className="font-medium tabular-nums text-ink">{countdown}</span>
                   </div>
                 </div>
 
-                {/* Quota Progress */}
-                <div className="space-y-2 pt-2 border-t border-[#292826]">
-                  <div className="flex items-center justify-between text-xs">
-                    <span className="text-[#999894]">Daily Usage</span>
-                    <span className="font-mono text-[#f4f4f0]">
-                      {isAdmin ? "Unlimited (0 / ∞)" : `${dailyUsed} / 25 messages used`}
-                    </span>
-                  </div>
-                  {!isAdmin && (
-                    <div className="w-full bg-[#242321] h-2 rounded-full overflow-hidden">
-                      <div
-                        className="bg-[#d97706] h-full rounded-full transition-all duration-500"
-                        style={{ width: `${usagePercentage}%` }}
-                      />
+                {/* Account identifier */}
+                <div>
+                  <SettingRow
+                    title="Account ID"
+                    description={<span className="break-all font-mono text-xs select-all">{user.id}</span>}
+                  >
+                    <button type="button" onClick={handleCopyId} className={secondaryButtonClass}>
+                      {copiedId ? <Check className="w-4 h-4 text-emerald-600 dark:text-emerald-400" /> : <Copy className="w-4 h-4" />}
+                      <span>{copiedId ? "Copied" : "Copy ID"}</span>
+                    </button>
+                  </SettingRow>
+                </div>
+
+                {isAdmin && (
+                  <div className={`${cardClass} flex flex-col gap-4 p-5 sm:flex-row sm:items-center sm:justify-between`}>
+                    <div className="flex items-center gap-3">
+                      <ShieldAlert className="w-5 h-5 text-accent" />
+                      <div>
+                        <div className="text-sm font-medium text-ink">Admin control center</div>
+                        <div className="text-sm text-muted">
+                          Manage user limits, telemetry, and security moderation.
+                        </div>
+                      </div>
                     </div>
+                    <Link href="/admin" onClick={onClose} className={primaryButtonClass}>
+                      <span>Open console</span>
+                      <ExternalLink className="w-3.5 h-3.5" />
+                    </Link>
+                  </div>
+                )}
+              </div>
+            )}
+
+            {/* TAB 3: MEMORY */}
+            {activeTab === "memory" && (
+              <div className="space-y-8">
+                <div className="flex items-start justify-between gap-4">
+                  <SectionHeader
+                    title="Memory"
+                    description="RoleFlow learns facts, conventions, and preferences across your conversations so future replies fit you better."
+                  />
+                  {memories.length > 0 && (
+                    <button
+                      type="button"
+                      onClick={handleClearAllMemories}
+                      disabled={clearingMemories}
+                      className={`${dangerButtonClass} shrink-0`}
+                    >
+                      <Trash2 className="w-3.5 h-3.5" />
+                      <span>Clear all</span>
+                    </button>
                   )}
                 </div>
 
-                {/* Reset Countdown */}
-                <div className="flex items-center justify-between pt-2 text-xs text-[#82817c]">
-                  <div className="flex items-center gap-1.5">
-                    <Clock className="w-3.5 h-3.5 text-[#d97706]" />
-                    <span>Quota Resets At Midnight UTC:</span>
-                  </div>
-                  <span className="font-mono font-medium text-[#f4f4f0]">{countdown}</span>
-                </div>
-              </div>
+                {memoryFeedback && notice(memoryFeedback)}
 
-              {/* Account Identifier Card */}
-              <div className="p-4 rounded-xl bg-[#1b1a19] border border-[#2b2a28] flex items-center justify-between">
-                <div>
-                  <div className="text-xs text-[#8a8985] font-medium">Account ID</div>
-                  <div className="font-mono text-xs text-[#e4e3de] select-all mt-0.5">
-                    {user.id}
-                  </div>
-                </div>
-                <button
-                  type="button"
-                  onClick={handleCopyId}
-                  className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-[#252422] hover:bg-[#302f2d] text-xs font-medium text-[#f4f4f0] border border-[#383734] transition-colors"
-                >
-                  {copiedId ? <Check className="w-3.5 h-3.5 text-emerald-400" /> : <Copy className="w-3.5 h-3.5" />}
-                  <span>{copiedId ? "Copied" : "Copy ID"}</span>
-                </button>
-              </div>
+                {/* Add memory */}
+                <form onSubmit={handleAddMemory} className="flex gap-2">
+                  <input
+                    type="text"
+                    value={newMemoryText}
+                    onChange={(e) => setNewMemoryText(e.target.value)}
+                    placeholder="Teach RoleFlow something, e.g. “I prefer Tailwind and TypeScript”"
+                    aria-label="New memory"
+                    className={`${inputClass} py-2`}
+                  />
+                  <button
+                    type="submit"
+                    disabled={isAddingMemory || !newMemoryText.trim()}
+                    className={`${primaryButtonClass} shrink-0`}
+                  >
+                    <Plus className="w-4 h-4" />
+                    <span>{isAddingMemory ? "Saving..." : "Add"}</span>
+                  </button>
+                </form>
 
-              {isAdmin && (
-                <div className="p-4 rounded-xl bg-amber-500/10 border border-amber-500/20 flex items-center justify-between">
-                  <div className="flex items-center gap-2.5">
-                    <ShieldAlert className="w-4 h-4 text-amber-400" />
-                    <div>
-                      <div className="text-xs font-medium text-amber-300">Admin Control Center</div>
-                      <div className="text-[11px] text-[#9b9a97]">
-                        Access user limits, telemetry, and security moderation.
-                      </div>
+                {/* Memory list */}
+                {loadingMemories ? (
+                  <div className="py-10 text-center text-sm text-muted">Loading your memories...</div>
+                ) : memories.length === 0 ? (
+                  <div className="space-y-2 rounded-2xl border border-dashed border-line px-6 py-10 text-center">
+                    <div className="mx-auto flex h-10 w-10 items-center justify-center rounded-full bg-accent-soft text-accent">
+                      <Brain className="w-5 h-5" />
                     </div>
+                    <h4 className="text-sm font-medium text-ink">No memories yet</h4>
+                    <p className="mx-auto max-w-sm text-sm text-muted">
+                      As you chat, key facts and conventions will appear here. You can also add them yourself above.
+                    </p>
                   </div>
-                  <Link
-                    href="/admin"
-                    onClick={onClose}
-                    className="flex items-center gap-1 px-3 py-1.5 rounded-lg bg-[#d97706] hover:bg-[#b45309] text-xs font-semibold text-white transition-colors"
-                  >
-                    <span>Open Console</span>
-                    <ExternalLink className="w-3 h-3" />
-                  </Link>
-                </div>
-              )}
-            </div>
-          )}
-
-          {/* TAB 3: MEMORY SYSTEM */}
-          {activeTab === "memory" && (
-            <div className="space-y-6 max-w-2xl">
-              <div className="flex items-start justify-between gap-4">
-                <div>
-                  <h4 className="text-sm font-medium text-[#f4f4f0] mb-1 flex items-center gap-2">
-                    <Brain className="w-4 h-4 text-[#d97706]" />
-                    <span>RoleFlow Memory System</span>
-                  </h4>
-                  <p className="text-xs text-[#9b9a97] leading-relaxed">
-                    RoleFlow automatically learns and stores facts, coding conventions, and preferences
-                    across your sessions to tailor future responses.
-                  </p>
-                </div>
-
-                {memories.length > 0 && (
-                  <button
-                    type="button"
-                    onClick={handleClearAllMemories}
-                    disabled={clearingMemories}
-                    className="shrink-0 flex items-center gap-1 px-3 py-1.5 rounded-lg bg-red-500/10 hover:bg-red-500/20 text-red-400 text-xs font-medium border border-red-500/20 transition-colors"
-                  >
-                    <Trash2 className="w-3 h-3" />
-                    <span>Clear All</span>
-                  </button>
-                )}
-              </div>
-
-              {memoryFeedback && (
-                <div className="p-3 rounded-xl bg-emerald-500/10 border border-emerald-500/20 text-xs text-emerald-400 flex items-center gap-2">
-                  <Check className="w-3.5 h-3.5" />
-                  <span>{memoryFeedback}</span>
-                </div>
-              )}
-
-              {/* Add Custom Memory Input */}
-              <form onSubmit={handleAddMemory} className="flex gap-2">
-                <input
-                  type="text"
-                  value={newMemoryText}
-                  onChange={(e) => setNewMemoryText(e.target.value)}
-                  placeholder="Teach RoleFlow a memory (e.g. 'I prefer Tailwind and TypeScript')"
-                  className="flex-1 bg-[#1f1e1d] text-xs text-[#f4f4f0] placeholder-[#7d7c78] px-3.5 py-2 rounded-xl border border-[#302f2d] focus:outline-none focus:border-[#d97706]"
-                />
-                <button
-                  type="submit"
-                  disabled={isAddingMemory || !newMemoryText.trim()}
-                  className="flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-[#d97706] hover:bg-[#b45309] text-white text-xs font-semibold transition-colors disabled:opacity-50"
-                >
-                  <Plus className="w-3.5 h-3.5" />
-                  <span>{isAddingMemory ? "Saving..." : "Add Memory"}</span>
-                </button>
-              </form>
-
-              {/* Memory Items List */}
-              {loadingMemories ? (
-                <div className="py-8 text-center text-xs text-[#888782]">
-                  Loading your learned memories...
-                </div>
-              ) : memories.length === 0 ? (
-                <div className="p-8 rounded-2xl bg-[#1b1a19] border border-[#2b2a28] text-center space-y-2">
-                  <div className="w-10 h-10 rounded-full bg-[#242321] border border-[#33322f] flex items-center justify-center text-[#d97706] mx-auto">
-                    <Brain className="w-5 h-5" />
-                  </div>
-                  <h5 className="text-xs font-semibold text-[#f4f4f0]">No Memories Yet</h5>
-                  <p className="text-xs text-[#8a8984] max-w-sm mx-auto">
-                    As you chat with RoleFlow, key facts and conventions will appear here automatically, or you can add them manually above.
-                  </p>
-                </div>
-              ) : (
-                <div className="space-y-2.5">
-                  <div className="text-xs font-medium text-[#888782] px-1">
-                    Learned Facts ({memories.length})
-                  </div>
-                  <div className="space-y-2 max-h-72 overflow-y-auto pr-1">
-                    {memories.map((item) => (
-                      <div
-                        key={item.id}
-                        className="group flex items-center justify-between p-3 rounded-xl bg-[#1d1c1a] border border-[#2c2b29] hover:border-[#3d3c39] transition-all"
-                      >
-                        <div className="flex items-start gap-2.5">
-                          <span className="w-1.5 h-1.5 rounded-full bg-[#d97706] mt-2 shrink-0" />
-                          <span className="text-xs text-[#deddd9] leading-relaxed select-text">
-                            {item.memory}
-                          </span>
-                        </div>
-                        <button
-                          type="button"
-                          onClick={() => handleDeleteMemory(item.id)}
-                          className="opacity-0 group-hover:opacity-100 p-1.5 rounded-lg text-[#858480] hover:text-red-400 hover:bg-[#282725] transition-all"
-                          title="Delete memory"
-                        >
-                          <Trash2 className="w-3.5 h-3.5" />
-                        </button>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              )}
-            </div>
-          )}
-
-          {/* TAB 4: CUSTOM INSTRUCTIONS */}
-          {activeTab === "instructions" && (
-            <div className="space-y-6 max-w-2xl">
-              <div>
-                <h4 className="text-sm font-medium text-[#f4f4f0] mb-1 flex items-center gap-2">
-                  <Sparkles className="w-4 h-4 text-[#d97706]" />
-                  <span>Custom Instructions</span>
-                </h4>
-                <p className="text-xs text-[#9b9a97]">
-                  Tailor how RoleFlow thinks, reasons, and formats code across all future conversations.
-                </p>
-              </div>
-
-              <div className="space-y-5">
-                {/* Textarea 1 */}
-                <div>
-                  <label className="block text-xs font-medium text-[#c4c3be] mb-1.5">
-                    What would you like RoleFlow to know about you?
-                  </label>
-                  <textarea
-                    value={customInstructions}
-                    onChange={(e) => setCustomInstructions(e.target.value)}
-                    rows={4}
-                    placeholder="e.g. I am a senior engineer building cloud architectures with TypeScript, Go, and Terraform. Assume strong technical context."
-                    className="w-full bg-[#1f1e1d] text-sm text-[#f4f4f0] placeholder-[#7d7c78] p-3.5 rounded-xl border border-[#302f2d] focus:outline-none focus:border-[#d97706] resize-none leading-relaxed"
-                  />
-                  <span className="text-[11px] text-[#787772] mt-1 block">
-                    Your background, role, favorite programming languages, and domains.
-                  </span>
-                </div>
-
-                {/* Textarea 2 */}
-                <div>
-                  <label className="block text-xs font-medium text-[#c4c3be] mb-1.5">
-                    How would you like RoleFlow to respond?
-                  </label>
-                  <textarea
-                    value={responseInstructions}
-                    onChange={(e) => setResponseInstructions(e.target.value)}
-                    rows={4}
-                    placeholder="e.g. Be concise and precise. Avoid conversational pleasantries. Provide complete code implementations instead of snippets when asked."
-                    className="w-full bg-[#1f1e1d] text-sm text-[#f4f4f0] placeholder-[#7d7c78] p-3.5 rounded-xl border border-[#302f2d] focus:outline-none focus:border-[#d97706] resize-none leading-relaxed"
-                  />
-                  <span className="text-[11px] text-[#787772] mt-1 block">
-                    Style, tone, formatting preferences, and engineering standards.
-                  </span>
-                </div>
-              </div>
-
-              <div className="pt-4 border-t border-[#262523] flex items-center justify-between">
-                {saveSuccess ? (
-                  <span className="text-xs text-emerald-400 font-medium flex items-center gap-1.5">
-                    <Check className="w-3.5 h-3.5" />
-                    Instructions saved successfully
-                  </span>
                 ) : (
-                  <span />
+                  <div className="space-y-3">
+                    <div className="text-sm font-medium text-muted">Saved memories ({memories.length})</div>
+                    <ul className="max-h-80 divide-y divide-line overflow-y-auto rounded-2xl border border-line bg-app">
+                      {memories.map((item) => (
+                        <li key={item.id} className="group flex items-start justify-between gap-3 px-4 py-3">
+                          <span className="select-text text-sm leading-relaxed text-ink">{item.memory}</span>
+                          <button
+                            type="button"
+                            onClick={() => handleDeleteMemory(item.id)}
+                            className={`shrink-0 rounded-lg p-1.5 text-muted opacity-100 transition-all hover:bg-hover hover:text-danger sm:opacity-0 sm:group-hover:opacity-100 ${focusRing}`}
+                            title="Delete memory"
+                            aria-label="Delete memory"
+                          >
+                            <Trash2 className="w-3.5 h-3.5" />
+                          </button>
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
                 )}
-                <button
-                  type="button"
-                  onClick={() => handleSaveAllPreferences()}
-                  disabled={saving}
-                  className="flex items-center gap-1.5 px-4 py-2 rounded-xl bg-[#f4f4f0] hover:bg-white text-[#141413] text-xs font-semibold transition-colors shadow"
-                >
-                  <Save className="w-3.5 h-3.5" />
-                  <span>{saving ? "Saving..." : "Save Instructions"}</span>
-                </button>
               </div>
-            </div>
-          )}
+            )}
 
-          {/* TAB 5: DATA & PRIVACY */}
-          {activeTab === "privacy" && (
-            <div className="space-y-6 max-w-2xl">
-              <div>
-                <h4 className="text-sm font-medium text-[#f4f4f0] mb-1 flex items-center gap-2">
-                  <Database className="w-4 h-4 text-[#d97706]" />
-                  <span>Data &amp; Privacy</span>
-                </h4>
-                <p className="text-xs text-[#9b9a97]">
-                  Manage your data export, conversational retention, and privacy commitments.
-                </p>
-              </div>
+            {/* TAB 4: CUSTOM INSTRUCTIONS */}
+            {activeTab === "instructions" && (
+              <div className="space-y-8">
+                <SectionHeader
+                  title="Custom instructions"
+                  description="Tell RoleFlow about yourself and how you want it to respond. These apply to every future conversation."
+                />
 
-              {/* Privacy highlights */}
-              <div className="p-4 rounded-xl bg-[#1a1918] border border-[#2a2927] space-y-2 text-xs text-[#999894]">
-                <div className="flex items-center gap-2 text-emerald-400 font-medium">
-                  <Shield className="w-4 h-4" />
-                  <span>Zero Public Model Training</span>
-                </div>
-                <p className="leading-relaxed text-[#8a8985]">
-                  RoleFlow strictly isolates user conversation logs and custom instructions. Your data is never used to train public or foundational AI models.
-                </p>
-              </div>
+                <div className="space-y-6">
+                  <div>
+                    <label htmlFor="settings-about" className={labelClass}>
+                      What should RoleFlow know about you?
+                    </label>
+                    <textarea
+                      id="settings-about"
+                      value={customInstructions}
+                      onChange={(e) => setCustomInstructions(e.target.value)}
+                      rows={5}
+                      placeholder="e.g. I am a senior engineer building cloud architectures with TypeScript, Go, and Terraform."
+                      className={`${inputClass} resize-none leading-relaxed`}
+                    />
+                    <span className={hintClass}>Your background, role, favorite languages, and domains.</span>
+                  </div>
 
-              {/* Data Export Box */}
-              <div className="p-4 rounded-xl bg-[#1d1c1a] border border-[#2b2a28] flex items-center justify-between">
-                <div>
-                  <div className="text-xs font-semibold text-[#f4f4f0]">Export All Account Data</div>
-                  <div className="text-xs text-[#8a8985] mt-0.5">
-                    Download complete conversational histories, artifacts, profile settings, and memories as JSON.
+                  <div>
+                    <label htmlFor="settings-response" className={labelClass}>
+                      How should RoleFlow respond?
+                    </label>
+                    <textarea
+                      id="settings-response"
+                      value={responseInstructions}
+                      onChange={(e) => setResponseInstructions(e.target.value)}
+                      rows={5}
+                      placeholder="e.g. Be concise. Skip pleasantries. Give complete code instead of snippets."
+                      className={`${inputClass} resize-none leading-relaxed`}
+                    />
+                    <span className={hintClass}>Style, tone, formatting, and engineering standards.</span>
                   </div>
                 </div>
-                <button
-                  type="button"
-                  onClick={handleExportData}
-                  disabled={isExporting}
-                  className="flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-[#252422] hover:bg-[#302f2d] text-xs font-medium text-[#f4f4f0] border border-[#383734] transition-colors shrink-0"
-                >
-                  <Download className="w-3.5 h-3.5 text-[#d97706]" />
-                  <span>{isExporting ? "Exporting..." : "Export JSON"}</span>
-                </button>
-              </div>
 
-              {/* Delete All Chats */}
-              <div className="p-4 rounded-xl bg-red-950/20 border border-red-900/30 flex items-center justify-between">
-                <div>
-                  <div className="text-xs font-semibold text-red-400">Delete All Conversations</div>
-                  <div className="text-xs text-[#a3a29d] mt-0.5">
-                    Permanently wipe all conversation threads and message logs from your account.
+                <div className="flex items-center justify-between gap-4 border-t border-line pt-5">
+                  <div className="min-h-[1.25rem]">
+                    {saveSuccess && (
+                      <span className={successTextClass}>
+                        <Check className="w-4 h-4" />
+                        Instructions saved
+                      </span>
+                    )}
                   </div>
-                </div>
-                <button
-                  type="button"
-                  onClick={handleDeleteAllChats}
-                  disabled={isDeletingChats}
-                  className="flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-red-500/10 hover:bg-red-500/20 text-red-400 text-xs font-semibold border border-red-500/30 transition-colors shrink-0"
-                >
-                  <Trash2 className="w-3.5 h-3.5" />
-                  <span>{isDeletingChats ? "Deleting..." : "Delete All Chats"}</span>
-                </button>
-              </div>
-
-              {deleteChatsSuccess && (
-                <div className="p-3 rounded-xl bg-emerald-500/10 border border-emerald-500/20 text-xs text-emerald-400">
-                  ✓ All conversation threads have been successfully deleted.
-                </div>
-              )}
-            </div>
-          )}
-
-          {/* TAB 6: ADMIN QUEUE */}
-          {activeTab === "admin" && isAdmin && (
-            <div className="space-y-6">
-              {/* Header section */}
-              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-4 border-b border-[#262523]">
-                <div>
-                  <div className="flex items-center gap-2 mb-1">
-                    <ShieldAlert className="w-4 h-4 text-red-400" />
-                    <h4 className="text-base font-semibold text-[#f4f4f0]">
-                      Safety &amp; Moderation Queue
-                    </h4>
-                  </div>
-                  <p className="text-xs text-[#9b9a97]">
-                    Live Trust &amp; Safety audit records and incident dossiers.
-                  </p>
-                </div>
-
-                <div className="flex items-center gap-2">
-                  <select
-                    value={logFilter}
-                    onChange={(e) => setLogFilter(e.target.value)}
-                    className="bg-[#201f1e] text-xs text-[#c5c4be] px-3 py-1.5 rounded-xl border border-[#333230] focus:outline-none"
-                  >
-                    <option value="ALL">All Statuses</option>
-                    <option value="FLAGGED">Flagged</option>
-                    <option value="APPEALED">Appealed</option>
-                    <option value="BANNED">Banned</option>
-                    <option value="RESOLVED">Resolved / Dismissed</option>
-                  </select>
-
                   <button
                     type="button"
-                    onClick={fetchModerationLogs}
-                    disabled={loadingLogs}
-                    className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-[#201f1e] hover:bg-[#2a2927] text-xs text-[#c5c4be] border border-[#333230] transition-colors"
+                    onClick={() => handleSaveAllPreferences()}
+                    disabled={saving}
+                    className={primaryButtonClass}
                   >
-                    <RotateCw className={`w-3.5 h-3.5 ${loadingLogs ? "animate-spin" : ""}`} />
-                    <span>Refresh</span>
+                    <Save className="w-4 h-4" />
+                    <span>{saving ? "Saving..." : "Save instructions"}</span>
                   </button>
-
-                  <Link
-                    href="/admin"
-                    onClick={onClose}
-                    className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-[#d97706] hover:bg-[#b45309] text-xs font-semibold text-white transition-colors"
-                  >
-                    <span>Full Admin Console</span>
-                    <ExternalLink className="w-3.5 h-3.5" />
-                  </Link>
                 </div>
               </div>
+            )}
 
-              {actionMessage && (
-                <div className="p-3 rounded-xl bg-emerald-500/10 border border-emerald-500/20 text-xs text-emerald-400">
-                  {actionMessage}
-                </div>
-              )}
+            {/* TAB 5: DATA & PRIVACY */}
+            {activeTab === "privacy" && (
+              <div className="space-y-8">
+                <SectionHeader
+                  title="Data & privacy"
+                  description="Export your data or delete your conversation history."
+                />
 
-              {loadingLogs ? (
-                <div className="py-12 text-center text-xs text-[#888782]">
-                  Loading moderation records...
-                </div>
-              ) : filteredLogs.length === 0 ? (
-                <div className="py-12 text-center space-y-2">
-                  <div className="inline-flex p-3 rounded-full bg-[#1e1d1b] border border-[#2e2d2b] text-[#888782]">
-                    <ShieldAlert className="w-5 h-5 text-emerald-400" />
+                <div className="flex gap-3 rounded-2xl border border-line bg-app p-4">
+                  <Shield className="mt-0.5 h-4 w-4 shrink-0 text-emerald-600 dark:text-emerald-400" />
+                  <div className="space-y-1">
+                    <div className="text-sm font-medium text-ink">Your data is not used for model training</div>
+                    <p className="text-sm leading-relaxed text-muted">
+                      RoleFlow keeps your conversations and custom instructions isolated to your account. They are never used to train public or foundational AI models.
+                    </p>
                   </div>
-                  <p className="text-sm text-[#f4f4f0] font-medium">Queue is clean</p>
-                  <p className="text-xs text-[#888782]">
-                    No moderation incidents match the current filter.
-                  </p>
                 </div>
-              ) : (
-                <div className="space-y-4">
-                  {filteredLogs.map((log) => {
-                    const isTier1 = log.tier === 1;
-                    const isExpanded = expandedLogId === log.id;
-                    const isProcessing = actionProcessingId === log.id;
 
-                    return (
-                      <div
-                        key={log.id}
-                        className={`rounded-xl border p-4 transition-all ${
-                          isTier1
-                            ? "bg-[#1c1313]/50 border-red-500/30 hover:border-red-500/50"
-                            : "bg-[#1c1813]/50 border-amber-500/30 hover:border-amber-500/50"
-                        }`}
-                      >
-                        <div className="flex flex-wrap items-center justify-between gap-2 mb-2.5">
-                          <div className="flex items-center gap-2">
-                            <span
-                              className={`px-2.5 py-0.5 rounded-full text-[10px] font-mono font-semibold tracking-wider ${
-                                isTier1
-                                  ? "bg-red-500/20 text-red-400 border border-red-500/40"
-                                  : "bg-amber-500/20 text-amber-400 border border-amber-500/40"
+                <div className="divide-y divide-line">
+                  <SettingRow
+                    title="Export all account data"
+                    description="Download your conversations, profile settings, and memories as JSON."
+                  >
+                    <button
+                      type="button"
+                      onClick={handleExportData}
+                      disabled={isExporting}
+                      className={secondaryButtonClass}
+                    >
+                      <Download className="w-3.5 h-3.5" />
+                      <span>{isExporting ? "Exporting..." : "Export JSON"}</span>
+                    </button>
+                  </SettingRow>
+
+                  <SettingRow
+                    title="Delete all conversations"
+                    description="Permanently remove every conversation thread from your account. This cannot be undone."
+                    danger
+                  >
+                    <button
+                      type="button"
+                      onClick={handleDeleteAllChats}
+                      disabled={isDeletingChats}
+                      className={dangerButtonClass}
+                    >
+                      <Trash2 className="w-3.5 h-3.5" />
+                      <span>{isDeletingChats ? "Deleting..." : "Delete all chats"}</span>
+                    </button>
+                  </SettingRow>
+                </div>
+
+                {deleteChatsSuccess && notice("All conversation threads have been deleted.")}
+              </div>
+            )}
+
+            {/* TAB 6: ADMIN QUEUE */}
+            {activeTab === "admin" && isAdmin && (
+              <div className="space-y-6">
+                <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+                  <SectionHeader
+                    title="Safety & moderation"
+                    description="Live trust and safety records and incident dossiers."
+                  />
+
+                  <div className="flex shrink-0 flex-wrap items-center gap-2">
+                    <select
+                      value={logFilter}
+                      onChange={(e) => setLogFilter(e.target.value)}
+                      aria-label="Filter by status"
+                      className={`rounded-xl border border-line bg-app px-3 py-2 text-sm text-ink ${focusRing}`}
+                    >
+                      <option value="ALL">All statuses</option>
+                      <option value="FLAGGED">Flagged</option>
+                      <option value="APPEALED">Appealed</option>
+                      <option value="BANNED">Banned</option>
+                      <option value="RESOLVED">Resolved / dismissed</option>
+                    </select>
+
+                    <button
+                      type="button"
+                      onClick={fetchModerationLogs}
+                      disabled={loadingLogs}
+                      className={secondaryButtonClass}
+                    >
+                      <RotateCw className={`w-3.5 h-3.5 ${loadingLogs ? "animate-spin" : ""}`} />
+                      <span>Refresh</span>
+                    </button>
+
+                    <Link href="/admin" onClick={onClose} className={primaryButtonClass}>
+                      <span>Full console</span>
+                      <ExternalLink className="w-3.5 h-3.5" />
+                    </Link>
+                  </div>
+                </div>
+
+                {actionMessage && notice(actionMessage)}
+
+                {loadingLogs ? (
+                  <div className="py-12 text-center text-sm text-muted">Loading moderation records...</div>
+                ) : filteredLogs.length === 0 ? (
+                  <div className="space-y-2 py-12 text-center">
+                    <div className="mx-auto inline-flex rounded-full border border-line bg-app p-3">
+                      <ShieldAlert className="h-5 w-5 text-emerald-600 dark:text-emerald-400" />
+                    </div>
+                    <p className="text-sm font-medium text-ink">The queue is clear</p>
+                    <p className="text-sm text-muted">No moderation incidents match this filter.</p>
+                  </div>
+                ) : (
+                  <div className="space-y-4">
+                    {filteredLogs.map((log) => {
+                      const isTier1 = log.tier === 1;
+                      const isExpanded = expandedLogId === log.id;
+                      const isProcessing = actionProcessingId === log.id;
+
+                      return (
+                        <div key={log.id} className={`${cardClass} p-5`}>
+                          <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
+                            <div className="flex flex-wrap items-center gap-2">
+                              <span
+                                className={`rounded-full border px-2.5 py-0.5 text-[11px] font-medium ${
+                                  isTier1
+                                    ? "border-danger/30 bg-danger-soft text-danger"
+                                    : "border-amber-500/30 bg-amber-500/10 text-amber-700 dark:text-amber-300"
+                                }`}
+                              >
+                                {isTier1 ? "Critical · Tier 1" : "Tier 2"}
+                              </span>
+                              <span className="font-mono text-xs text-ink">{log.category}</span>
+                              <span
+                                className={`rounded-md border px-2 py-0.5 text-[11px] font-medium ${
+                                  log.status === "BANNED"
+                                    ? "border-danger/30 bg-danger-soft text-danger"
+                                    : log.status === "APPEALED"
+                                    ? "border-sky-500/30 bg-sky-500/10 text-sky-700 dark:text-sky-300"
+                                    : log.status === "RESOLVED"
+                                    ? "border-emerald-500/30 bg-emerald-500/10 text-emerald-700 dark:text-emerald-300"
+                                    : "border-amber-500/30 bg-amber-500/10 text-amber-700 dark:text-amber-300"
+                                }`}
+                              >
+                                {log.status}
+                              </span>
+                            </div>
+                            <div className="flex items-center gap-1.5 text-xs text-muted">
+                              <Clock className="w-3.5 h-3.5" />
+                              <span>{log.createdAt ? new Date(log.createdAt).toLocaleString() : "Recent"}</span>
+                            </div>
+                          </div>
+
+                          <div className="grid grid-cols-1 gap-2 border-y border-line py-3 text-xs text-muted sm:grid-cols-3">
+                            <div className="flex min-w-0 items-center gap-1.5">
+                              <Mail className="h-3.5 w-3.5 shrink-0" />
+                              <span className="truncate">{log.userEmail || "guest"}</span>
+                            </div>
+                            <div className="flex min-w-0 items-center gap-1.5">
+                              <Globe className="h-3.5 w-3.5 shrink-0" />
+                              <span className="truncate">{log.ipAddress || "127.0.0.1"}</span>
+                            </div>
+                            <div className="flex min-w-0 items-center gap-1.5">
+                              <span className="truncate font-mono">ID: {log.id}</span>
+                            </div>
+                          </div>
+
+                          <div className="mt-4">
+                            <div className="mb-1.5 flex items-center justify-between text-xs font-medium text-muted">
+                              <span>Flagged prompt</span>
+                              <button
+                                type="button"
+                                onClick={() => setExpandedLogId(isExpanded ? null : log.id)}
+                                className={`flex items-center gap-1 rounded text-accent hover:underline ${focusRing}`}
+                              >
+                                <span>{isExpanded ? "Collapse" : "Expand"}</span>
+                                {isExpanded ? <ChevronUp className="w-3.5 h-3.5" /> : <ChevronDown className="w-3.5 h-3.5" />}
+                              </button>
+                            </div>
+                            <pre
+                              className={`whitespace-pre-wrap rounded-xl border border-line bg-app p-3 font-mono text-xs leading-relaxed text-ink overflow-x-auto ${
+                                isExpanded ? "max-h-96" : "max-h-16 overflow-hidden"
                               }`}
                             >
-                              {isTier1 ? "CRITICAL TIER 1" : "TIER 2"}
-                            </span>
-                            <span className="font-mono text-[11px] text-[#f4f4f0] font-medium">
-                              {log.category}
-                            </span>
-                            <span
-                              className={`px-2 py-0.5 rounded text-[10px] font-mono ${
-                                log.status === "BANNED"
-                                  ? "bg-red-950/60 text-red-300 border border-red-800/40"
-                                  : log.status === "APPEALED"
-                                  ? "bg-sky-950/60 text-sky-300 border border-sky-800/40"
-                                  : log.status === "RESOLVED"
-                                  ? "bg-emerald-950/60 text-emerald-300 border border-emerald-800/40"
-                                  : "bg-amber-950/60 text-amber-300 border border-amber-800/40"
-                              }`}
-                            >
-                              {log.status}
-                            </span>
+                              <code>{log.prompt}</code>
+                            </pre>
                           </div>
-                          <div className="flex items-center gap-2 text-xs text-[#888782] font-mono">
-                            <Clock className="w-3.5 h-3.5" />
-                            <span>
-                              {log.createdAt ? new Date(log.createdAt).toLocaleString() : "Recent"}
-                            </span>
-                          </div>
-                        </div>
 
-                        <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 text-xs text-[#a1a09a] py-2 border-y border-white/5 font-mono">
-                          <div className="flex items-center gap-1.5 truncate">
-                            <Mail className="w-3.5 h-3.5 text-[#777672] shrink-0" />
-                            <span className="truncate">{log.userEmail || "guest"}</span>
-                          </div>
-                          <div className="flex items-center gap-1.5 truncate">
-                            <Globe className="w-3.5 h-3.5 text-[#777672] shrink-0" />
-                            <span>{log.ipAddress || "127.0.0.1"}</span>
-                          </div>
-                          <div className="flex items-center gap-1.5 truncate text-[#777672]">
-                            <span>ID: {log.id}</span>
-                          </div>
-                        </div>
+                          {log.appealNote && (
+                            <div className="mt-3 space-y-1 rounded-xl border border-sky-500/20 bg-sky-500/10 p-3 text-xs">
+                              <div className="font-medium text-sky-700 dark:text-sky-300">User appeal statement</div>
+                              <p className="italic leading-relaxed text-ink">&ldquo;{log.appealNote}&rdquo;</p>
+                            </div>
+                          )}
 
-                        <div className="mt-3">
-                          <div className="flex items-center justify-between text-[11px] font-medium text-[#888782] mb-1">
-                            <span>Flagged Prompt Evidence</span>
+                          <div className="mt-4 flex flex-wrap items-center justify-end gap-2 border-t border-line pt-3">
                             <button
                               type="button"
-                              onClick={() => setExpandedLogId(isExpanded ? null : log.id)}
-                              className="flex items-center gap-1 text-[#d97706] hover:underline"
+                              onClick={() => handleExportDossier(log.id)}
+                              className={secondaryButtonClass}
                             >
-                              <span>{isExpanded ? "Collapse" : "Expand"}</span>
-                              {isExpanded ? <ChevronUp className="w-3.5 h-3.5" /> : <ChevronDown className="w-3.5 h-3.5" />}
+                              <Download className="w-3.5 h-3.5" />
+                              <span>Export dossier</span>
+                            </button>
+
+                            <button
+                              type="button"
+                              disabled={isProcessing}
+                              onClick={() => handleModerationAction(log.id, "UNBAN_DISMISS")}
+                              className={secondaryButtonClass}
+                            >
+                              <UserCheck className="w-3.5 h-3.5" />
+                              <span>Unban / dismiss</span>
+                            </button>
+
+                            <button
+                              type="button"
+                              disabled={isProcessing}
+                              onClick={() => handleModerationAction(log.id, "CONFIRM_BAN")}
+                              className={dangerButtonClass}
+                            >
+                              <Ban className="w-3.5 h-3.5" />
+                              <span>Confirm ban</span>
                             </button>
                           </div>
-                          <pre
-                            className={`p-3 rounded-lg bg-black/50 text-xs font-mono text-[#e4e3de] overflow-x-auto border border-white/5 whitespace-pre-wrap leading-relaxed ${
-                              isExpanded ? "max-h-96" : "max-h-16 overflow-hidden"
-                            }`}
-                          >
-                            <code>{log.prompt}</code>
-                          </pre>
                         </div>
-
-                        {log.appealNote && (
-                          <div className="mt-3 p-3 rounded-lg bg-sky-950/20 border border-sky-800/30 text-xs space-y-1">
-                            <div className="font-semibold text-sky-400">User Appeal Statement:</div>
-                            <p className="text-[#c5c4be] leading-relaxed italic">
-                              "{log.appealNote}"
-                            </p>
-                          </div>
-                        )}
-
-                        <div className="flex flex-wrap items-center justify-end gap-2 mt-4 pt-3 border-t border-white/5">
-                          <button
-                            type="button"
-                            onClick={() => handleExportDossier(log.id)}
-                            className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-[#242322] hover:bg-[#2d2c2a] text-xs font-medium text-[#f4f4f0] border border-[#3b3a37] transition-colors"
-                          >
-                            <Download className="w-3.5 h-3.5 text-[#d97706]" />
-                            <span>Export Official Dossier</span>
-                          </button>
-
-                          <button
-                            type="button"
-                            disabled={isProcessing}
-                            onClick={() => handleModerationAction(log.id, "UNBAN_DISMISS")}
-                            className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 text-xs font-medium transition-colors disabled:opacity-50"
-                          >
-                            <UserCheck className="w-3.5 h-3.5" />
-                            <span>Unban / Dismiss</span>
-                          </button>
-
-                          <button
-                            type="button"
-                            disabled={isProcessing}
-                            onClick={() => handleModerationAction(log.id, "CONFIRM_BAN")}
-                            className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-red-500/10 hover:bg-red-500/20 text-red-400 border border-red-500/30 text-xs font-medium transition-colors disabled:opacity-50"
-                          >
-                            <Ban className="w-3.5 h-3.5" />
-                            <span>Confirm Ban</span>
-                          </button>
-                        </div>
-                      </div>
-                    );
-                  })}
-                </div>
-              )}
-            </div>
-          )}
+                      );
+                    })}
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
         </div>
       </div>
     </div>

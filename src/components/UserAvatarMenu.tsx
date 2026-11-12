@@ -2,14 +2,7 @@
 
 import React, { useState, useRef, useEffect } from "react";
 import Link from "next/link";
-import {
-  Settings,
-  Shield,
-  Trash2,
-  LogOut,
-  User as UserIcon,
-  Sparkles,
-} from "lucide-react";
+import { Settings, Shield, Trash2, LogOut } from "lucide-react";
 import { UserProfile } from "@/types";
 import { formatCleanName } from "@/lib/format";
 
@@ -40,138 +33,124 @@ export const UserAvatarMenu: React.FC<UserAvatarMenuProps> = ({
   const cleanName = formatCleanName(user.name, user.email);
   const initial = cleanName.charAt(0).toUpperCase();
 
-  // Close on outside click or escape key
+  // Close on outside click or Escape
   useEffect(() => {
+    if (!isOpen) return;
     const handleClickOutside = (event: MouseEvent) => {
       if (menuRef.current && !menuRef.current.contains(event.target as Node)) {
         setIsOpen(false);
       }
     };
-
     const handleKeyDown = (event: KeyboardEvent) => {
-      if (event.key === "Escape") {
-        setIsOpen(false);
-      }
+      if (event.key === "Escape") setIsOpen(false);
     };
-
-    if (isOpen) {
-      document.addEventListener("mousedown", handleClickOutside);
-      document.addEventListener("keydown", handleKeyDown);
-    }
-
+    document.addEventListener("mousedown", handleClickOutside);
+    document.addEventListener("keydown", handleKeyDown);
     return () => {
       document.removeEventListener("mousedown", handleClickOutside);
       document.removeEventListener("keydown", handleKeyDown);
     };
   }, [isOpen]);
 
-  const popoverClasses =
-    position === "bottom-left"
-      ? "bottom-full left-0 mb-2"
-      : "top-full right-0 mt-2";
+  const popoverPlacement =
+    position === "bottom-left" ? "bottom-full left-0 mb-2" : "top-full right-0 mt-2";
+
+  const itemClass =
+    "w-full flex items-center gap-2.5 px-2.5 py-2 rounded-lg text-sm text-ink hover:bg-hover transition-colors duration-150 text-left";
 
   return (
     <div className="relative inline-block" ref={menuRef}>
-      {/* Clickable Avatar Circle */}
       <button
         type="button"
         onClick={() => setIsOpen(!isOpen)}
-        className="w-8 h-8 rounded-full bg-[#262624] border border-[#383734] flex items-center justify-center text-xs font-semibold text-[#d97706] hover:border-[#d97706] hover:scale-105 active:scale-95 transition-all shadow-sm focus:outline-none"
+        className="w-9 h-9 rounded-full bg-accent text-white flex items-center justify-center text-sm font-medium hover:bg-accent-hover transition-colors duration-150 outline-none focus-visible:ring-2 focus-visible:ring-accent/40"
         title={cleanName}
-        aria-haspopup="true"
+        aria-haspopup="menu"
         aria-expanded={isOpen}
       >
         {initial}
       </button>
 
-      {/* Sleek Floating Popover Menu */}
       {isOpen && (
         <div
-          className={`absolute ${popoverClasses} w-64 rounded-2xl bg-[#1b1a19] border border-[#2e2d2b] shadow-2xl z-50 p-2 animate-in fade-in zoom-in-95 duration-150 text-[#e4e3de] select-none`}
+          role="menu"
+          className={`absolute ${popoverPlacement} w-64 rounded-xl bg-card shadow-menu z-50 p-1.5 text-ink select-none animate-message`}
         >
-          {/* User Header */}
-          <div className="px-3 py-2.5 border-b border-[#292826] flex items-center gap-2.5">
-            <div className="w-9 h-9 rounded-full bg-[#282725] border border-[#3b3a37] flex items-center justify-center text-xs font-bold text-[#d97706] shrink-0">
+          {/* User header */}
+          <div className="px-2.5 py-2.5 mb-1 border-b border-line flex items-center gap-2.5">
+            <div className="w-9 h-9 rounded-full bg-accent text-white flex items-center justify-center text-sm font-medium shrink-0">
               {initial}
             </div>
             <div className="min-w-0 flex-1">
               <div className="flex items-center gap-1.5">
-                <span className="text-xs font-semibold text-[#f4f4f0] truncate">
-                  {cleanName}
-                </span>
+                <span className="text-sm font-medium truncate">{cleanName}</span>
                 {isAdmin && (
-                  <span className="text-[9px] font-mono font-bold px-1.5 py-0.2 rounded bg-amber-500/20 text-amber-300 border border-amber-500/30 shrink-0">
+                  <span className="text-[9px] font-mono font-bold px-1.5 py-0.5 rounded bg-accent-soft text-accent shrink-0">
                     ADMIN
                   </span>
                 )}
               </div>
-              <div className="text-[11px] text-[#8e8d89] truncate" title={user.email}>
+              <div className="text-xs text-muted truncate" title={user.email}>
                 {user.email}
               </div>
             </div>
           </div>
 
-          {/* Action List */}
-          <div className="py-1 space-y-0.5">
-            {/* Settings */}
+          <div className="space-y-0.5">
             <button
               type="button"
+              role="menuitem"
               onClick={() => {
                 setIsOpen(false);
                 onOpenSettings();
               }}
-              className="w-full flex items-center gap-2.5 px-3 py-2 rounded-xl text-xs font-medium text-[#cfcec9] hover:text-[#f4f4f0] hover:bg-[#252422] transition-colors"
+              className={itemClass}
             >
-              <Settings className="w-4 h-4 text-[#9b9a97]" />
+              <Settings className="w-4 h-4 text-muted" strokeWidth={1.75} />
               <span>Settings</span>
             </button>
 
-            {/* Admin Console (If Admin) */}
             {isAdmin && (
               <Link
                 href="/admin"
+                role="menuitem"
                 onClick={() => setIsOpen(false)}
-                className="w-full flex items-center justify-between px-3 py-2 rounded-xl text-xs font-medium text-amber-300 hover:text-amber-200 hover:bg-amber-500/10 transition-colors"
+                className={itemClass}
               >
-                <div className="flex items-center gap-2.5">
-                  <Shield className="w-4 h-4 text-amber-400" />
-                  <span>Admin Console</span>
-                </div>
-                <span className="text-[10px] font-mono px-1.5 py-0.5 rounded bg-amber-500/20 text-amber-300 border border-amber-500/30">
-                  Ctrl
-                </span>
+                <Shield className="w-4 h-4 text-muted" strokeWidth={1.75} />
+                <span>Admin console</span>
               </Link>
             )}
 
-            {/* Clear Conversation */}
             {onClearConversation && (
               <button
                 type="button"
+                role="menuitem"
                 onClick={() => {
                   setIsOpen(false);
                   onClearConversation();
                 }}
-                className="w-full flex items-center gap-2.5 px-3 py-2 rounded-xl text-xs font-medium text-[#cfcec9] hover:text-[#f4f4f0] hover:bg-[#252422] transition-colors"
+                className={itemClass}
               >
-                <Trash2 className="w-4 h-4 text-[#9b9a97]" />
-                <span>Clear Conversation</span>
+                <Trash2 className="w-4 h-4 text-muted" strokeWidth={1.75} />
+                <span>Clear conversation</span>
               </button>
             )}
           </div>
 
-          {/* Sign Out Row */}
           {onSignOut && (
-            <div className="pt-1 mt-1 border-t border-[#292826]">
+            <div className="pt-1 mt-1 border-t border-line">
               <button
                 type="button"
+                role="menuitem"
                 onClick={() => {
                   setIsOpen(false);
                   onSignOut();
                 }}
-                className="w-full flex items-center gap-2.5 px-3 py-2 rounded-xl text-xs font-medium text-rose-400 hover:text-rose-300 hover:bg-rose-500/10 transition-colors"
+                className="w-full flex items-center gap-2.5 px-2.5 py-2 rounded-lg text-sm text-danger hover:bg-danger-soft transition-colors duration-150 text-left"
               >
-                <LogOut className="w-4 h-4 text-rose-400" />
-                <span>Sign Out</span>
+                <LogOut className="w-4 h-4" strokeWidth={1.75} />
+                <span>Sign out</span>
               </button>
             </div>
           )}

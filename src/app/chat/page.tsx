@@ -23,10 +23,15 @@ import {
   UserProfile,
   UsageStats,
 } from "@/types";
-import { Code, Sparkles, Bug, Compass } from "lucide-react";
+import { Code, Bug, Compass } from "lucide-react";
 
 export default function ChatPage() {
-  const [sidebarOpen, setSidebarOpen] = useState(true);
+  // Open by default on desktop. On phones the sidebar starts closed and opens as a drawer.
+  const [sidebarOpen, setSidebarOpen] = useState(false);
+
+  useEffect(() => {
+    if (window.innerWidth >= 768) setSidebarOpen(true);
+  }, []);
   const [model, setModel] = useState<ModelId>("roleflow-genesis-1");
   const [effort, setEffort] = useState<EffortLevel>("medium");
 
@@ -193,9 +198,9 @@ export default function ChatPage() {
   }, [messages, isLoading]);
 
   const getGreeting = () => {
-    const timeGreeting = getTimeGreeting();
+    const timeGreeting = getTimeGreeting().toLowerCase();
     const userName = formatCleanName(user?.name, user?.email);
-    return `${timeGreeting}, ${userName}`;
+    return `Good ${timeGreeting}, ${userName}`;
   };
 
   const handleSelectChat = (chatId: string) => {
@@ -486,15 +491,33 @@ export default function ChatPage() {
 
   const activeProject = projects.find((p) => p.id === selectedProjectId);
 
+  const composer = (
+    <PromptBox
+      onSend={handleSendMessage}
+      isLoading={isLoading}
+      model={model}
+      onModelChange={setModel}
+      effort={effort}
+      onEffortChange={setEffort}
+      projects={projects}
+      selectedProjectId={selectedProjectId}
+      onProjectChange={setSelectedProjectId}
+      onCreateProject={() => setCreateProjectModalOpen(true)}
+    />
+  );
+
   return (
-    <div className="flex h-screen w-screen overflow-hidden roleflow-mesh-bg text-[#f4f4f0]">
-      {/* Sidebar */}
+    <div className="flex h-[100dvh] w-screen overflow-hidden bg-app text-ink">
+      {/* Sidebar: a fixed drawer on phones, a column on desktop */}
       <Sidebar
         isOpen={sidebarOpen}
         onToggle={() => setSidebarOpen(!sidebarOpen)}
         chats={chats}
         activeChatId={currentChatId}
-        onSelectChat={handleSelectChat}
+        onSelectChat={(id) => {
+          handleSelectChat(id);
+          if (typeof window !== "undefined" && window.innerWidth < 768) setSidebarOpen(false);
+        }}
         onNewChat={handleNewChat}
         onDeleteChat={handleDeleteChat}
         onTogglePinChat={handleTogglePinChat}
@@ -513,7 +536,7 @@ export default function ChatPage() {
         onClearConversation={handleNewChat}
       />
 
-      {/* Main Chat Center Pane */}
+      {/* Main column */}
       <div className="flex-1 flex flex-col h-full min-w-0 overflow-hidden relative">
         <Header
           model={model}
@@ -531,62 +554,51 @@ export default function ChatPage() {
           onOpenSettings={() => setSettingsModalOpen(true)}
           onClearConversation={handleNewChat}
           onSignOut={handleSignOut}
+          onToggleSidebar={() => setSidebarOpen(true)}
         />
 
-        <div className="flex-1 flex flex-col overflow-y-auto">
-          {messages.length === 0 ? (
-            /* Blank Canvas (RoleFlow Workspace) */
-            <div className="flex-1 flex flex-col items-center justify-center p-6 text-center max-w-2xl mx-auto w-full">
-              {/* Logo & Greeting */}
-              <div className="flex items-center justify-center gap-3.5 mb-7">
-                <Logo size={38} showText={false} />
-                <h1 className="font-serif text-3xl sm:text-[38px] text-[#f4f4f0] font-normal tracking-tight">
+        {messages.length === 0 ? (
+          /* Empty state: greeting and composer centered in the viewport */
+          <div className="flex-1 overflow-y-auto">
+            <div className="min-h-full flex flex-col items-center justify-center px-4 sm:px-6 pb-8 pt-4">
+              <div className="w-full max-w-3xl">
+                <div className="flex justify-center mb-5">
+                  <Logo size={36} showText={false} />
+                </div>
+                <h1 className="font-display text-[32px] sm:text-[40px] leading-tight text-center text-ink mb-8 sm:mb-10">
                   {getGreeting()}
                 </h1>
-              </div>
 
-              {/* Centered Prompt Box */}
-              <div className="w-full">
-                <PromptBox
-                  onSend={handleSendMessage}
-                  isLoading={isLoading}
-                  model={model}
-                  onModelChange={setModel}
-                  effort={effort}
-                  onEffortChange={setEffort}
-                  projects={projects}
-                  selectedProjectId={selectedProjectId}
-                  onProjectChange={setSelectedProjectId}
-                  onCreateProject={() => setCreateProjectModalOpen(true)}
-                />
-              </div>
+                {composer}
 
-              {/* Starter Chips */}
-              <div className="flex flex-wrap items-center justify-center gap-2 mt-5">
-                {starterChips.map((chip, i) => {
-                  const Icon = chip.icon;
-                  return (
-                    <button
-                      key={i}
-                      type="button"
-                      onClick={() => handleSendMessage(chip.text, [])}
-                      className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-[#1c1b1a] hover:bg-[#252423] text-xs text-[#999894] hover:text-[#f4f4f0] border border-[#2e2d2b] transition-all hover:border-[#42403c] shadow-sm"
-                    >
-                      <Icon className="w-3.5 h-3.5 text-[#d97706]" />
-                      <span>{chip.text}</span>
-                    </button>
-                  );
-                })}
-              </div>
+                <div className="flex flex-wrap items-center justify-center gap-2 mt-5">
+                  {starterChips.map((chip, i) => {
+                    const Icon = chip.icon;
+                    return (
+                      <button
+                        key={i}
+                        type="button"
+                        onClick={() => handleSendMessage(chip.text, [])}
+                        className="flex items-center gap-2 min-h-[36px] px-3.5 rounded-full border border-line bg-card text-sm text-ink/80 hover:text-ink hover:bg-hover transition-colors duration-150 outline-none focus-visible:ring-2 focus-visible:ring-accent/40"
+                      >
+                        <Icon className="w-4 h-4 text-accent shrink-0" strokeWidth={1.75} />
+                        <span>{chip.text}</span>
+                      </button>
+                    );
+                  })}
+                </div>
 
-              <p className="text-xs text-[#7d7c78] mt-6">
-                Independent AI built by RoleFlow · Frontier open-weights cloud cluster
-              </p>
+                <p className="text-xs text-muted text-center mt-8">
+                  RoleFlow can make mistakes. Check important information.
+                </p>
+              </div>
             </div>
-          ) : (
-            /* Active Message Flow */
-            <div className="flex-1 flex flex-col">
-              <div className="flex-1 overflow-y-auto divide-y divide-[#222120]/40 pb-36">
+          </div>
+        ) : (
+          /* Conversation: scrollable messages with the composer pinned below */
+          <>
+            <div className="flex-1 overflow-y-auto">
+              <div className="pt-4 pb-6">
                 {messages.map((message, index) => (
                   <MessageItem
                     key={message.id}
@@ -599,39 +611,29 @@ export default function ChatPage() {
                 ))}
 
                 {isLoading && (
-                  <div className="w-full max-w-3xl mx-auto py-5 px-4 animate-message">
-                    <div className="inline-flex items-center gap-2.5 px-3.5 py-1.5 rounded-full bg-[#1b1a19] border border-[#2d2c2a] shadow-sm select-none">
-                      <span className="w-2 h-2 rounded-full bg-[#d97706] animate-ping" />
-                      <span className="font-mono text-xs text-[#d97706] font-medium">
-                        Thinking for {thinkingSeconds.toFixed(1)}s...
+                  <div className="w-full max-w-3xl mx-auto px-4 sm:px-6 py-4 animate-message">
+                    <div className="inline-flex items-center gap-2 text-sm text-muted select-none" role="status" aria-live="polite">
+                      <span className="inline-flex items-center gap-1" aria-hidden="true">
+                        <span className="typing-dot w-1.5 h-1.5 rounded-full bg-accent" />
+                        <span className="typing-dot w-1.5 h-1.5 rounded-full bg-accent" />
+                        <span className="typing-dot w-1.5 h-1.5 rounded-full bg-accent" />
                       </span>
+                      <span className="font-mono text-xs">Thinking for {thinkingSeconds.toFixed(1)}s</span>
                     </div>
                   </div>
                 )}
                 <div ref={messagesEndRef} />
               </div>
-
-              {/* Floating Bottom Prompt Bar */}
-              <div className="sticky bottom-0 bg-gradient-to-t from-[#141413] via-[#141413]/95 to-transparent pt-6 pb-4">
-                <PromptBox
-                  onSend={handleSendMessage}
-                  isLoading={isLoading}
-                  model={model}
-                  onModelChange={setModel}
-                  effort={effort}
-                  onEffortChange={setEffort}
-                  projects={projects}
-                  selectedProjectId={selectedProjectId}
-                  onProjectChange={setSelectedProjectId}
-                  onCreateProject={() => setCreateProjectModalOpen(true)}
-                />
-              </div>
             </div>
-          )}
-        </div>
+
+            <div className="shrink-0 bg-app px-3 sm:px-4 pb-4 pt-2">
+              <div className="w-full max-w-3xl mx-auto">{composer}</div>
+            </div>
+          </>
+        )}
       </div>
 
-      {/* Slide-out RoleFlow Artifacts Panel */}
+      {/* Artifact panel */}
       {activeArtifact && (
         <ArtifactsPanel
           artifact={activeArtifact}

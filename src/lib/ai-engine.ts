@@ -18,6 +18,20 @@ export interface GenerateResult {
   memoriesAdded?: string[];
   memoriesRemoved?: string[];
   isFallback?: boolean;
+  /** Set when the upstream provider blocked the request or the generation for safety reasons. */
+  isSafetyRefusal?: boolean;
+  safetyReason?: string;
+}
+
+/**
+ * True when Groq rejected a request or generation on safety grounds. Groq does not say which
+ * RoleFlow category applies, so callers treat these as Tier 2 unless our own scanner matched.
+ */
+export function isUpstreamSafetyBlock(status: number, body: string): boolean {
+  if (status === 400 && /content_policy_violation|content_filter|safety|flagged/i.test(body)) {
+    return true;
+  }
+  return false;
 }
 
 function getGroqKeyPool(): string[] {
@@ -133,6 +147,15 @@ Only emit memory tags when truly relevant to remember long-term. Do not announce
           console.error(
             `Groq request failed: model=${backendModel} key#${(keyIndex + attempt) % keyPool.length} status=${res.status} body=${body.slice(0, 500)}`
           );
+          // A safety rejection applies to the content, not the key, so stop retrying other keys.
+          if (isUpstreamSafetyBlock(res.status, body)) {
+            return {
+              content: "",
+              thinkingTime: Math.max(0.8, Number(((Date.now() - startTime) / 1000).toFixed(1))),
+              isSafetyRefusal: true,
+              safetyReason: "upstream_content_policy",
+            };
+          }
           continue;
         }
 
@@ -146,6 +169,16 @@ Only emit memory tags when truly relevant to remember long-term. Do not announce
             0.8,
             Number(((Date.now() - startTime) / 1000).toFixed(1))
           );
+
+          // Groq reports a filtered generation as finish_reason "content_filter" on a 200 response.
+          if (choice?.finish_reason === "content_filter") {
+            return {
+              content: "",
+              thinkingTime,
+              isSafetyRefusal: true,
+              safetyReason: "upstream_content_filter",
+            };
+          }
 
           if (serverText) {
             // Extract AI memory actions

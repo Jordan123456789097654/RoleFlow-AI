@@ -1,20 +1,21 @@
 "use client";
 
-import React, { useState } from "react";
+import React, { useState, useMemo } from "react";
 import Link from "next/link";
 import {
   Plus,
   Search,
   Pin,
-  MessageSquare,
+  PinOff,
   FolderKanban,
   Settings,
   LogIn,
   LogOut,
-  ChevronLeft,
-  ChevronRight,
+  PanelLeftClose,
+  PanelLeftOpen,
   Trash2,
   Shield,
+  MessageSquare,
 } from "lucide-react";
 import { Chat, Project, UserProfile } from "@/types";
 import { formatCleanName } from "@/lib/format";
@@ -42,6 +43,36 @@ interface SidebarProps {
   onClearConversation?: () => void;
 }
 
+type ChatGroup = { label: string; chats: Chat[] };
+
+/** Buckets chats into Today, Previous 7 days, and Older, newest first. */
+function groupChatsByDate(chats: Chat[]): ChatGroup[] {
+  const now = new Date();
+  const startOfToday = new Date(now.getFullYear(), now.getMonth(), now.getDate()).getTime();
+  const weekAgo = startOfToday - 6 * 24 * 60 * 60 * 1000;
+
+  const buckets: Record<"today" | "week" | "older", Chat[]> = { today: [], week: [], older: [] };
+  const sorted = [...chats].sort((a, b) => {
+    const ta = new Date(b.updatedAt || b.createdAt).getTime() || 0;
+    const tb = new Date(a.updatedAt || a.createdAt).getTime() || 0;
+    return ta - tb;
+  });
+
+  for (const chat of sorted) {
+    const t = new Date(chat.updatedAt || chat.createdAt).getTime() || 0;
+    if (t >= startOfToday) buckets.today.push(chat);
+    else if (t >= weekAgo) buckets.week.push(chat);
+    else buckets.older.push(chat);
+  }
+
+  const groups: ChatGroup[] = [
+    { label: "Today", chats: buckets.today },
+    { label: "Previous 7 days", chats: buckets.week },
+    { label: "Older", chats: buckets.older },
+  ];
+  return groups.filter((g) => g.chats.length > 0);
+}
+
 export const Sidebar: React.FC<SidebarProps> = ({
   isOpen,
   onToggle,
@@ -64,214 +95,197 @@ export const Sidebar: React.FC<SidebarProps> = ({
 }) => {
   const [searchQuery, setSearchQuery] = useState("");
 
-  const filteredChats = chats.filter((c) =>
-    c.title.toLowerCase().includes(searchQuery.toLowerCase())
+  const filteredChats = useMemo(
+    () => chats.filter((c) => c.title.toLowerCase().includes(searchQuery.toLowerCase())),
+    [chats, searchQuery]
   );
 
   const pinnedChats = filteredChats.filter((c) => c.pinned);
-  const unpinnedChats = filteredChats.filter((c) => !c.pinned);
+  const groups = useMemo(
+    () => groupChatsByDate(filteredChats.filter((c) => !c.pinned)),
+    [filteredChats]
+  );
 
+  const isAdmin = Boolean(user?.isAdmin || user?.email?.toLowerCase() === "jordanedanield13@gmail.com");
+
+  const rowClass = (active: boolean) =>
+    `group flex items-center gap-2 min-h-[36px] pl-2.5 pr-1.5 rounded-lg text-sm cursor-pointer transition-colors duration-150 ${
+      active ? "bg-hover text-ink" : "text-ink/80 hover:bg-hover hover:text-ink"
+    }`;
+
+  const iconBtn =
+    "p-1.5 rounded-md text-muted hover:text-ink hover:bg-app transition-colors duration-150 outline-none focus-visible:ring-2 focus-visible:ring-accent/40";
+
+  const renderChat = (chat: Chat) => (
+    <div
+      key={chat.id}
+      className={rowClass(activeChatId === chat.id)}
+      onClick={() => onSelectChat(chat.id)}
+      aria-current={activeChatId === chat.id ? "true" : undefined}
+    >
+      <span className="truncate flex-1 min-w-0">{chat.title}</span>
+      <div className="flex items-center gap-0.5 shrink-0 md:opacity-0 md:group-hover:opacity-100 focus-within:opacity-100 transition-opacity duration-150">
+        <button
+          type="button"
+          onClick={(e) => {
+            e.stopPropagation();
+            onTogglePinChat(chat.id);
+          }}
+          className={iconBtn}
+          title={chat.pinned ? "Unpin chat" : "Pin chat"}
+          aria-label={chat.pinned ? "Unpin chat" : "Pin chat"}
+        >
+          {chat.pinned ? <PinOff className="w-3.5 h-3.5" strokeWidth={1.75} /> : <Pin className="w-3.5 h-3.5" strokeWidth={1.75} />}
+        </button>
+        <button
+          type="button"
+          onClick={(e) => {
+            e.stopPropagation();
+            onDeleteChat(chat.id);
+          }}
+          className={`${iconBtn} hover:text-danger`}
+          title="Delete chat"
+          aria-label="Delete chat"
+        >
+          <Trash2 className="w-3.5 h-3.5" strokeWidth={1.75} />
+        </button>
+      </div>
+    </div>
+  );
+
+  // Closed on desktop: a single floating button. On phones the header menu button handles this.
   if (!isOpen) {
     return (
-      <div className="fixed top-3 left-3 z-40">
+      <div className="hidden md:block fixed top-3 left-3 z-40">
         <button
           type="button"
           onClick={onToggle}
-          className="p-2 rounded-xl bg-[#202022] hover:bg-[#2c2c30] text-[#9b9a97] hover:text-[#f3f3ee] border border-[#333235] transition-colors shadow-lg"
-          title="Open Sidebar"
+          className="p-2 rounded-lg text-muted hover:text-ink hover:bg-hover transition-colors duration-150 outline-none focus-visible:ring-2 focus-visible:ring-accent/40"
+          title="Open sidebar"
+          aria-label="Open sidebar"
         >
-          <ChevronRight className="w-5 h-5" />
+          <PanelLeftOpen className="w-5 h-5" strokeWidth={1.75} />
         </button>
       </div>
     );
   }
 
   return (
-    <aside className="w-64 h-full bg-[#141413] border-r border-[#2a2927] flex flex-col z-40 shrink-0 transition-all duration-300">
-      {/* Top Header */}
-      <div className="h-14 px-3 flex items-center justify-between border-b border-[#242321]">
-        <Link href="/" title="RoleFlow Home" className="hover:opacity-80 transition-opacity">
-          <Logo size={24} />
-        </Link>
-        <button
-          type="button"
-          onClick={onToggle}
-          className="p-1.5 rounded-lg text-[#9b9a97] hover:text-[#f3f3ee] hover:bg-[#22211f] transition-colors"
-          title="Close Sidebar"
-        >
-          <ChevronLeft className="w-4 h-4" />
-        </button>
-      </div>
+    <>
+      {/* Scrim for the phone drawer */}
+      <div
+        className="md:hidden fixed inset-0 z-40 bg-ink/30"
+        onClick={onToggle}
+        aria-hidden="true"
+      />
 
-      {/* New Chat Button */}
-      <div className="p-3">
-        <button
-          type="button"
-          onClick={onNewChat}
-          className="w-full flex items-center gap-2 px-3 py-2 rounded-xl bg-[#22211f] hover:bg-[#2b2a28] text-[#f3f3ee] border border-[#302f2d] transition-colors text-sm font-medium shadow-sm"
-        >
-          <Plus className="w-4 h-4 text-[#d97706]" />
-          <span>New Chat</span>
-        </button>
-      </div>
-
-      {/* Search Input */}
-      <div className="px-3 mb-2">
-        <div className="relative">
-          <Search className="w-3.5 h-3.5 text-[#858480] absolute left-3 top-2.5" />
-          <input
-            type="text"
-            value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
-            placeholder="Search chats..."
-            className="w-full bg-[#1b1a19] text-xs text-[#f3f3ee] placeholder-[#858480] pl-8 pr-3 py-2 rounded-lg border border-[#2e2d2b] focus:outline-none focus:border-[#4d4c52]"
-          />
+      <aside className="fixed md:static inset-y-0 left-0 z-50 md:z-auto w-[280px] md:w-[260px] h-full bg-panel flex flex-col shrink-0 border-r border-line md:border-r-0 shadow-menu md:shadow-none">
+        {/* Top bar */}
+        <div className="h-14 px-3 flex items-center justify-between">
+          <Link href="/" title="RoleFlow home" className="px-1.5 outline-none focus-visible:ring-2 focus-visible:ring-accent/40 rounded">
+            <Logo size={24} showText={false} />
+          </Link>
+          <button
+            type="button"
+            onClick={onToggle}
+            className="p-2 rounded-lg text-muted hover:text-ink hover:bg-hover transition-colors duration-150 outline-none focus-visible:ring-2 focus-visible:ring-accent/40"
+            title="Close sidebar"
+            aria-label="Close sidebar"
+          >
+            <PanelLeftClose className="w-5 h-5" strokeWidth={1.75} />
+          </button>
         </div>
-      </div>
 
-      {/* Chat List Scrollable */}
-      <div className="flex-1 overflow-y-auto px-2 space-y-4">
-        {/* Pinned Chats */}
-        {pinnedChats.length > 0 && (
-          <div>
-            <div className="text-[11px] font-semibold text-[#858480] px-2 py-1 flex items-center gap-1.5 uppercase tracking-wider">
-              <Pin className="w-3 h-3 text-[#d97706]" />
-              <span>Pinned</span>
-            </div>
-            <div className="space-y-0.5 mt-1">
-              {pinnedChats.map((chat) => (
-                <div
-                  key={chat.id}
-                  className={`group flex items-center justify-between px-2.5 py-1.5 rounded-lg text-xs transition-colors cursor-pointer ${
-                    activeChatId === chat.id
-                      ? "bg-[#252422] text-[#f3f3ee] font-medium"
-                      : "text-[#9b9a97] hover:bg-[#1d1c1a] hover:text-[#f3f3ee]"
-                  }`}
-                  onClick={() => onSelectChat(chat.id)}
-                >
-                  <span className="truncate">{chat.title}</span>
-                  <div className="opacity-0 group-hover:opacity-100 flex items-center gap-1">
-                    <button
-                      type="button"
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        onTogglePinChat(chat.id);
-                      }}
-                      className="p-1 hover:text-[#f3f3ee]"
-                      title="Unpin"
-                    >
-                      <Pin className="w-3 h-3 text-[#d97706]" />
-                    </button>
-                    <button
-                      type="button"
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        onDeleteChat(chat.id);
-                      }}
-                      className="p-1 hover:text-rose-400"
-                      title="Delete"
-                    >
-                      <Trash2 className="w-3 h-3" />
-                    </button>
-                  </div>
-                </div>
-              ))}
-            </div>
-          </div>
-        )}
+        {/* New chat */}
+        <div className="px-3 pb-2">
+          <button
+            type="button"
+            onClick={onNewChat}
+            className="w-full flex items-center gap-2 min-h-[40px] px-2.5 rounded-lg text-sm text-ink hover:bg-hover transition-colors duration-150 outline-none focus-visible:ring-2 focus-visible:ring-accent/40"
+          >
+            <Plus className="w-[18px] h-[18px]" strokeWidth={1.75} />
+            <span>New chat</span>
+          </button>
+        </div>
 
-        {/* Recent Chats */}
-        <div>
-          <div className="text-[11px] font-semibold text-[#858480] px-2 py-1 uppercase tracking-wider">
-            Recent Chats
+        {/* Search */}
+        <div className="px-3 pb-3">
+          <div className="relative">
+            <Search className="w-4 h-4 text-muted absolute left-2.5 top-1/2 -translate-y-1/2 pointer-events-none" strokeWidth={1.75} />
+            <input
+              type="search"
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              placeholder="Search chats"
+              aria-label="Search chats"
+              className="w-full min-h-[36px] bg-card text-sm text-ink placeholder:text-muted pl-8 pr-3 rounded-lg border border-line outline-none focus:border-accent/50 focus-visible:ring-2 focus-visible:ring-accent/30 transition-colors duration-150"
+            />
           </div>
-          {unpinnedChats.length === 0 ? (
-            <div className="text-xs text-[#6e6d69] px-2 py-3 text-center">
-              No chats yet
-            </div>
-          ) : (
-            <div className="space-y-0.5 mt-1">
-              {unpinnedChats.map((chat) => (
-                <div
-                  key={chat.id}
-                  className={`group flex items-center justify-between px-2.5 py-1.5 rounded-lg text-xs transition-colors cursor-pointer ${
-                    activeChatId === chat.id
-                      ? "bg-[#252422] text-[#f3f3ee] font-medium"
-                      : "text-[#9b9a97] hover:bg-[#1d1c1a] hover:text-[#f3f3ee]"
-                  }`}
-                  onClick={() => onSelectChat(chat.id)}
-                >
-                  <div className="flex items-center gap-2 truncate">
-                    <MessageSquare className="w-3 h-3 shrink-0 text-[#858480]" />
-                    <span className="truncate">{chat.title}</span>
-                  </div>
-                  <div className="opacity-0 group-hover:opacity-100 flex items-center gap-1">
-                    <button
-                      type="button"
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        onTogglePinChat(chat.id);
-                      }}
-                      className="p-1 hover:text-[#f3f3ee]"
-                      title="Pin chat"
-                    >
-                      <Pin className="w-3 h-3" />
-                    </button>
-                    <button
-                      type="button"
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        onDeleteChat(chat.id);
-                      }}
-                      className="p-1 hover:text-rose-400"
-                      title="Delete chat"
-                    >
-                      <Trash2 className="w-3 h-3" />
-                    </button>
-                  </div>
-                </div>
-              ))}
+        </div>
+
+        {/* Scrollable list */}
+        <nav className="flex-1 overflow-y-auto px-2 pb-3 space-y-5">
+          {pinnedChats.length > 0 && (
+            <section>
+              <h3 className="px-2.5 pb-1.5 text-xs font-medium text-muted">Pinned</h3>
+              <div className="space-y-0.5">{pinnedChats.map(renderChat)}</div>
+            </section>
+          )}
+
+          {groups.map((group) => (
+            <section key={group.label}>
+              <h3 className="px-2.5 pb-1.5 text-xs font-medium text-muted">{group.label}</h3>
+              <div className="space-y-0.5">{group.chats.map(renderChat)}</div>
+            </section>
+          ))}
+
+          {filteredChats.length === 0 && (
+            <div className="flex flex-col items-center gap-2 py-8 text-center">
+              <MessageSquare className="w-5 h-5 text-muted" strokeWidth={1.75} />
+              <p className="text-xs text-muted">
+                {searchQuery ? "No chats match your search" : "Your conversations will appear here"}
+              </p>
             </div>
           )}
-        </div>
 
-        {/* Projects / Workspaces */}
-        <div>
-          <div className="flex items-center justify-between text-[11px] font-semibold text-[#858480] px-2 py-1 uppercase tracking-wider">
-            <span>Projects</span>
-            <button
-              type="button"
-              onClick={onCreateProject}
-              className="hover:text-[#f3f3ee]"
-              title="New project"
-            >
-              <Plus className="w-3 h-3" />
-            </button>
-          </div>
-          <div className="space-y-0.5 mt-1">
-            {projects.map((proj) => (
-              <div
-                key={proj.id}
-                onClick={() => onSelectProject(proj.id)}
-                className={`flex items-center gap-2 px-2.5 py-1.5 rounded-lg text-xs cursor-pointer transition-colors ${
-                  activeProjectId === proj.id
-                    ? "bg-[#252422] text-[#d97706] font-medium"
-                    : "text-[#9b9a97] hover:bg-[#1d1c1a] hover:text-[#f3f3ee]"
-                }`}
+          {/* Projects */}
+          <section>
+            <div className="flex items-center justify-between px-2.5 pb-1.5">
+              <h3 className="text-xs font-medium text-muted">Projects</h3>
+              <button
+                type="button"
+                onClick={onCreateProject}
+                className={iconBtn}
+                title="New project"
+                aria-label="New project"
               >
-                <FolderKanban className="w-3.5 h-3.5 shrink-0" />
-                <span className="truncate">{proj.name}</span>
-              </div>
-            ))}
-          </div>
-        </div>
-      </div>
+                <Plus className="w-3.5 h-3.5" strokeWidth={1.75} />
+              </button>
+            </div>
+            <div className="space-y-0.5">
+              {projects.map((proj) => (
+                <button
+                  key={proj.id}
+                  type="button"
+                  onClick={() => onSelectProject(proj.id)}
+                  className={`w-full flex items-center gap-2 min-h-[36px] px-2.5 rounded-lg text-sm text-left transition-colors duration-150 ${
+                    activeProjectId === proj.id
+                      ? "bg-hover text-accent font-medium"
+                      : "text-ink/80 hover:bg-hover hover:text-ink"
+                  }`}
+                >
+                  <FolderKanban className="w-4 h-4 shrink-0" strokeWidth={1.75} />
+                  <span className="truncate">{proj.name}</span>
+                </button>
+              ))}
+            </div>
+          </section>
+        </nav>
 
-      {/* Bottom Profile / Auth Bar */}
-      <div className="p-3 border-t border-[#242321] bg-[#11100f]">
-        {user ? (
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-2.5 truncate">
+        {/* Account */}
+        <div className="p-3 border-t border-line">
+          {user ? (
+            <div className="flex items-center gap-2.5">
               <UserAvatarMenu
                 user={user}
                 onOpenSettings={onOpenSettings}
@@ -279,71 +293,60 @@ export const Sidebar: React.FC<SidebarProps> = ({
                 onSignOut={onSignOut}
                 position="bottom-left"
               />
-              <div
-                className="truncate cursor-pointer hover:opacity-85 transition-opacity"
+              <button
+                type="button"
                 onClick={onOpenSettings}
+                className="min-w-0 flex-1 text-left rounded-lg px-1 py-0.5 hover:bg-hover transition-colors duration-150 outline-none focus-visible:ring-2 focus-visible:ring-accent/40"
               >
-                <div className="text-xs font-medium text-[#f3f3ee] truncate flex items-center gap-1.5">
+                <div className="text-sm font-medium text-ink truncate flex items-center gap-1.5">
                   <span className="truncate">{formatCleanName(user.name, user.email)}</span>
-                  {(Boolean(user.isAdmin) || user.email.toLowerCase() === "jordanedanield13@gmail.com") && (
-                    <span className="text-[9px] font-mono font-semibold px-1 py-0.5 rounded bg-amber-500/20 text-amber-300 border border-amber-500/30 shrink-0">
+                  {isAdmin && (
+                    <span className="text-[9px] font-mono font-semibold px-1 py-0.5 rounded bg-accent-soft text-accent shrink-0">
                       ADMIN
                     </span>
                   )}
                 </div>
-                <div className="text-[11px] text-[#858480] truncate">
-                  {user.email}
-                </div>
+                <div className="text-xs text-muted truncate">{user.email}</div>
+              </button>
+
+              <div className="flex items-center shrink-0">
+                {isAdmin && (
+                  <Link href="/admin" className={iconBtn} title="Admin console" aria-label="Admin console">
+                    <Shield className="w-4 h-4" strokeWidth={1.75} />
+                  </Link>
+                )}
+                <button type="button" onClick={onOpenSettings} className={iconBtn} title="Settings" aria-label="Settings">
+                  <Settings className="w-4 h-4" strokeWidth={1.75} />
+                </button>
+                <button
+                  type="button"
+                  onClick={onSignOut}
+                  className={`${iconBtn} hover:text-danger`}
+                  title="Sign out"
+                  aria-label="Sign out"
+                >
+                  <LogOut className="w-4 h-4" strokeWidth={1.75} />
+                </button>
               </div>
             </div>
-
-            <div className="flex items-center gap-1">
-              {(Boolean(user.isAdmin) || user.email.toLowerCase() === "jordanedanield13@gmail.com") && (
-                <Link
-                  href="/admin"
-                  className="p-1.5 text-amber-400 hover:text-amber-300 hover:bg-amber-500/10 rounded-lg transition-colors border border-amber-500/20"
-                  title="Admin Console"
-                >
-                  <Shield className="w-4 h-4" />
-                </Link>
-              )}
+          ) : (
+            <div className="space-y-3">
+              <div className="flex items-center justify-between text-xs text-muted px-1">
+                <span>Guest messages</span>
+                <span className="font-medium text-accent">{guestMessagesRemaining} left</span>
+              </div>
               <button
                 type="button"
-                onClick={onOpenSettings}
-                className="p-1.5 text-[#9b9a97] hover:text-[#f3f3ee] hover:bg-[#22211f] rounded-lg transition-colors"
-                title="Settings"
+                onClick={onOpenAuth}
+                className="w-full flex items-center justify-center gap-2 min-h-[40px] px-3 rounded-lg bg-accent hover:bg-accent-hover text-white text-sm font-medium transition-colors duration-150 outline-none focus-visible:ring-2 focus-visible:ring-accent/40"
               >
-                <Settings className="w-4 h-4" />
-              </button>
-              <button
-                type="button"
-                onClick={onSignOut}
-                className="p-1.5 text-[#9b9a97] hover:text-rose-400 hover:bg-[#22211f] rounded-lg transition-colors"
-                title="Sign out"
-              >
-                <LogOut className="w-4 h-4" />
+                <LogIn className="w-4 h-4" strokeWidth={1.75} />
+                <span>Sign in with email</span>
               </button>
             </div>
-          </div>
-        ) : (
-          <div className="space-y-2">
-            <div className="flex items-center justify-between text-xs text-[#858480]">
-              <span>Guest Messages</span>
-              <span className="text-[#d97706] font-semibold">
-                {guestMessagesRemaining} left
-              </span>
-            </div>
-            <button
-              type="button"
-              onClick={onOpenAuth}
-              className="w-full flex items-center justify-center gap-2 px-3 py-2 rounded-xl bg-[#d97706] hover:bg-[#b45309] text-white text-xs font-medium transition-colors shadow-md"
-            >
-              <LogIn className="w-3.5 h-3.5" />
-              <span>Sign in with Email</span>
-            </button>
-          </div>
-        )}
-      </div>
-    </aside>
+          )}
+        </div>
+      </aside>
+    </>
   );
 };

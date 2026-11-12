@@ -1,7 +1,7 @@
 "use client";
 
-import React, { useState } from "react";
-import { X, Copy, Check, Download, Archive, Play, Code2, Eye } from "lucide-react";
+import React, { useState, useEffect } from "react";
+import { X, Copy, Check, Download, Archive, Code2, Eye } from "lucide-react";
 import JSZip from "jszip";
 import { Artifact } from "@/types";
 
@@ -14,6 +14,14 @@ export const ArtifactsPanel: React.FC<ArtifactsPanelProps> = ({ artifact, onClos
   const [activeTab, setActiveTab] = useState<"code" | "preview">("preview");
   const [activeFileIndex, setActiveFileIndex] = useState(0);
   const [copied, setCopied] = useState(false);
+
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") onClose();
+    };
+    document.addEventListener("keydown", onKey);
+    return () => document.removeEventListener("keydown", onKey);
+  }, [onClose]);
 
   if (!artifact) return null;
 
@@ -56,50 +64,47 @@ export const ArtifactsPanel: React.FC<ArtifactsPanelProps> = ({ artifact, onClos
     URL.revokeObjectURL(url);
   };
 
+  const segment = (active: boolean) =>
+    `flex items-center gap-1.5 min-h-[32px] px-3 rounded-md text-sm transition-colors duration-150 outline-none focus-visible:ring-2 focus-visible:ring-accent/40 ${
+      active ? "bg-card text-ink shadow-sm" : "text-muted hover:text-ink"
+    }`;
+
   return (
-    <aside className="w-[520px] lg:w-[620px] h-full bg-[#18181b] border-l border-[#2e2d2b] flex flex-col z-30 shrink-0 transition-all duration-300">
+    <aside
+      className="fixed inset-0 z-40 md:static md:inset-auto md:z-auto w-full md:w-[min(560px,46vw)] lg:w-[min(640px,44vw)] h-full bg-app md:border-l border-line flex flex-col shrink-0 animate-message"
+      aria-label="Artifact"
+    >
       {/* Header */}
-      <div className="h-14 px-4 border-b border-[#2e2d2b] flex items-center justify-between bg-[#141413]">
-        <div className="flex items-center gap-3 overflow-hidden">
-          <div className="w-8 h-8 rounded-lg bg-[#262624] border border-[#383734] flex items-center justify-center shrink-0">
-            <Code2 className="w-4 h-4 text-[#d97706]" />
+      <div className="h-14 px-4 border-b border-line flex items-center justify-between gap-3">
+        <div className="flex items-center gap-3 min-w-0">
+          <div className="w-8 h-8 rounded-lg bg-accent-soft flex items-center justify-center shrink-0">
+            <Code2 className="w-4 h-4 text-accent" strokeWidth={1.75} />
           </div>
-          <div className="truncate">
-            <h3 className="text-sm font-medium text-[#f3f3ee] truncate">
-              {artifact.title}
-            </h3>
-            <span className="text-[11px] text-[#9b9a97] uppercase tracking-wider">
+          <div className="min-w-0">
+            <h3 className="text-sm font-medium text-ink truncate">{artifact.title}</h3>
+            <span className="text-[11px] text-muted uppercase tracking-wider">
               {artifact.primaryLanguage}
             </span>
           </div>
         </div>
 
-        {/* Tab & Close */}
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-2 shrink-0">
           {canPreview && (
-            <div className="flex items-center bg-[#20201f] p-0.5 rounded-lg border border-[#333230]">
+            <div className="flex items-center bg-hover p-0.5 rounded-lg">
               <button
                 type="button"
                 onClick={() => setActiveTab("code")}
-                className={`flex items-center gap-1.5 px-2.5 py-1 rounded-md text-xs font-medium transition-colors ${
-                  activeTab === "code"
-                    ? "bg-[#2b2a28] text-[#f3f3ee] shadow-sm"
-                    : "text-[#9b9a97] hover:text-[#f3f3ee]"
-                }`}
+                className={segment(activeTab === "code")}
               >
-                <Code2 className="w-3.5 h-3.5" />
+                <Code2 className="w-4 h-4" strokeWidth={1.75} />
                 <span>Code</span>
               </button>
               <button
                 type="button"
                 onClick={() => setActiveTab("preview")}
-                className={`flex items-center gap-1.5 px-2.5 py-1 rounded-md text-xs font-medium transition-colors ${
-                  activeTab === "preview"
-                    ? "bg-[#2b2a28] text-[#f3f3ee] shadow-sm"
-                    : "text-[#9b9a97] hover:text-[#f3f3ee]"
-                }`}
+                className={segment(activeTab === "preview")}
               >
-                <Eye className="w-3.5 h-3.5" />
+                <Eye className="w-4 h-4" strokeWidth={1.75} />
                 <span>Preview</span>
               </button>
             </div>
@@ -108,25 +113,26 @@ export const ArtifactsPanel: React.FC<ArtifactsPanelProps> = ({ artifact, onClos
           <button
             type="button"
             onClick={onClose}
-            className="p-1.5 rounded-lg text-[#9b9a97] hover:text-[#f3f3ee] hover:bg-[#262624] transition-colors"
+            aria-label="Close artifact"
+            className="p-2 rounded-lg text-muted hover:text-ink hover:bg-hover transition-colors duration-150 outline-none focus-visible:ring-2 focus-visible:ring-accent/40"
           >
-            <X className="w-4 h-4" />
+            <X className="w-4 h-4" strokeWidth={1.75} />
           </button>
         </div>
       </div>
 
-      {/* Multi-file Tabs (if multiple files exist) */}
+      {/* Multi-file tabs */}
       {artifact.files.length > 1 && (
-        <div className="flex items-center gap-1 px-4 py-2 border-b border-[#2e2d2b] bg-[#1a1918] overflow-x-auto">
+        <div className="flex items-center gap-1 px-3 py-2 border-b border-line overflow-x-auto">
           {artifact.files.map((file, idx) => (
             <button
               key={file.filename}
               type="button"
               onClick={() => setActiveFileIndex(idx)}
-              className={`px-3 py-1 rounded text-xs font-mono transition-colors shrink-0 ${
+              className={`px-3 py-1.5 rounded-md text-xs font-mono transition-colors duration-150 shrink-0 outline-none focus-visible:ring-2 focus-visible:ring-accent/40 ${
                 activeFileIndex === idx
-                  ? "bg-[#282725] text-[#f3f3ee] font-semibold border border-[#383734]"
-                  : "text-[#9b9a97] hover:text-[#f3f3ee]"
+                  ? "bg-hover text-ink"
+                  : "text-muted hover:text-ink hover:bg-hover/60"
               }`}
             >
               {file.filename}
@@ -135,43 +141,41 @@ export const ArtifactsPanel: React.FC<ArtifactsPanelProps> = ({ artifact, onClos
         </div>
       )}
 
-      {/* Main Content Pane */}
-      <div className="flex-1 overflow-hidden relative bg-[#121212]">
+      {/* Content */}
+      <div className="flex-1 overflow-hidden relative bg-panel">
         {activeTab === "preview" && canPreview ? (
-          <div className="w-full h-full bg-white">
-            <iframe
-              srcDoc={currentFile.content}
-              title={artifact.title}
-              sandbox="allow-scripts allow-modals"
-              className="w-full h-full border-0"
-            />
-          </div>
+          <iframe
+            srcDoc={currentFile.content}
+            title={artifact.title}
+            sandbox="allow-scripts allow-modals"
+            className="w-full h-full border-0 bg-white"
+          />
         ) : (
-          <pre className="p-4 text-xs font-mono text-[#e4e4e7] overflow-auto h-full leading-relaxed select-text">
+          <pre className="p-4 text-[13px] font-mono text-ink overflow-auto h-full leading-relaxed select-text">
             <code>{currentFile.content}</code>
           </pre>
         )}
       </div>
 
-      {/* Footer Actions */}
-      <div className="h-12 px-4 border-t border-[#2e2d2b] flex items-center justify-between bg-[#141413]">
-        <div className="flex items-center gap-2">
+      {/* Footer actions */}
+      <div className="min-h-14 px-3 py-2 border-t border-line flex flex-wrap items-center justify-between gap-2">
+        <div className="flex items-center gap-1 min-w-0">
           <button
             type="button"
             onClick={handleCopy}
-            className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium text-[#9b9a97] hover:text-[#f3f3ee] hover:bg-[#262624] transition-colors"
+            className="flex items-center gap-1.5 min-h-[36px] px-3 rounded-lg text-sm text-muted hover:text-ink hover:bg-hover transition-colors duration-150"
           >
-            {copied ? <Check className="w-3.5 h-3.5 text-emerald-400" /> : <Copy className="w-3.5 h-3.5" />}
+            {copied ? <Check className="w-4 h-4 text-accent" strokeWidth={2} /> : <Copy className="w-4 h-4" strokeWidth={1.75} />}
             <span>{copied ? "Copied" : "Copy"}</span>
           </button>
 
           <button
             type="button"
             onClick={handleDownloadFile}
-            className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium text-[#9b9a97] hover:text-[#f3f3ee] hover:bg-[#262624] transition-colors"
+            className="flex items-center gap-1.5 min-h-[36px] px-3 rounded-lg text-sm text-muted hover:text-ink hover:bg-hover transition-colors duration-150 min-w-0"
           >
-            <Download className="w-3.5 h-3.5" />
-            <span>Download {currentFile.filename}</span>
+            <Download className="w-4 h-4 shrink-0" strokeWidth={1.75} />
+            <span className="truncate">Download {currentFile.filename}</span>
           </button>
         </div>
 
@@ -179,10 +183,10 @@ export const ArtifactsPanel: React.FC<ArtifactsPanelProps> = ({ artifact, onClos
           <button
             type="button"
             onClick={handleDownloadZip}
-            className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium bg-[#262624] hover:bg-[#30302d] text-[#f3f3ee] border border-[#3b3a37] transition-colors"
+            className="flex items-center gap-1.5 min-h-[36px] px-3 rounded-lg text-sm font-medium bg-card text-ink shadow-sm hover:bg-hover transition-colors duration-150"
           >
-            <Archive className="w-3.5 h-3.5 text-[#d97706]" />
-            <span>Download .ZIP</span>
+            <Archive className="w-4 h-4 text-accent" strokeWidth={1.75} />
+            <span>Download .zip</span>
           </button>
         )}
       </div>

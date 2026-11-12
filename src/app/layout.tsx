@@ -1,13 +1,30 @@
-import type { Metadata } from "next";
+import type { Metadata, Viewport } from "next";
 import "./globals.css";
 
 export const metadata: Metadata = {
-  title: "RoleFlow · Independent AI Assistant",
-  description: "Next-generation custom AI platform built by RoleFlow for general inquiry and high-precision software engineering.",
+  title: "RoleFlow",
+  description: "RoleFlow is an AI assistant for general questions, writing, analysis, and software engineering.",
   icons: {
     icon: "/favicon.ico",
   },
 };
+
+export const viewport: Viewport = {
+  width: "device-width",
+  initialScale: 1,
+  viewportFit: "cover",
+};
+
+// Runs before first paint so the saved theme never flashes. Reads "light" | "dark" | "system".
+const themeScript = `
+(function () {
+  try {
+    var t = localStorage.getItem("roleflow_theme") || "system";
+    var dark = t === "dark" || (t !== "light" && window.matchMedia("(prefers-color-scheme: dark)").matches);
+    if (dark) document.documentElement.classList.add("dark");
+  } catch (e) {}
+})();
+`;
 
 export default function RootLayout({
   children,
@@ -15,10 +32,11 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="en" className="dark">
-      <body className="bg-[#18181b] text-[#f3f3ee] antialiased min-h-screen">
-        {children}
-      </body>
+    <html lang="en" suppressHydrationWarning>
+      <head>
+        <script dangerouslySetInnerHTML={{ __html: themeScript }} />
+      </head>
+      <body className="min-h-screen bg-app text-ink antialiased">{children}</body>
     </html>
   );
 }

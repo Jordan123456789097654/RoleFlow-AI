@@ -9,13 +9,12 @@ import {
   ThumbsUp,
   ThumbsDown,
   RotateCw,
-  Edit2,
+  Pencil,
   Code2,
   FileText,
   ChevronRight,
-  Terminal,
   ShieldAlert,
-  Sparkles,
+  Download,
 } from "lucide-react";
 import { Message, Artifact } from "@/types";
 
@@ -26,6 +25,39 @@ interface MessageItemProps {
   onOpenArtifact?: (artifact: Artifact) => void;
   isStreaming?: boolean;
 }
+
+const iconButton =
+  "p-2 rounded-lg text-muted hover:text-ink hover:bg-hover transition-colors duration-150 outline-none focus-visible:ring-2 focus-visible:ring-accent/40";
+
+/** Fenced code block with its own copy state, so each block shows its own "Copied" feedback. */
+const CodeBlock: React.FC<{ code: string; language: string }> = ({ code, language }) => {
+  const [copied, setCopied] = useState(false);
+
+  const handleCopy = () => {
+    navigator.clipboard.writeText(code);
+    setCopied(true);
+    setTimeout(() => setCopied(false), 2000);
+  };
+
+  return (
+    <div className="my-4 rounded-xl border border-line bg-panel overflow-hidden">
+      <div className="h-9 px-3.5 flex items-center justify-between border-b border-line">
+        <span className="font-mono text-xs text-muted">{language}</span>
+        <button
+          type="button"
+          onClick={handleCopy}
+          className="flex items-center gap-1.5 px-2 py-1 rounded-md text-xs text-muted hover:text-ink hover:bg-hover transition-colors duration-150 outline-none focus-visible:ring-2 focus-visible:ring-accent/40"
+        >
+          {copied ? <Check className="w-3.5 h-3.5" strokeWidth={2} /> : <Copy className="w-3.5 h-3.5" strokeWidth={1.75} />}
+          <span>{copied ? "Copied" : "Copy code"}</span>
+        </button>
+      </div>
+      <pre className="p-4 text-[13px] font-mono text-ink overflow-x-auto leading-relaxed select-text">
+        <code>{code}</code>
+      </pre>
+    </div>
+  );
+};
 
 export const MessageItem: React.FC<MessageItemProps> = ({
   message,
@@ -38,12 +70,11 @@ export const MessageItem: React.FC<MessageItemProps> = ({
   const isBlocked = Boolean(message.moderationBlocked);
 
   const [copied, setCopied] = useState(false);
-  const [copiedCodeIdx, setCopiedCodeIdx] = useState<number | null>(null);
   const [feedback, setFeedback] = useState<"up" | "down" | null>(null);
   const [isEditing, setIsEditing] = useState(false);
   const [editContent, setEditContent] = useState(message.content);
 
-  // Moderation Appeal State
+  // Moderation appeal state
   const [isAppealing, setIsAppealing] = useState(false);
   const [appealText, setAppealText] = useState("");
   const [appealSubmitted, setAppealSubmitted] = useState(message.appealStatus === "APPEALED");
@@ -54,12 +85,6 @@ export const MessageItem: React.FC<MessageItemProps> = ({
     navigator.clipboard.writeText(message.content);
     setCopied(true);
     setTimeout(() => setCopied(false), 2000);
-  };
-
-  const handleCopyCode = (code: string, idx: number) => {
-    navigator.clipboard.writeText(code);
-    setCopiedCodeIdx(idx);
-    setTimeout(() => setCopiedCodeIdx(null), 2000);
   };
 
   const handleSaveEdit = () => {
@@ -94,77 +119,39 @@ export const MessageItem: React.FC<MessageItemProps> = ({
     }
   };
 
-  // Sleek Safety & Moderation Refusal Card
+  // Safety and moderation notice. Tier 1 is a hard block, tier 2 is a refusal with a warning.
   if (isBlocked) {
     const isTier1 = message.moderationTier === 1;
     return (
-      <div className="w-full max-w-3xl mx-auto py-5 px-4 animate-message">
-        <div
-          className={`rounded-2xl border p-5 sm:p-6 shadow-xl transition-all ${
-            isTier1
-              ? "border-red-500/50 bg-gradient-to-b from-[#201212]/90 via-[#181111]/90 to-[#141413] shadow-red-950/20"
-              : "border-amber-500/50 bg-gradient-to-b from-[#201912]/90 via-[#181511]/90 to-[#141413] shadow-amber-950/20"
-          }`}
-        >
-          {/* Header Row */}
-          <div className="flex items-start justify-between gap-3 mb-3">
-            <div className="flex items-center gap-2.5">
-              <div
-                className={`p-2 rounded-xl ${
-                  isTier1
-                    ? "bg-red-500/10 text-red-400 border border-red-500/20"
-                    : "bg-amber-500/10 text-amber-400 border border-amber-500/20"
-                }`}
-              >
-                <ShieldAlert className="w-5 h-5" />
-              </div>
-              <div>
-                <h4 className="text-sm font-semibold text-[#f4f4f0] flex items-center gap-2">
-                  {isTier1 ? "Trust & Safety Enforcement" : "Content Policy Warning"}
-                </h4>
-                <p className="text-xs text-[#9b9a97]">
-                  {isTier1
-                    ? "Request blocked under zero-tolerance safety policies"
-                    : "Request refused in accordance with acceptable use guidelines"}
-                </p>
-              </div>
+      <div className="w-full max-w-3xl mx-auto px-4 sm:px-6 py-4 animate-message">
+        <div className={`rounded-xl border p-5 sm:p-6 bg-card ${isTier1 ? "border-danger/40" : "border-accent/40"}`}>
+          <div className="flex items-start gap-3">
+            <div className={`p-2 rounded-lg shrink-0 ${isTier1 ? "bg-danger-soft text-danger" : "bg-accent-soft text-accent"}`}>
+              <ShieldAlert className="w-[18px] h-[18px]" strokeWidth={1.75} />
             </div>
-
-            <div className="shrink-0">
-              <span
-                className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-mono font-semibold tracking-wider ${
-                  isTier1
-                    ? "bg-red-500/20 text-red-400 border border-red-500/30"
-                    : "bg-amber-500/20 text-amber-400 border border-amber-500/30"
-                }`}
-              >
-                <span
-                  className={`w-1.5 h-1.5 rounded-full ${
-                    isTier1 ? "bg-red-400 animate-pulse" : "bg-amber-400"
-                  }`}
-                />
-                {isTier1 ? "CRITICAL TIER 1" : "TIER 2"}
-              </span>
+            <div className="min-w-0 flex-1">
+              <h4 className="text-sm font-medium text-ink">
+                {isTier1 ? "Blocked under our safety policy" : "Request declined"}
+              </h4>
+              <p className="text-xs text-muted mt-0.5">
+                {isTier1
+                  ? "This request violates our zero-tolerance policies."
+                  : "This request was refused under our acceptable use guidelines."}
+              </p>
             </div>
           </div>
 
-          {/* Refusal Text */}
-          <div className="text-sm text-[#e4e3de] leading-relaxed my-3 pl-1 font-sans">
-            {message.content}
-          </div>
+          <div className="text-sm text-ink leading-relaxed mt-4">{message.content}</div>
 
-          {/* Incident Details Bar */}
-          <div className="flex flex-wrap items-center justify-between gap-2 pt-3 mt-3 border-t border-white/5 text-xs text-[#888782]">
-            <div className="flex items-center gap-2">
+          <div className="flex flex-wrap items-center justify-between gap-2 mt-4 pt-3 border-t border-line text-xs text-muted">
+            <div className="flex items-center gap-2 min-w-0">
               {message.moderationCategory && (
-                <span className="font-mono text-[11px] px-2 py-0.5 rounded bg-black/40 border border-white/10 text-[#c5c4be]">
+                <span className="font-mono text-[11px] px-2 py-0.5 rounded bg-hover text-ink/80">
                   {message.moderationCategory}
                 </span>
               )}
               {message.moderationLogId && (
-                <span className="font-mono text-[11px] text-[#71717a]">
-                  ID: {message.moderationLogId}
-                </span>
+                <span className="font-mono text-[11px] truncate">Reference: {message.moderationLogId}</span>
               )}
             </div>
 
@@ -173,26 +160,25 @@ export const MessageItem: React.FC<MessageItemProps> = ({
                 href="/acceptable-use"
                 target="_blank"
                 rel="noreferrer"
-                className="hover:text-[#f4f4f0] underline transition-colors"
+                className="underline underline-offset-2 hover:text-ink transition-colors duration-150"
               >
-                Acceptable Use Policy
+                Acceptable use policy
               </a>
 
-              {/* Appeal action button / status */}
               {message.canAppeal && (
                 <div>
                   {appealSubmitted ? (
-                    <span className="inline-flex items-center gap-1 px-3 py-1 rounded-lg bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 font-medium text-xs">
-                      <Check className="w-3.5 h-3.5" />
-                      Review Requested
+                    <span className="inline-flex items-center gap-1 min-h-[32px] px-2.5 rounded-lg bg-hover text-ink font-medium">
+                      <Check className="w-3.5 h-3.5" strokeWidth={2} />
+                      Review requested
                     </span>
                   ) : !isAppealing ? (
                     <button
                       type="button"
                       onClick={() => setIsAppealing(true)}
-                      className="px-3 py-1 rounded-lg bg-white/10 hover:bg-white/20 text-[#f4f4f0] font-medium transition-colors border border-white/10 hover:border-white/20 shadow-sm"
+                      className="min-h-[32px] px-3 rounded-lg bg-hover text-ink font-medium hover:opacity-80 transition-opacity duration-150"
                     >
-                      Request Review
+                      Request review
                     </button>
                   ) : null}
                 </div>
@@ -200,42 +186,35 @@ export const MessageItem: React.FC<MessageItemProps> = ({
             </div>
           </div>
 
-          {/* Expanded Inline Appeal Form */}
           {isAppealing && !appealSubmitted && (
-            <form onSubmit={handleSubmitAppeal} className="mt-4 pt-3 border-t border-white/10 space-y-3">
-              <div className="flex items-center justify-between">
-                <span className="text-xs font-medium text-[#c5c4be]">
-                  Submit Request for Administrative Review
-                </span>
-                <span className="text-[11px] text-[#888782]">
-                  Reviewed by RoleFlow Trust & Safety
-                </span>
+            <form onSubmit={handleSubmitAppeal} className="mt-4 pt-4 border-t border-line space-y-3">
+              <div className="flex flex-wrap items-center justify-between gap-2">
+                <span className="text-sm font-medium text-ink">Request an administrative review</span>
+                <span className="text-xs text-muted">Reviewed by RoleFlow trust and safety</span>
               </div>
               <textarea
                 value={appealText}
                 onChange={(e) => setAppealText(e.target.value)}
                 rows={3}
-                placeholder="Explain the technical or benign research context of your request..."
+                placeholder="Explain the context of your request, such as research or a technical use."
                 required
-                className="w-full bg-[#141413] text-xs text-[#f4f4f0] placeholder-[#71717a] p-3 rounded-xl border border-white/10 focus:outline-none focus:border-amber-500/60 resize-none leading-relaxed"
+                className="w-full bg-app text-sm text-ink placeholder:text-muted p-3 rounded-lg border border-line outline-none focus:border-accent/50 focus-visible:ring-2 focus-visible:ring-accent/30 resize-none leading-relaxed transition-colors duration-150"
               />
-              {appealError && (
-                <div className="text-xs text-red-400">{appealError}</div>
-              )}
+              {appealError && <div className="text-xs text-danger">{appealError}</div>}
               <div className="flex items-center justify-end gap-2">
                 <button
                   type="button"
                   onClick={() => setIsAppealing(false)}
-                  className="px-3 py-1.5 rounded-lg text-xs text-[#9b9a97] hover:text-[#f4f4f0] transition-colors"
+                  className="min-h-[36px] px-3 rounded-lg text-sm text-muted hover:text-ink hover:bg-hover transition-colors duration-150"
                 >
                   Cancel
                 </button>
                 <button
                   type="submit"
                   disabled={isSubmittingAppeal || !appealText.trim()}
-                  className="px-3.5 py-1.5 rounded-lg text-xs font-semibold bg-[#f4f4f0] hover:bg-white text-[#141413] transition-colors shadow disabled:opacity-50"
+                  className="min-h-[36px] px-4 rounded-lg text-sm font-medium bg-ink text-app hover:opacity-90 transition-opacity duration-150 disabled:opacity-50"
                 >
-                  {isSubmittingAppeal ? "Submitting..." : "Submit Appeal"}
+                  {isSubmittingAppeal ? "Submitting..." : "Submit appeal"}
                 </button>
               </div>
             </form>
@@ -245,19 +224,19 @@ export const MessageItem: React.FC<MessageItemProps> = ({
     );
   }
 
-  // User Message
+  // User message
   if (isUser) {
     return (
-      <div className="group w-full max-w-3xl mx-auto py-3 px-4 flex justify-end animate-message">
-        <div className="max-w-[85%] flex flex-col items-end">
+      <div className="group w-full max-w-3xl mx-auto px-4 sm:px-6 py-3 animate-message">
+        <div className="flex flex-col items-end">
           {message.attachments && message.attachments.length > 0 && (
-            <div className="flex flex-wrap gap-2 mb-2 justify-end">
+            <div className="flex flex-wrap gap-2 mb-2 justify-end max-w-[85%]">
               {message.attachments.map((att, i) => (
                 <div
                   key={i}
-                  className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-[#222120] border border-[#33312e] text-xs text-[#e4e4e7] shadow-sm"
+                  className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg bg-card border border-line text-xs text-ink"
                 >
-                  <FileText className="w-3.5 h-3.5 text-[#d97706]" />
+                  <FileText className="w-3.5 h-3.5 text-accent shrink-0" strokeWidth={1.75} />
                   <span className="truncate max-w-[150px] font-mono">{att.name}</span>
                 </div>
               ))}
@@ -265,43 +244,45 @@ export const MessageItem: React.FC<MessageItemProps> = ({
           )}
 
           {isEditing ? (
-            <div className="w-full min-w-[340px] bg-[#1f1e1d] p-3.5 rounded-2xl border border-[#3b3a37] shadow-xl">
+            <div className="w-full sm:w-[min(32rem,85%)] bg-card p-3.5 rounded-2xl border border-line shadow-composer">
               <textarea
                 value={editContent}
                 onChange={(e) => setEditContent(e.target.value)}
-                className="w-full bg-transparent text-[#f4f4f0] text-sm focus:outline-none resize-none min-h-[80px] leading-relaxed"
+                className="w-full bg-transparent text-[16px] text-ink outline-none resize-none min-h-[72px] leading-relaxed"
                 rows={3}
+                aria-label="Edit message"
               />
-              <div className="flex items-center justify-end gap-2 mt-2 pt-2 border-t border-[#2e2d2b]">
+              <div className="flex items-center justify-end gap-2 mt-2 pt-2 border-t border-line">
                 <button
                   type="button"
                   onClick={() => setIsEditing(false)}
-                  className="px-3 py-1.5 text-xs text-[#999894] hover:text-[#f4f4f0] transition-colors"
+                  className="min-h-[36px] px-3 rounded-lg text-sm text-muted hover:text-ink hover:bg-hover transition-colors duration-150"
                 >
                   Cancel
                 </button>
                 <button
                   type="button"
                   onClick={handleSaveEdit}
-                  className="px-3.5 py-1.5 text-xs font-semibold bg-[#f4f4f0] text-[#141413] rounded-xl hover:bg-white transition-all shadow"
+                  className="min-h-[36px] px-4 rounded-lg text-sm font-medium bg-ink text-app hover:opacity-90 transition-opacity duration-150"
                 >
-                  Save & Submit
+                  Save and submit
                 </button>
               </div>
             </div>
           ) : (
-            <div className="relative group/bubble flex items-center gap-2">
+            <div className="flex items-center gap-1.5 max-w-[85%]">
               {onEdit && (
                 <button
                   type="button"
                   onClick={() => setIsEditing(true)}
-                  className="opacity-0 group-hover/bubble:opacity-100 p-1.5 text-[#888783] hover:text-[#f4f4f0] hover:bg-[#222120] rounded-lg transition-all"
+                  className="opacity-100 md:opacity-0 md:group-hover:opacity-100 focus-visible:opacity-100 p-2 rounded-lg text-muted hover:text-ink hover:bg-hover transition-all duration-150 outline-none focus-visible:ring-2 focus-visible:ring-accent/40"
                   title="Edit message"
+                  aria-label="Edit message"
                 >
-                  <Edit2 className="w-3.5 h-3.5" />
+                  <Pencil className="w-4 h-4" strokeWidth={1.75} />
                 </button>
               )}
-              <div className="bg-[#242322] text-[#f4f4f0] px-4 py-2.5 rounded-2xl text-[14.5px] leading-relaxed border border-[#353330] shadow-sm select-text">
+              <div className="bg-hover text-ink px-4 py-2.5 rounded-2xl text-[16px] leading-relaxed whitespace-pre-wrap break-words select-text">
                 {message.content}
               </div>
             </div>
@@ -311,225 +292,152 @@ export const MessageItem: React.FC<MessageItemProps> = ({
     );
   }
 
-  // Rich Markdown rendering with full Table, Typography, and Code formatting
-  const renderFormattedContent = (content: string) => {
-    return (
-      <ReactMarkdown
-        remarkPlugins={[remarkGfm]}
-        components={{
-          table: ({ node, ...props }) => (
-            <div className="my-5 overflow-x-auto rounded-xl border border-[#2e2d2b] bg-[#141413] shadow-md">
-              <table className="w-full text-left text-xs border-collapse" {...props} />
-            </div>
-          ),
-          thead: ({ node, ...props }) => (
-            <thead className="bg-[#1c1b1a] border-b border-[#2e2d2b] text-[#c5c4be]" {...props} />
-          ),
-          th: ({ node, ...props }) => (
-            <th className="px-4 py-3 font-semibold text-[#f4f4f0] border-r border-[#2e2d2b] last:border-r-0" {...props} />
-          ),
-          td: ({ node, ...props }) => (
-            <td className="px-4 py-3 border-b border-[#2e2d2b] last:border-b-0 border-r border-[#2e2d2b] last:border-r-0 text-[#d4d4d0] align-top" {...props} />
-          ),
-          h1: ({ node, ...props }) => (
-            <h1 className="text-xl font-bold text-[#f4f4f0] mt-7 mb-3.5 tracking-tight font-sans" {...props} />
-          ),
-          h2: ({ node, ...props }) => (
-            <h2 className="text-lg font-bold text-[#f4f4f0] mt-6 mb-3 tracking-tight font-sans" {...props} />
-          ),
-          h3: ({ node, ...props }) => (
-            <h3 className="text-base font-semibold text-[#f4f4f0] mt-5 mb-2 font-sans" {...props} />
-          ),
-          h4: ({ node, ...props }) => (
-            <h4 className="text-sm font-semibold text-[#f4f4f0] mt-4 mb-2 font-sans" {...props} />
-          ),
-          p: ({ node, ...props }) => (
-            <p className="mb-3.5 last:mb-0 leading-[1.75]" {...props} />
-          ),
-          ul: ({ node, ...props }) => (
-            <ul className="list-disc list-outside ml-5 my-3 space-y-1.5" {...props} />
-          ),
-          ol: ({ node, ...props }) => (
-            <ol className="list-decimal list-outside ml-5 my-3 space-y-1.5" {...props} />
-          ),
-          li: ({ node, ...props }) => (
-            <li className="leading-relaxed pl-1" {...props} />
-          ),
-          blockquote: ({ node, ...props }) => (
-            <blockquote className="border-l-2 border-[#d97706] pl-4 my-4 italic text-[#a1a1aa] bg-[#1a1918]/40 py-1.5 rounded-r-lg" {...props} />
-          ),
-          hr: ({ node, ...props }) => (
-            <hr className="my-6 border-[#2e2d2b]" {...props} />
-          ),
-          strong: ({ node, ...props }) => (
-            <strong className="font-semibold text-[#ffffff]" {...props} />
-          ),
-          em: ({ node, ...props }) => (
-            <em className="italic text-[#f4f4f0]" {...props} />
-          ),
-          a: ({ node, ...props }) => (
-            <a
-              className="text-[#d97706] underline hover:text-[#f59e0b] transition-colors"
-              target="_blank"
-              rel="noopener noreferrer"
-              {...props}
-            />
-          ),
-          code: ({ node, inline, className, children, ...props }: any) => {
-            const match = /language-(\w+)/.exec(className || "");
-            const isInline = inline || (!match && !String(children).includes("\n"));
+  // Assistant message: Markdown rendered on the canvas, no bubble
+  const renderFormattedContent = (content: string) => (
+    <ReactMarkdown
+      remarkPlugins={[remarkGfm]}
+      components={{
+        table: ({ node, ...props }) => (
+          <div className="my-4 overflow-x-auto rounded-lg border border-line">
+            <table className="w-full text-left text-sm border-collapse" {...props} />
+          </div>
+        ),
+        thead: ({ node, ...props }) => <thead className="bg-panel" {...props} />,
+        th: ({ node, ...props }) => (
+          <th className="px-3.5 py-2 font-medium text-ink border-b border-line" {...props} />
+        ),
+        td: ({ node, ...props }) => (
+          <td className="px-3.5 py-2 text-ink/90 border-b border-line last:border-b-0 align-top" {...props} />
+        ),
+        h1: ({ node, ...props }) => <h1 className="font-display text-2xl text-ink mt-6 mb-3" {...props} />,
+        h2: ({ node, ...props }) => <h2 className="font-display text-xl text-ink mt-6 mb-2.5" {...props} />,
+        h3: ({ node, ...props }) => <h3 className="font-display text-lg text-ink mt-5 mb-2" {...props} />,
+        h4: ({ node, ...props }) => <h4 className="text-base font-medium text-ink mt-4 mb-2" {...props} />,
+        p: ({ node, ...props }) => <p className="mb-4 last:mb-0" {...props} />,
+        ul: ({ node, ...props }) => <ul className="list-disc pl-6 my-3 space-y-1.5 marker:text-muted" {...props} />,
+        ol: ({ node, ...props }) => <ol className="list-decimal pl-6 my-3 space-y-1.5 marker:text-muted" {...props} />,
+        li: ({ node, ...props }) => <li className="pl-1 leading-relaxed" {...props} />,
+        blockquote: ({ node, ...props }) => (
+          <blockquote className="border-l-2 border-accent pl-4 my-4 text-muted" {...props} />
+        ),
+        hr: ({ node, ...props }) => <hr className="my-6 border-line" {...props} />,
+        strong: ({ node, ...props }) => <strong className="font-semibold text-ink" {...props} />,
+        em: ({ node, ...props }) => <em className="italic" {...props} />,
+        a: ({ node, ...props }) => (
+          <a
+            className="text-accent underline underline-offset-[3px] hover:text-accent-hover transition-colors duration-150"
+            target="_blank"
+            rel="noopener noreferrer"
+            {...props}
+          />
+        ),
+        code: ({ node, inline, className, children, ...props }: any) => {
+          const match = /language-(\w+)/.exec(className || "");
+          const isInline = inline || (!match && !String(children).includes("\n"));
 
-            if (isInline) {
-              return (
-                <code
-                  className="px-1.5 py-0.5 rounded-md bg-[#242322] border border-[#33312e] text-[#f59e0b] font-mono text-[13px]"
-                  {...props}
-                >
-                  {children}
-                </code>
-              );
-            }
-
-            const language = match ? match[1] : "code";
-            const codeString = String(children).replace(/\n$/, "");
-
+          if (isInline) {
             return (
-              <div className="my-4 rounded-xl border border-[#2e2d2b] bg-[#11100f] overflow-hidden shadow-md">
-                <div className="h-9 px-3.5 bg-[#1a1918] border-b border-[#2a2927] flex items-center justify-between text-xs text-[#999894]">
-                  <div className="flex items-center gap-2">
-                    <Terminal className="w-3.5 h-3.5 text-[#d97706]" />
-                    <span className="font-mono text-[11px] font-medium text-[#c5c4be]">{language}</span>
-                  </div>
-                  <button
-                    type="button"
-                    onClick={() => handleCopyCode(codeString, Math.random())}
-                    className="flex items-center gap-1.5 px-2 py-1 rounded hover:bg-[#242322] text-[#999894] hover:text-[#f4f4f0] transition-colors"
-                  >
-                    <Copy className="w-3.5 h-3.5" />
-                    <span className="text-[11px]">Copy code</span>
-                  </button>
-                </div>
-                <pre className="p-4 text-xs font-mono text-[#e4e4e7] overflow-x-auto leading-relaxed select-text">
-                  <code>{codeString}</code>
-                </pre>
-              </div>
+              <code className="px-1.5 py-0.5 rounded-md bg-hover font-mono text-[0.875em]" {...props}>
+                {children}
+              </code>
             );
-          },
-        }}
-      >
-        {content}
-      </ReactMarkdown>
-    );
-  };
+          }
 
-  // Assistant Message
+          const language = match ? match[1] : "code";
+          const codeString = String(children).replace(/\n$/, "");
+          return <CodeBlock code={codeString} language={language} />;
+        },
+      }}
+    >
+      {content}
+    </ReactMarkdown>
+  );
+
   return (
-    <div className="w-full max-w-3xl mx-auto py-5 px-4 animate-message">
-      <div className="space-y-4">
-        {/* Thought for X.Xs subtle badge */}
-        {message.role === "assistant" && typeof message.thinkingTime === "number" && (
-          <div className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-[#1b1a19] border border-[#2a2927] text-xs text-[#8f8e8a] font-mono select-none">
-            <Sparkles className="w-3.5 h-3.5 text-[#d97706]" />
-            <span>Thought for {Number(message.thinkingTime).toFixed(1)}s</span>
-          </div>
-        )}
-
-        {/* Editorial Typography */}
-        <div className="font-roleflow-serif text-[15.5px] leading-[1.75] text-[#ebebe5] select-text">
-          {renderFormattedContent(message.content)}
-          {isStreaming && (
-            <span className="inline-block w-2 h-4 ml-1 bg-[#d97706] animate-pulse align-middle rounded-sm" />
-          )}
+    <div className="w-full max-w-3xl mx-auto px-4 sm:px-6 py-4 animate-message">
+      {typeof message.thinkingTime === "number" && (
+        <div className="mb-2 text-xs text-muted select-none">
+          Thought for {Number(message.thinkingTime).toFixed(1)}s
         </div>
+      )}
 
-        {/* Generated files */}
-        {message.generatedFiles && message.generatedFiles.length > 0 && (
-          <div className="flex flex-wrap gap-2">
-            {message.generatedFiles.map((f, i) => (
-              <a
-                key={i}
-                href={f.dataUrl}
-                download={f.name}
-                className="flex items-center gap-2 px-3 py-2 rounded-xl bg-[#1d1c1b] border border-[#2f2e2c] hover:border-[#d97706]/70 transition-colors text-xs text-[#f4f4f0]"
-              >
-                <FileText className="w-3.5 h-3.5 text-[#d97706]" />
-                <span className="font-mono">{f.name}</span>
-                <span className="text-[#8f8e8a]">{Math.max(1, Math.round(f.size / 1024))} KB · Download</span>
-              </a>
-            ))}
-          </div>
+      <div className="prose-claude text-ink text-[16px] select-text">
+        {renderFormattedContent(message.content)}
+        {isStreaming && (
+          <span className="inline-block w-[2px] h-[1.05em] ml-0.5 align-[-0.15em] bg-accent animate-pulse rounded-full" />
         )}
+      </div>
 
-        {/* Artifact Slideout Card */}
-        {message.artifact && (
-          <div
-            onClick={() => onOpenArtifact && onOpenArtifact(message.artifact!)}
-            className="cursor-pointer group/art flex items-center justify-between p-3.5 rounded-2xl bg-[#1d1c1b] border border-[#2f2e2c] hover:border-[#d97706]/70 transition-all duration-200 shadow-md hover:shadow-lg"
-          >
-            <div className="flex items-center gap-3">
-              <div className="w-10 h-10 rounded-xl bg-[#262523] border border-[#383734] flex items-center justify-center text-[#d97706] group-hover/art:scale-105 transition-transform">
-                <Code2 className="w-5 h-5" />
-              </div>
-              <div>
-                <h4 className="text-sm font-medium text-[#f4f4f0] group-hover/art:text-[#f59e0b] transition-colors">
-                  {message.artifact.title}
-                </h4>
-                <span className="text-xs text-[#8f8e8a]">
-                  Click to open code & live preview
-                </span>
-              </div>
-            </div>
-            <div className="flex items-center gap-1.5 text-xs text-[#d97706] font-medium pr-2">
-              <span>View</span>
-              <ChevronRight className="w-4 h-4 group-hover/art:translate-x-0.5 transition-transform" />
-            </div>
-          </div>
-        )}
-
-        {/* Action Row: Copy, Thumbs Up, Thumbs Down, Regenerate */}
-        <div className="flex items-center gap-1.5 pt-1 text-[#807f7b]">
-          <button
-            type="button"
-            onClick={handleCopy}
-            className="p-1.5 rounded-lg hover:text-[#f4f4f0] hover:bg-[#222120] transition-colors"
-            title="Copy response"
-          >
-            {copied ? <Check className="w-4 h-4 text-emerald-400" /> : <Copy className="w-4 h-4" />}
-          </button>
-
-          <button
-            type="button"
-            onClick={() => setFeedback(feedback === "up" ? null : "up")}
-            className={`p-1.5 rounded-lg hover:bg-[#222120] transition-colors ${
-              feedback === "up" ? "text-emerald-400" : "hover:text-[#f4f4f0]"
-            }`}
-            title="Good response"
-          >
-            <ThumbsUp className="w-4 h-4" />
-          </button>
-
-          <button
-            type="button"
-            onClick={() => setFeedback(feedback === "down" ? null : "down")}
-            className={`p-1.5 rounded-lg hover:bg-[#222120] transition-colors ${
-              feedback === "down" ? "text-rose-400" : "hover:text-[#f4f4f0]"
-            }`}
-            title="Bad response"
-          >
-            <ThumbsDown className="w-4 h-4" />
-          </button>
-
-          {onRegenerate && (
-            <button
-              type="button"
-              onClick={onRegenerate}
-              className="p-1.5 rounded-lg hover:text-[#f4f4f0] hover:bg-[#222120] transition-colors"
-              title="Regenerate"
+      {message.generatedFiles && message.generatedFiles.length > 0 && (
+        <div className="flex flex-wrap gap-2 mt-4">
+          {message.generatedFiles.map((f, i) => (
+            <a
+              key={i}
+              href={f.dataUrl}
+              download={f.name}
+              className="flex items-center gap-2 min-h-[40px] px-3 rounded-lg bg-card border border-line hover:bg-hover transition-colors duration-150 text-sm text-ink"
             >
-              <RotateCw className="w-4 h-4" />
-            </button>
-          )}
+              <FileText className="w-4 h-4 text-accent shrink-0" strokeWidth={1.75} />
+              <span className="font-mono text-xs">{f.name}</span>
+              <span className="text-xs text-muted">{Math.max(1, Math.round(f.size / 1024))} KB</span>
+              <Download className="w-3.5 h-3.5 text-muted" strokeWidth={1.75} />
+            </a>
+          ))}
         </div>
+      )}
+
+      {message.artifact && (
+        <button
+          type="button"
+          onClick={() => onOpenArtifact && onOpenArtifact(message.artifact!)}
+          className="group mt-4 w-full max-w-md flex items-center justify-between gap-3 p-3 rounded-xl bg-card border border-line hover:bg-hover transition-colors duration-150 text-left outline-none focus-visible:ring-2 focus-visible:ring-accent/40"
+        >
+          <div className="flex items-center gap-3 min-w-0">
+            <div className="w-10 h-10 rounded-lg bg-accent-soft flex items-center justify-center shrink-0">
+              <Code2 className="w-5 h-5 text-accent" strokeWidth={1.75} />
+            </div>
+            <div className="min-w-0">
+              <div className="text-sm font-medium text-ink truncate">{message.artifact.title}</div>
+              <div className="text-xs text-muted">Open code and live preview</div>
+            </div>
+          </div>
+          <ChevronRight className="w-4 h-4 text-muted shrink-0 group-hover:translate-x-0.5 transition-transform duration-150" strokeWidth={1.75} />
+        </button>
+      )}
+
+      {/* Action row */}
+      <div className="flex items-center gap-0.5 mt-2 -ml-2 text-muted">
+        <button type="button" onClick={handleCopy} className={iconButton} title="Copy response" aria-label="Copy response">
+          {copied ? <Check className="w-4 h-4 text-accent" strokeWidth={2} /> : <Copy className="w-4 h-4" strokeWidth={1.75} />}
+        </button>
+
+        <button
+          type="button"
+          onClick={() => setFeedback(feedback === "up" ? null : "up")}
+          className={`${iconButton} ${feedback === "up" ? "text-accent" : ""}`}
+          title="Good response"
+          aria-label="Good response"
+          aria-pressed={feedback === "up"}
+        >
+          <ThumbsUp className="w-4 h-4" strokeWidth={1.75} />
+        </button>
+
+        <button
+          type="button"
+          onClick={() => setFeedback(feedback === "down" ? null : "down")}
+          className={`${iconButton} ${feedback === "down" ? "text-danger" : ""}`}
+          title="Bad response"
+          aria-label="Bad response"
+          aria-pressed={feedback === "down"}
+        >
+          <ThumbsDown className="w-4 h-4" strokeWidth={1.75} />
+        </button>
+
+        {onRegenerate && (
+          <button type="button" onClick={onRegenerate} className={iconButton} title="Regenerate" aria-label="Regenerate">
+            <RotateCw className="w-4 h-4" strokeWidth={1.75} />
+          </button>
+        )}
       </div>
     </div>
   );

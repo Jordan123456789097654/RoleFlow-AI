@@ -1,9 +1,8 @@
 "use client";
 
 import React from "react";
-import { Share2, Sparkles, User as UserIcon } from "lucide-react";
+import { Menu, Share2 } from "lucide-react";
 import { EffortLevel, ModelId, Project, UserProfile } from "@/types";
-import { formatCleanName } from "@/lib/format";
 import { ModelSelector } from "./ModelSelector";
 import { EffortDropdown } from "./EffortDropdown";
 import { UserAvatarMenu } from "./UserAvatarMenu";
@@ -21,6 +20,8 @@ interface HeaderProps {
   onOpenSettings: () => void;
   onClearConversation?: () => void;
   onSignOut?: () => void;
+  /** Opens the sidebar drawer. Shown on small screens only. */
+  onToggleSidebar?: () => void;
 }
 
 export const Header: React.FC<HeaderProps> = ({
@@ -36,32 +37,46 @@ export const Header: React.FC<HeaderProps> = ({
   onOpenSettings,
   onClearConversation,
   onSignOut,
+  onToggleSidebar,
 }) => {
   return (
-    <header className="h-14 px-4 border-b border-[#242321] bg-[#141413] flex items-center justify-between shrink-0 z-20">
-      <div className="flex items-center gap-3">
-        <ModelSelector currentModel={model} onSelect={onModelChange} />
+    <header className="h-14 px-3 sm:px-4 flex items-center justify-between gap-2 shrink-0 z-20 bg-app/90 backdrop-blur-sm">
+      <div className="flex items-center gap-1 min-w-0">
+        {onToggleSidebar && (
+          <button
+            type="button"
+            onClick={onToggleSidebar}
+            aria-label="Open sidebar"
+            className="md:hidden p-2 -ml-1 rounded-lg text-muted hover:text-ink hover:bg-hover transition-colors duration-150 outline-none focus-visible:ring-2 focus-visible:ring-accent/40"
+          >
+            <Menu className="w-5 h-5" strokeWidth={1.75} />
+          </button>
+        )}
+
+        <ModelSelector currentModel={model} onSelect={onModelChange} placement="down" />
 
         {currentProject && (
-          <span className="text-xs px-2.5 py-1 rounded-lg bg-[#252422] text-[#d97706] font-medium border border-[#383734]">
+          <span className="hidden sm:inline-flex text-xs px-2.5 py-1 rounded-full bg-accent-soft text-accent font-medium truncate max-w-[160px]">
             {currentProject.name}
           </span>
         )}
       </div>
 
-      <div className="flex items-center gap-3">
+      <div className="flex items-center gap-1 sm:gap-2 shrink-0">
         {hasMessages && (
           <button
             type="button"
             onClick={onShare}
-            className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium text-[#9b9a97] hover:text-[#f3f3ee] hover:bg-[#22211f] transition-colors border border-[#302f2d]"
+            className="flex items-center gap-1.5 min-h-[36px] px-3 rounded-lg text-sm text-muted hover:text-ink hover:bg-hover transition-colors duration-150 outline-none focus-visible:ring-2 focus-visible:ring-accent/40"
           >
-            <Share2 className="w-3.5 h-3.5" />
-            <span>Share</span>
+            <Share2 className="w-4 h-4" strokeWidth={1.75} />
+            <span className="hidden sm:inline">Share</span>
           </button>
         )}
 
-        <EffortDropdown effort={effort} onChange={onEffortChange} />
+        <div className="hidden sm:block">
+          <EffortDropdown effort={effort} onChange={onEffortChange} placement="down" />
+        </div>
 
         {user ? (
           <UserAvatarMenu
@@ -75,7 +90,7 @@ export const Header: React.FC<HeaderProps> = ({
           <button
             type="button"
             onClick={onOpenAuth}
-            className="px-3 py-1.5 rounded-lg bg-[#f3f3ee] hover:bg-white text-[#141413] text-xs font-semibold transition-colors shadow"
+            className="min-h-[36px] px-4 rounded-lg bg-ink text-app text-sm font-medium hover:opacity-90 transition-opacity duration-150 outline-none focus-visible:ring-2 focus-visible:ring-accent/40"
           >
             Sign in
           </button>

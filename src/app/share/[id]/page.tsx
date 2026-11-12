@@ -2,7 +2,7 @@ import { db } from "@/lib/db";
 import { Logo } from "@/components/Logo";
 import { MessageItem } from "@/components/MessageItem";
 import Link from "next/link";
-import { ArrowLeft, MessageSquare } from "lucide-react";
+import { ArrowLeft } from "lucide-react";
 
 export const dynamic = "force-dynamic";
 
@@ -11,60 +11,59 @@ export default async function SharePage({ params }: { params: { id: string } }) 
 
   if (!chat) {
     return (
-      <div className="min-h-screen bg-[#18181b] text-[#f3f3ee] flex flex-col items-center justify-center p-6 text-center">
-        <Logo size={32} className="mb-4" />
-        <h1 className="text-xl font-semibold mb-2">Conversation not found</h1>
-        <p className="text-sm text-[#9b9a97] mb-6">
+      <div className="flex min-h-screen flex-col items-center justify-center bg-app px-6 text-center text-ink">
+        <Logo size={32} className="mb-8" />
+        <h1 className="font-display text-2xl font-medium">Conversation not found</h1>
+        <p className="mt-3 max-w-sm text-sm leading-relaxed text-muted">
           This shared link may have expired or been deleted.
         </p>
         <Link
           href="/"
-          className="px-4 py-2 rounded-xl bg-[#f3f3ee] text-[#141413] text-sm font-semibold hover:bg-white transition-colors"
+          className="mt-8 inline-flex min-h-11 items-center justify-center rounded-lg bg-accent px-5 text-sm font-medium text-white transition-colors hover:bg-accent-hover"
         >
-          Return to RoleFlow
+          Go to RoleFlow
         </Link>
       </div>
     );
   }
 
-  return (
-    <div className="min-h-screen bg-[#18181b] text-[#f3f3ee] flex flex-col">
-      {/* Top Header */}
-      <header className="h-14 px-6 border-b border-[#2e2d2b] bg-[#141413] flex items-center justify-between">
-        <div className="flex items-center gap-4">
-          <Link
-            href="/"
-            className="flex items-center gap-1.5 text-xs text-[#9b9a97] hover:text-[#f3f3ee] transition-colors"
-          >
-            <ArrowLeft className="w-4 h-4" />
-            <span>Back</span>
-          </Link>
-          <Logo size={24} />
-        </div>
+  const modelName = chat.model === "roleflow-genesis-1" ? "RoleFlow Genesis 1.0" : "RoleFlow Flash 1.0";
 
-        <div className="flex items-center gap-2">
-          <span className="text-xs text-[#858480]">Shared Conversation</span>
+  return (
+    <div className="flex min-h-screen flex-col bg-app text-ink">
+      <header className="sticky top-0 z-40 w-full border-b border-line bg-app/90 backdrop-blur-md">
+        <div className="mx-auto flex h-16 max-w-3xl items-center justify-between gap-3 px-4 sm:px-6">
+          <div className="flex min-w-0 items-center gap-3">
+            <Link
+              href="/"
+              aria-label="Back to home"
+              className="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-lg text-muted transition-colors hover:bg-hover hover:text-ink"
+            >
+              <ArrowLeft className="h-4 w-4" />
+            </Link>
+            <Logo size={24} showText={false} className="shrink-0" />
+            <span className="hidden text-sm text-muted sm:inline">Shared conversation</span>
+          </div>
+
           <Link
             href="/"
-            className="px-3 py-1.5 rounded-lg bg-[#262624] hover:bg-[#30302d] text-xs font-medium text-[#f3f3ee] border border-[#383734] transition-colors"
+            className="inline-flex min-h-10 shrink-0 items-center rounded-lg bg-accent px-4 text-sm font-medium text-white transition-colors hover:bg-accent-hover"
           >
-            Start New Chat
+            Start your own chat
           </Link>
         </div>
       </header>
 
-      {/* Title */}
-      <div className="max-w-3xl mx-auto w-full pt-8 px-4">
-        <h1 className="text-2xl font-serif text-[#f3f3ee] font-medium mb-1">
+      <div className="mx-auto w-full max-w-3xl px-4 pb-8 pt-10 sm:px-6">
+        <h1 className="break-words font-display text-2xl font-normal leading-snug tracking-tight text-ink sm:text-3xl">
           {chat.title}
         </h1>
-        <p className="text-xs text-[#858480]">
-          Model: {chat.model === "roleflow-genesis-1" ? "RoleFlow Genesis 1.0" : "RoleFlow Flash 1.0"} · Effort: {chat.effort.toUpperCase()}
+        <p className="mt-2 text-xs text-muted">
+          {modelName} · Effort: {chat.effort.toUpperCase()}
         </p>
       </div>
 
-      {/* Messages */}
-      <main className="flex-1 max-w-3xl mx-auto w-full py-6 space-y-4">
+      <main className="mx-auto w-full max-w-3xl flex-1 space-y-6 px-4 pb-16 sm:px-6">
         {chat.messages.map((message) => {
           // Sanitize message: strip any internal audit or user identity metadata
           const sanitizedMsg = {
@@ -79,8 +78,13 @@ export default async function SharePage({ params }: { params: { id: string } }) 
         })}
       </main>
 
-      <footer className="py-6 border-t border-[#242321] text-center text-xs text-[#73726e]">
-        Built with RoleFlow · Independent AI Platform
+      <footer className="border-t border-line px-4 py-8 text-center text-xs text-muted">
+        <div className="flex flex-col items-center gap-3">
+          <p>Shared from RoleFlow</p>
+          <Link href="/" className="inline-flex min-h-10 items-center text-accent transition-colors hover:text-accent-hover">
+            Try RoleFlow
+          </Link>
+        </div>
       </footer>
     </div>
   );

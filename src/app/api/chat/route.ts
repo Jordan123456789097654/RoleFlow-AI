@@ -418,6 +418,79 @@ export async function POST(req: NextRequest) {
       memories: persistentMemories,
     });
 
+    // Upstream safety block: Groq refused the request or filtered the generation. Our scanner
+    // did not catch it, so it is audited here as a Tier 2 incident (strike + warning, no auto-ban),
+    // alerted to admins, and not charged against quota.
+    if (result.isSafetyRefusal) {
+      const newStrikes = await db.incrementStrikes(userEmail || userId || identifier);
+      const logId =
+        "mod-" + Date.now() + "-" + Math.random().toString(36).substring(2, 7);
+      const logEntry: ModerationLogEntry = {
+        id: logId,
+        userId: userId || "guest",
+        userEmail: userEmail || "guest",
+        prompt: promptToScan,
+        context: incidentContext,
+        tier: 2,
+        category: "UPSTREAM_SAFETY_BLOCK",
+        status: "FLAGGED",
+        ipAddress,
+        createdAt: new Date().toISOString(),
+        reason: `Upstream model provider blocked this request on safety grounds (${result.safetyReason || "unspecified"}).`,
+      };
+      await db.saveModerationLog(logEntry);
+
+      sendSecurityAlertEmail({
+        userEmail: userEmail || "Guest User",
+        userId,
+        timestamp: new Date().toUTCString(),
+        flaggedPrompt: promptToScan,
+        category: "UPSTREAM_SAFETY_BLOCK",
+        tier: 2,
+        ipAddress,
+        logId,
+      }).catch((e) => console.error("Security alert dispatch error:", e));
+
+      const warningContent = `This request has been flagged and refused under RoleFlow's Acceptable Use Policy. Your account has received strike ${newStrikes}. Continued infractions may result in permanent suspension.`;
+
+      const assistantMessage: Message = {
+        id: "msg-" + Date.now(),
+        role: "assistant",
+        content: warningContent,
+        moderationBlocked: true,
+        moderationTier: 2,
+        moderationCategory: "UPSTREAM_SAFETY_BLOCK",
+        moderationLogId: logId,
+        canAppeal: true,
+        createdAt: new Date().toISOString(),
+      };
+
+      const refusedChatId = chatId || "chat-" + Date.now();
+      const refusedChat: Chat = {
+        id: refusedChatId,
+        userId,
+        title: promptToScan.slice(0, 36) + (promptToScan.length > 36 ? "..." : ""),
+        projectId,
+        model,
+        effort,
+        messages: [...cappedMessages, assistantMessage],
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+      };
+      await db.saveChat(refusedChat, userId);
+
+      return NextResponse.json({
+        chatId: refusedChatId,
+        message: assistantMessage,
+        chat: refusedChat,
+        blocked: true,
+        tier: 2,
+        logId,
+        strikes: newStrikes,
+        error: warningContent,
+      });
+    }
+
     // Auto-persist memories added or removed by AI
     if (userId && !isGuest) {
       if (result.memoriesAdded && result.memoriesAdded.length > 0) {
