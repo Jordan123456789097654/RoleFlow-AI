@@ -1,9 +1,10 @@
 import fs from "fs";
 import path from "path";
+import os from "os";
 import { sql } from "@vercel/postgres";
 import { MemoryItem } from "@/types";
 
-const DATA_DIR = path.join(process.cwd(), ".data");
+const DATA_DIR = process.env.VERCEL ? path.join(os.tmpdir(), "roleflow-data") : path.join(process.cwd(), ".data");
 const STORE_FILE = path.join(DATA_DIR, "store.json");
 const isPostgresConfigured = Boolean(
   process.env.POSTGRES_URL || process.env.DATABASE_URL || process.env.STORAGE_URL

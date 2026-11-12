@@ -1,9 +1,10 @@
 import fs from "fs";
 import path from "path";
+import os from "os";
 import { sql } from "@vercel/postgres";
 import { Chat, Project, UserProfile, ModerationLogEntry, ModerationStatus, SystemConfig, MemoryItem } from "@/types";
 
-const DATA_DIR = path.join(process.cwd(), ".data");
+const DATA_DIR = process.env.VERCEL ? path.join(os.tmpdir(), "roleflow-data") : path.join(process.cwd(), ".data");
 const STORE_FILE = path.join(DATA_DIR, "store.json");
 
 export const ADMIN_EMAIL = (process.env.ADMIN_EMAIL || "").toLowerCase().trim();
@@ -112,18 +113,28 @@ async function ensureDb() {
         plan VARCHAR(50) DEFAULT 'FREE',
         message_count INTEGER DEFAULT 0,
         last_reset_date VARCHAR(20),
+        is_banned BOOLEAN DEFAULT FALSE,
+        strikes INTEGER DEFAULT 0,
         created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
       );
     `;
-    await sql`
-      ALTER TABLE roleflow_users ADD COLUMN IF NOT EXISTS response_instructions TEXT;
-      ALTER TABLE roleflow_users ADD COLUMN IF NOT EXISTS is_admin BOOLEAN DEFAULT FALSE;
-      ALTER TABLE roleflow_users ADD COLUMN IF NOT EXISTS plan VARCHAR(50) DEFAULT 'FREE';
-      ALTER TABLE roleflow_users ADD COLUMN IF NOT EXISTS message_count INTEGER DEFAULT 0;
-      ALTER TABLE roleflow_users ADD COLUMN IF NOT EXISTS last_reset_date VARCHAR(20);
-      ALTER TABLE roleflow_users ADD COLUMN IF NOT EXISTS is_banned BOOLEAN DEFAULT FALSE;
-      ALTER TABLE roleflow_users ADD COLUMN IF NOT EXISTS strikes INTEGER DEFAULT 0;
-    `;
+
+    // Alter columns one by one to avoid prepared statement multi-command error
+    const userColumns = [
+      "response_instructions TEXT",
+      "is_admin BOOLEAN DEFAULT FALSE",
+      "plan VARCHAR(50) DEFAULT 'FREE'",
+      "message_count INTEGER DEFAULT 0",
+      "last_reset_date VARCHAR(20)",
+      "is_banned BOOLEAN DEFAULT FALSE",
+      "strikes INTEGER DEFAULT 0",
+    ];
+    for (const col of userColumns) {
+      try {
+        await sql.query(`ALTER TABLE roleflow_users ADD COLUMN IF NOT EXISTS ${col};`);
+      } catch (_) {}
+    }
+
     await sql`
       CREATE TABLE IF NOT EXISTS roleflow_moderation_logs (
         id VARCHAR(255) PRIMARY KEY,
@@ -138,6 +149,7 @@ async function ensureDb() {
         created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
       );
     `;
+
     await sql`
       CREATE TABLE IF NOT EXISTS roleflow_guest_usage (
         id VARCHAR(255) PRIMARY KEY,
@@ -145,6 +157,7 @@ async function ensureDb() {
         last_reset_date VARCHAR(20)
       );
     `;
+
     await sql`
       CREATE TABLE IF NOT EXISTS roleflow_chats (
         id VARCHAR(255) PRIMARY KEY,
@@ -159,6 +172,7 @@ async function ensureDb() {
         updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
       );
     `;
+
     await sql`
       CREATE TABLE IF NOT EXISTS roleflow_projects (
         id VARCHAR(255) PRIMARY KEY,
@@ -169,6 +183,7 @@ async function ensureDb() {
         created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
       );
     `;
+
     await sql`
       CREATE TABLE IF NOT EXISTS roleflow_auth_codes (
         email VARCHAR(255) PRIMARY KEY,
@@ -178,15 +193,18 @@ async function ensureDb() {
         attempts INTEGER DEFAULT 0
       );
     `;
-    await sql`
-      ALTER TABLE roleflow_auth_codes ADD COLUMN IF NOT EXISTS attempts INTEGER DEFAULT 0;
-    `;
+
+    try {
+      await sql.query(`ALTER TABLE roleflow_auth_codes ADD COLUMN IF NOT EXISTS attempts INTEGER DEFAULT 0;`);
+    } catch (_) {}
+
     await sql`
       CREATE TABLE IF NOT EXISTS roleflow_system_configs (
         key VARCHAR(50) PRIMARY KEY,
         value JSONB NOT NULL
       );
     `;
+
     await sql`
       CREATE TABLE IF NOT EXISTS roleflow_memories (
         id VARCHAR(255) PRIMARY KEY,
@@ -195,6 +213,7 @@ async function ensureDb() {
         created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
       );
     `;
+
     isInitialized = true;
   } catch (error) {
     console.warn("Postgres initialization notice (using fallback):", error);

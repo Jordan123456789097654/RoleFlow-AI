@@ -1,6 +1,8 @@
 "use client";
 
 import React, { useState } from "react";
+import ReactMarkdown from "react-markdown";
+import remarkGfm from "remark-gfm";
 import {
   Copy,
   Check,
@@ -309,49 +311,115 @@ export const MessageItem: React.FC<MessageItemProps> = ({
     );
   }
 
-  // Parse code blocks in assistant response
+  // Rich Markdown rendering with full Table, Typography, and Code formatting
   const renderFormattedContent = (content: string) => {
-    const parts = content.split(/(```[\s\S]*?```)/g);
-
-    return parts.map((part, idx) => {
-      if (part.startsWith("```") && part.endsWith("```")) {
-        const lines = part.slice(3, -3).trim().split("\n");
-        const language = lines[0].trim().toLowerCase() || "code";
-        const code = lines.slice(1).join("\n");
-
-        return (
-          <div key={idx} className="my-4 rounded-xl border border-[#2e2d2b] bg-[#11100f] overflow-hidden shadow-md">
-            <div className="h-9 px-3.5 bg-[#1a1918] border-b border-[#2a2927] flex items-center justify-between text-xs text-[#999894]">
-              <div className="flex items-center gap-2">
-                <Terminal className="w-3.5 h-3.5 text-[#d97706]" />
-                <span className="font-mono text-[11px] font-medium text-[#c5c4be]">{language}</span>
-              </div>
-              <button
-                type="button"
-                onClick={() => handleCopyCode(code, idx)}
-                className="flex items-center gap-1.5 px-2 py-1 rounded hover:bg-[#242322] text-[#999894] hover:text-[#f4f4f0] transition-colors"
-              >
-                {copiedCodeIdx === idx ? (
-                  <Check className="w-3.5 h-3.5 text-emerald-400" />
-                ) : (
-                  <Copy className="w-3.5 h-3.5" />
-                )}
-                <span className="text-[11px]">{copiedCodeIdx === idx ? "Copied" : "Copy code"}</span>
-              </button>
+    return (
+      <ReactMarkdown
+        remarkPlugins={[remarkGfm]}
+        components={{
+          table: ({ node, ...props }) => (
+            <div className="my-5 overflow-x-auto rounded-xl border border-[#2e2d2b] bg-[#141413] shadow-md">
+              <table className="w-full text-left text-xs border-collapse" {...props} />
             </div>
-            <pre className="p-4 text-xs font-mono text-[#e4e4e7] overflow-x-auto leading-relaxed select-text">
-              <code>{code}</code>
-            </pre>
-          </div>
-        );
-      }
+          ),
+          thead: ({ node, ...props }) => (
+            <thead className="bg-[#1c1b1a] border-b border-[#2e2d2b] text-[#c5c4be]" {...props} />
+          ),
+          th: ({ node, ...props }) => (
+            <th className="px-4 py-3 font-semibold text-[#f4f4f0] border-r border-[#2e2d2b] last:border-r-0" {...props} />
+          ),
+          td: ({ node, ...props }) => (
+            <td className="px-4 py-3 border-b border-[#2e2d2b] last:border-b-0 border-r border-[#2e2d2b] last:border-r-0 text-[#d4d4d0] align-top" {...props} />
+          ),
+          h1: ({ node, ...props }) => (
+            <h1 className="text-xl font-bold text-[#f4f4f0] mt-7 mb-3.5 tracking-tight font-sans" {...props} />
+          ),
+          h2: ({ node, ...props }) => (
+            <h2 className="text-lg font-bold text-[#f4f4f0] mt-6 mb-3 tracking-tight font-sans" {...props} />
+          ),
+          h3: ({ node, ...props }) => (
+            <h3 className="text-base font-semibold text-[#f4f4f0] mt-5 mb-2 font-sans" {...props} />
+          ),
+          h4: ({ node, ...props }) => (
+            <h4 className="text-sm font-semibold text-[#f4f4f0] mt-4 mb-2 font-sans" {...props} />
+          ),
+          p: ({ node, ...props }) => (
+            <p className="mb-3.5 last:mb-0 leading-[1.75]" {...props} />
+          ),
+          ul: ({ node, ...props }) => (
+            <ul className="list-disc list-outside ml-5 my-3 space-y-1.5" {...props} />
+          ),
+          ol: ({ node, ...props }) => (
+            <ol className="list-decimal list-outside ml-5 my-3 space-y-1.5" {...props} />
+          ),
+          li: ({ node, ...props }) => (
+            <li className="leading-relaxed pl-1" {...props} />
+          ),
+          blockquote: ({ node, ...props }) => (
+            <blockquote className="border-l-2 border-[#d97706] pl-4 my-4 italic text-[#a1a1aa] bg-[#1a1918]/40 py-1.5 rounded-r-lg" {...props} />
+          ),
+          hr: ({ node, ...props }) => (
+            <hr className="my-6 border-[#2e2d2b]" {...props} />
+          ),
+          strong: ({ node, ...props }) => (
+            <strong className="font-semibold text-[#ffffff]" {...props} />
+          ),
+          em: ({ node, ...props }) => (
+            <em className="italic text-[#f4f4f0]" {...props} />
+          ),
+          a: ({ node, ...props }) => (
+            <a
+              className="text-[#d97706] underline hover:text-[#f59e0b] transition-colors"
+              target="_blank"
+              rel="noopener noreferrer"
+              {...props}
+            />
+          ),
+          code: ({ node, inline, className, children, ...props }: any) => {
+            const match = /language-(\w+)/.exec(className || "");
+            const isInline = inline || (!match && !String(children).includes("\n"));
 
-      return (
-        <span key={idx} className="whitespace-pre-wrap">
-          {part}
-        </span>
-      );
-    });
+            if (isInline) {
+              return (
+                <code
+                  className="px-1.5 py-0.5 rounded-md bg-[#242322] border border-[#33312e] text-[#f59e0b] font-mono text-[13px]"
+                  {...props}
+                >
+                  {children}
+                </code>
+              );
+            }
+
+            const language = match ? match[1] : "code";
+            const codeString = String(children).replace(/\n$/, "");
+
+            return (
+              <div className="my-4 rounded-xl border border-[#2e2d2b] bg-[#11100f] overflow-hidden shadow-md">
+                <div className="h-9 px-3.5 bg-[#1a1918] border-b border-[#2a2927] flex items-center justify-between text-xs text-[#999894]">
+                  <div className="flex items-center gap-2">
+                    <Terminal className="w-3.5 h-3.5 text-[#d97706]" />
+                    <span className="font-mono text-[11px] font-medium text-[#c5c4be]">{language}</span>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => handleCopyCode(codeString, Math.random())}
+                    className="flex items-center gap-1.5 px-2 py-1 rounded hover:bg-[#242322] text-[#999894] hover:text-[#f4f4f0] transition-colors"
+                  >
+                    <Copy className="w-3.5 h-3.5" />
+                    <span className="text-[11px]">Copy code</span>
+                  </button>
+                </div>
+                <pre className="p-4 text-xs font-mono text-[#e4e4e7] overflow-x-auto leading-relaxed select-text">
+                  <code>{codeString}</code>
+                </pre>
+              </div>
+            );
+          },
+        }}
+      >
+        {content}
+      </ReactMarkdown>
+    );
   };
 
   // Assistant Message
