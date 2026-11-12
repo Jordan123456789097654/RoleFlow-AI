@@ -41,6 +41,7 @@ npm run dev
 
 ### 2. Environment Variables (`.env.local`)
 ```env
+SESSION_SECRET=   # required in production; at least 32 chars, e.g. `openssl rand -hex 32`
 RESEND_API_KEY=your_resend_api_key
 RESEND_FROM_EMAIL=RoleFlow <noreply@roleflow.site>
 NEXT_PUBLIC_APP_URL=https://roleflow.site
@@ -57,8 +58,9 @@ GROQ_API_KEYS=key1,key2,key3,key4,key5
 1. Push this project to GitHub.
 2. Import the repository into [Vercel](https://vercel.com).
 3. In **Project Settings** → **Domains**, add `roleflow.site`.
-4. In **Storage**, create a **Postgres** database and link it to your project.
+4. In **Storage**, create a **Postgres** database and link it to your project. Production refuses to store data without one.
 5. In **Environment Variables**, add:
+   - `SESSION_SECRET` (at least 32 characters; the app refuses to start sessions without it)
    - `RESEND_API_KEY`
    - `RESEND_FROM_EMAIL` = `RoleFlow <noreply@roleflow.site>`
    - `NEXT_PUBLIC_APP_URL` = `https://roleflow.site`

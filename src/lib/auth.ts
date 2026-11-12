@@ -3,11 +3,17 @@ import { NextRequest, NextResponse } from "next/server";
 
 export const SESSION_COOKIE_NAME = "roleflow_session";
 
-// Secure session secret: use process.env.SESSION_SECRET or an ephemeral random key per process to prevent forge attacks
-const EPHEMERAL_SECRET = crypto.randomBytes(32).toString("hex");
-const SESSION_SECRET = process.env.SESSION_SECRET || EPHEMERAL_SECRET;
-if (!process.env.SESSION_SECRET && process.env.NODE_ENV === "production") {
-  console.warn("SECURITY WARNING: SESSION_SECRET is not set in environment variables. Using ephemeral runtime key.");
+// Session signing secret. Required in production: without a stable secret,
+// sessions break across serverless instances and tokens can't be verified safely.
+const DEV_FALLBACK_SECRET = crypto.randomBytes(32).toString("hex");
+
+function getSessionSecret(): string {
+  const secret = process.env.SESSION_SECRET;
+  if (secret && secret.length >= 32) return secret;
+  if (process.env.NODE_ENV === "production") {
+    throw new Error("SESSION_SECRET must be set to at least 32 characters in production.");
+  }
+  return DEV_FALLBACK_SECRET;
 }
 
 export const GUEST_COOKIE_NAME = "roleflow_guest_sig";
@@ -17,7 +23,7 @@ export const GUEST_COOKIE_NAME = "roleflow_guest_sig";
  */
 export function createGuestToken(guestId: string, ip: string): string {
   const data = `${guestId}:${ip}`;
-  const sig = crypto.createHmac("sha256", SESSION_SECRET).update(data).digest("base64url");
+  const sig = crypto.createHmac("sha256", getSessionSecret()).update(data).digest("base64url");
   return `${Buffer.from(data).toString("base64url")}.${sig}`;
 }
 
@@ -31,7 +37,7 @@ export function verifyGuestToken(token: string, ip: string): string | null {
   const [b64Data, sig] = parts;
   try {
     const data = Buffer.from(b64Data, "base64url").toString("utf-8");
-    const expectedSig = crypto.createHmac("sha256", SESSION_SECRET).update(data).digest("base64url");
+    const expectedSig = crypto.createHmac("sha256", getSessionSecret()).update(data).digest("base64url");
     const bufA = Buffer.from(sig);
     const bufB = Buffer.from(expectedSig);
     if (bufA.length !== bufB.length || !crypto.timingSafeEqual(bufA, bufB)) return null;
@@ -72,7 +78,7 @@ export function createSessionToken(payload: {
   const payloadStr = JSON.stringify(fullPayload);
   const data = Buffer.from(payloadStr, "utf-8").toString("base64url");
   const signature = crypto
-    .createHmac("sha256", SESSION_SECRET)
+    .createHmac("sha256", getSessionSecret())
     .update(data)
     .digest("base64url");
 
@@ -93,7 +99,7 @@ export function verifySessionToken(token: string): SessionPayload | null {
 
   try {
     const expectedSig = crypto
-      .createHmac("sha256", SESSION_SECRET)
+      .createHmac("sha256", getSessionSecret())
       .update(data)
       .digest("base64url");
 

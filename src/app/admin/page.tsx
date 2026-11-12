@@ -26,7 +26,63 @@ import {
   Sparkles,
   ExternalLink,
 } from "lucide-react";
-import { UserProfile, SystemConfig, ModerationLogEntry } from "@/types";
+import { UserProfile, SystemConfig, ModerationLogEntry, IncidentContext, IncidentTurn } from "@/types";
+
+/** Shows the conversation captured when an incident was flagged, including attachments and images. */
+function ConversationContext({ raw }: { raw?: string }) {
+  if (!raw) {
+    return (
+      <div className="mt-2 text-xs text-[#858480]">
+        No conversation captured for this incident (recorded before context capture was enabled).
+      </div>
+    );
+  }
+  let turns: IncidentTurn[] = [];
+  try {
+    turns = (JSON.parse(raw) as IncidentContext).turns;
+  } catch {
+    return <div className="mt-2 text-xs text-red-300">Captured conversation could not be parsed.</div>;
+  }
+  return (
+    <details className="mt-2">
+      <summary className="text-xs text-[#858480] cursor-pointer select-none">
+        Conversation at time of flag ({turns.length} turns)
+      </summary>
+      <div className="mt-2 space-y-2 max-h-96 overflow-y-auto">
+        {turns.map((t, i) => (
+          <div key={i} className="bg-[#121211] border border-[#272624] rounded-lg p-2.5 text-xs">
+            <div className="text-[#858480] mb-1 uppercase tracking-wide">{t.role}</div>
+            {t.content && (
+              <div className="text-[#f4f4f0] whitespace-pre-wrap break-words">{t.content}</div>
+            )}
+            {(t.attachments || []).map((a, j) => (
+              <div key={j} className="mt-2">
+                <div className="text-[#858480]">
+                  [{a.imageDataUrl !== undefined ? "image" : "file"}] {a.name} ({a.type})
+                </div>
+                {a.imageDataUrl && (
+                  <img
+                    src={a.imageDataUrl}
+                    alt={a.name}
+                    className="mt-1 max-h-64 rounded border border-[#272624]"
+                  />
+                )}
+                {a.imageDataUrl === null && (
+                  <div className="mt-1 text-[#858480]">Image bytes not retained for this turn.</div>
+                )}
+                {a.text && (
+                  <pre className="mt-1 text-[#f4f4f0] whitespace-pre-wrap break-words max-h-40 overflow-y-auto">
+                    {a.text}
+                  </pre>
+                )}
+              </div>
+            ))}
+          </div>
+        ))}
+      </div>
+    </details>
+  );
+}
 
 export default function AdminPage() {
   const [activeTab, setActiveTab] = useState<"telemetry" | "config" | "users" | "moderation">("telemetry");
@@ -1051,6 +1107,7 @@ export default function AdminPage() {
                         <div className="bg-[#121211] border border-[#272624] rounded-xl p-3 text-xs text-[#f4f4f0] font-mono break-words whitespace-pre-wrap max-h-32 overflow-y-auto">
                           {log.prompt}
                         </div>
+                        <ConversationContext raw={log.context} />
                         {log.appealNote && (
                           <div className="mt-2 text-xs text-amber-300 bg-amber-500/10 border border-amber-500/20 rounded-lg p-2.5">
                             <span className="font-semibold block mb-0.5">User Appeal Statement:</span>

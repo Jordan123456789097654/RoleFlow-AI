@@ -100,6 +100,9 @@ const isPostgresConfigured = Boolean(
 
 let isInitialized = false;
 async function ensureDb() {
+  if (!isPostgresConfigured && process.env.VERCEL) {
+    throw new Error("Database not configured: link Vercel Postgres (POSTGRES_URL) before serving traffic. Refusing to store data in temporary storage.");
+  }
   if (!isPostgresConfigured || isInitialized) return;
   try {
     await sql`
@@ -148,6 +151,10 @@ async function ensureDb() {
         ip_address VARCHAR(100),
         created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
       );
+    `;
+
+    await sql`
+      ALTER TABLE roleflow_moderation_logs ADD COLUMN IF NOT EXISTS context TEXT;
     `;
 
     await sql`
@@ -909,8 +916,8 @@ export const db = {
     if (isPostgresConfigured) {
       try {
         await sql`
-          INSERT INTO roleflow_moderation_logs (id, user_id, user_email, prompt, tier, category, status, appeal_note, ip_address, created_at)
-          VALUES (${log.id}, ${log.userId}, ${log.userEmail}, ${log.prompt}, ${log.tier}, ${log.category}, ${log.status}, ${log.appealNote || null}, ${log.ipAddress || ""}, ${log.createdAt ? new Date(log.createdAt).toISOString() : new Date().toISOString()})
+          INSERT INTO roleflow_moderation_logs (id, user_id, user_email, prompt, tier, category, status, appeal_note, ip_address, created_at, context)
+          VALUES (${log.id}, ${log.userId}, ${log.userEmail}, ${log.prompt}, ${log.tier}, ${log.category}, ${log.status}, ${log.appealNote || null}, ${log.ipAddress || ""}, ${log.createdAt ? new Date(log.createdAt).toISOString() : new Date().toISOString()}, ${log.context || null})
           ON CONFLICT (id) DO UPDATE
           SET status = ${log.status}, appeal_note = ${log.appealNote || null};
         `;
@@ -930,7 +937,7 @@ export const db = {
     if (isPostgresConfigured) {
       try {
         const { rows } = await sql`
-          SELECT id, user_id as "userId", user_email as "userEmail", prompt, tier, category, status, appeal_note as "appealNote", ip_address as "ipAddress", created_at as "createdAt"
+          SELECT id, user_id as "userId", user_email as "userEmail", prompt, tier, category, status, appeal_note as "appealNote", ip_address as "ipAddress", context, created_at as "createdAt"
           FROM roleflow_moderation_logs
           ORDER BY created_at DESC;
         `;
@@ -956,7 +963,7 @@ export const db = {
     if (isPostgresConfigured) {
       try {
         const { rows } = await sql`
-          SELECT id, user_id as "userId", user_email as "userEmail", prompt, tier, category, status, appeal_note as "appealNote", ip_address as "ipAddress", created_at as "createdAt"
+          SELECT id, user_id as "userId", user_email as "userEmail", prompt, tier, category, status, appeal_note as "appealNote", ip_address as "ipAddress", context, created_at as "createdAt"
           FROM roleflow_moderation_logs
           WHERE id = ${id};
         `;

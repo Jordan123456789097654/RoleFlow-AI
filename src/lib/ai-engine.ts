@@ -1,4 +1,4 @@
-import { Artifact, EffortLevel, Message, ModelId } from "@/types";
+import { Artifact, Attachment, EffortLevel, Message, ModelId } from "@/types";
 
 interface GenerateParams {
   messages: Message[];
@@ -64,7 +64,11 @@ export async function generateRoleFlowResponse({
   // Multi-Key Groq Pool with Automatic Failover
   const keyPool = getGroqKeyPool();
   if (keyPool.length > 0) {
-    const backendModel = isGenesis ? "openai/gpt-oss-120b" : "llama-3.1-8b-instant";
+    // Attachments are folded into the messages here. Turns with images need a vision model.
+    const { messages: modelMessages, hasImages } = buildModelMessages(messages);
+    const backendModel = hasImages
+      ? VISION_MODEL
+      : isGenesis ? "openai/gpt-oss-120b" : "llama-3.1-8b-instant";
 
     const systemPrompt = `You are RoleFlow, a frontier AI assistant developed by RoleFlow for software engineering, architecture, and general intelligence.
 Your model name is ${modelName}.
@@ -95,7 +99,7 @@ Only emit memory tags when truly relevant to remember long-term. Do not announce
 
     const formattedMessages = [
       { role: "system", content: systemPrompt },
-      ...messages.map((m) => ({ role: m.role, content: m.content })),
+      ...modelMessages,
     ];
 
     // Try keys sequentially if one hits a rate limit
@@ -116,6 +120,14 @@ Only emit memory tags when truly relevant to remember long-term. Do not announce
             max_tokens: effort === "max" || effort === "extra" ? 8192 : 4096,
           }),
         });
+
+        if (!res.ok) {
+          const body = await res.text().catch(() => "");
+          console.error(
+            `Groq request failed: model=${backendModel} key#${(keyIndex + attempt) % keyPool.length} status=${res.status} body=${body.slice(0, 500)}`
+          );
+          continue;
+        }
 
         if (res.ok) {
           keyIndex = (keyIndex + attempt + 1) % keyPool.length;
@@ -196,10 +208,126 @@ Only emit memory tags when truly relevant to remember long-term. Do not announce
   }
 
   const elapsed = Math.max(0.6, Number(((Date.now() - startTime) / 1000).toFixed(1)));
-  // Fallback when Groq is unavailable or unconfigured
+  if (keyPool.length === 0) {
+    console.error("No usable Groq key: GROQ_API_KEYS is unset, or no key starts with 'gsk_'.");
+  } else {
+    console.error(`All ${keyPool.length} Groq key(s) failed. See the preceding 'Groq request failed' entries for status and body.`);
+  }
+  // Fallback when Groq is unavailable or unconfigured. This must not look like a real answer.
   return {
-    content: `I'm RoleFlow. How can I assist you with your software development, architecture, or general questions today?`,
+    content: `RoleFlow couldn't get a response from its model just now. Please try again in a moment.`,
     thinkingTime: elapsed,
     isFallback: true,
   };
+}
+
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Attachments and vision
+// ─────────────────────────────────────────────────────────────────────────────
+
+/** Groq's vision-capable model. Used for any turn that includes an image. */
+export const VISION_MODEL = "meta-llama/llama-4-scout-17b-16e-instruct";
+
+const MAX_IMAGES_PER_TURN = 4;
+const MAX_TEXT_ATTACHMENT_CHARS = 60_000;
+
+export type ContentPart =
+  | { type: "text"; text: string }
+  | { type: "image_url"; image_url: { url: string } };
+
+export interface ModelMessage {
+  role: "system" | "user" | "assistant";
+  content: string | ContentPart[];
+}
+
+export function isImageAttachment(a: Attachment): boolean {
+  return a.type.startsWith("image/") && a.content.startsWith("data:image/");
+}
+
+export function textAttachmentBlock(a: Attachment): string {
+  const body =
+    a.content.length > MAX_TEXT_ATTACHMENT_CHARS
+      ? a.content.slice(0, MAX_TEXT_ATTACHMENT_CHARS) + "\n[... file truncated ...]"
+      : a.content;
+  return `Attached file "${a.name}":\n\`\`\`\n${body}\n\`\`\``;
+}
+
+/**
+ * Converts the chat history into provider messages. Text attachments are inlined.
+ * Images are sent only on the latest user turn, which is the only one the model
+ * needs to see. Earlier images are represented by their filenames.
+ */
+export function buildModelMessages(messages: Message[]): {
+  messages: ModelMessage[];
+  hasImages: boolean;
+} {
+  const lastUserIndex = messages.map((m) => m.role).lastIndexOf("user");
+  let hasImages = false;
+
+  const out: ModelMessage[] = messages.map((m, idx) => {
+    const attachments = m.attachments ?? [];
+    if (m.role !== "user" || attachments.length === 0) {
+      return { role: m.role, content: m.content };
+    }
+
+    const images = attachments.filter(isImageAttachment);
+    const textBlocks = attachments.filter((a) => !isImageAttachment(a)).map(textAttachmentBlock);
+    const text = [m.content, ...textBlocks].filter(Boolean).join("\n\n");
+
+    if (images.length === 0 || idx !== lastUserIndex) {
+      const note =
+        images.length > 0
+          ? `\n\n[Images attached earlier: ${images.map((i) => i.name).join(", ")}]`
+          : "";
+      return { role: "user", content: text + note };
+    }
+
+    hasImages = true;
+    const parts: ContentPart[] = [
+      { type: "text", text: text || "Please look at the attached image(s)." },
+    ];
+    for (const img of images.slice(0, MAX_IMAGES_PER_TURN)) {
+      parts.push({ type: "image_url", image_url: { url: img.content } });
+    }
+    return { role: "user", content: parts };
+  });
+
+  return { messages: out, hasImages };
+}
+
+/**
+ * One-shot, non-streaming completion with the same key failover as the chat path.
+ * Returns null if no key is configured or every key fails.
+ */
+export async function groqChatCompletion(opts: {
+  model: string;
+  messages: ModelMessage[];
+  temperature?: number;
+  maxTokens?: number;
+}): Promise<string | null> {
+  const keyPool = getGroqKeyPool();
+  for (let attempt = 0; attempt < keyPool.length; attempt++) {
+    const key = keyPool[(keyIndex + attempt) % keyPool.length];
+    try {
+      const res = await fetch("https://api.groq.com/openai/v1/chat/completions", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${key}` },
+        body: JSON.stringify({
+          model: opts.model,
+          messages: opts.messages,
+          temperature: opts.temperature ?? 0,
+          max_tokens: opts.maxTokens ?? 512,
+        }),
+      });
+      if (res.ok) {
+        keyIndex = (keyIndex + attempt + 1) % keyPool.length;
+        const data = await res.json();
+        return data.choices?.[0]?.message?.content || null;
+      }
+    } catch {
+      // Try the next key.
+    }
+  }
+  return null;
 }

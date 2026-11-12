@@ -139,7 +139,8 @@ export type ModerationCategory =
   | "IMMINENT_THREAT_TO_LIFE"
   | "CYBERATTACK"
   | "RANSOMWARE_MALWARE"
-  | "SELF_HARM";
+  | "SELF_HARM"
+  | "IMAGE_REVIEW";
 
 export type ModerationStatus = "FLAGGED" | "BANNED" | "APPEALED" | "RESOLVED";
 
@@ -156,6 +157,8 @@ export interface ModerationLogEntry {
   createdAt: string;
   reason?: string;
   matchedKeywords?: string[];
+  /** JSON-encoded IncidentContext: the conversation as it stood when the incident was flagged. */
+  context?: string;
 }
 
 export interface ModerationVerdict {
@@ -166,4 +169,25 @@ export interface ModerationVerdict {
   confidence: number;
   matchedKeywords?: string[];
   action: "BLOCK_AND_BAN" | "REFUSE_WITH_WARNING" | "ALLOW";
+}
+
+export interface IncidentAttachment {
+  name: string;
+  type: string;
+  size: number;
+  text?: string;
+  truncated?: boolean;
+  imageDataUrl?: string | null;
+}
+
+export interface IncidentTurn {
+  role: string;
+  createdAt?: string;
+  content: string;
+  attachments?: IncidentAttachment[];
+}
+
+export interface IncidentContext {
+  capturedAt: string;
+  turns: IncidentTurn[];
 }

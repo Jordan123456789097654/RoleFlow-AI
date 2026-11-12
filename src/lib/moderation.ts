@@ -1,5 +1,6 @@
 import crypto from "crypto";
 import {
+  IncidentContext,
   ModerationCategory,
   ModerationLogEntry,
   ModerationTier,
@@ -264,6 +265,31 @@ export function scanMessage(prompt: string): ModerationVerdict {
 /**
  * Generates a factual Trust & Safety incident dossier for internal administrative records.
  */
+/** Renders the captured conversation for the text dossier. Image bytes stay in the JSON export. */
+function formatContextForDossier(raw?: string): string {
+  if (!raw) {
+    return "No conversation context was captured for this incident (recorded before context capture was enabled).";
+  }
+  try {
+    const parsed = JSON.parse(raw) as IncidentContext;
+    const lines = parsed.turns.map((t, i) => {
+      const header = `[${i + 1}] ${t.role.toUpperCase()} @ ${t.createdAt || "unknown time"}`;
+      const body = t.content ? `${t.content}` : "(no text)";
+      const attachments = (t.attachments || []).map((a) => {
+        if (a.imageDataUrl !== undefined) {
+          return `    [image] ${a.name} (${a.type}, ${a.size} bytes)${a.imageDataUrl ? " — included in JSON export" : " — image bytes not retained"}`;
+        }
+        const note = a.truncated ? " [truncated]" : "";
+        return `    [file] ${a.name} (${a.type}, ${a.size} bytes)${note}\n${a.text ?? ""}`;
+      });
+      return [header, body, ...attachments].join("\n");
+    });
+    return lines.join("\n\n");
+  } catch {
+    return "Captured context could not be parsed.";
+  }
+}
+
 export function generateIncidentDossier(logEntry: ModerationLogEntry): string {
   const hashDigest = crypto
     .createHash("sha256")
@@ -320,6 +346,11 @@ BEGIN RAW PROMPT EVIDENCE [RF-INC-${logEntry.id}]
 ${logEntry.prompt}
 ------------------------------------------------------------------------------
 END RAW PROMPT EVIDENCE
+
+${subDivider}
+SECTION 3B: CONVERSATION AT TIME OF FLAG (up to last 12 turns)
+${subDivider}
+${formatContextForDossier(logEntry.context)}
 
 ${subDivider}
 SECTION 4: SYSTEM INTERVENTION LOG

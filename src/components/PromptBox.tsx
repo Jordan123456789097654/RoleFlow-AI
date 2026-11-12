@@ -78,11 +78,38 @@ export const PromptBox: React.FC<PromptBoxProps> = ({
     }
   };
 
+  const MAX_IMAGE_BYTES = 4 * 1024 * 1024;
+  const MAX_TEXT_BYTES = 512 * 1024;
+  const TEXT_FILE_PATTERN =
+    /\.(txt|md|csv|tsv|json|ya?ml|xml|html?|css|scss|js|jsx|ts|tsx|py|java|c|cpp|h|rs|go|rb|php|sh|sql|log|env|toml|ini)$/i;
+
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = e.target.files;
     if (!files) return;
 
     Array.from(files).forEach((file) => {
+      const isImage = file.type.startsWith("image/");
+      const isText =
+        !isImage &&
+        (file.type.startsWith("text/") ||
+          file.type === "application/json" ||
+          TEXT_FILE_PATTERN.test(file.name));
+
+      if (!isImage && !isText) {
+        window.alert(
+          `"${file.name}" can't be read yet. Attach images (PNG, JPG, WEBP, GIF) or text and code files.`
+        );
+        return;
+      }
+      if (isImage && file.size > MAX_IMAGE_BYTES) {
+        window.alert(`"${file.name}" is larger than 4 MB. Please use a smaller image.`);
+        return;
+      }
+      if (isText && file.size > MAX_TEXT_BYTES) {
+        window.alert(`"${file.name}" is larger than 512 KB. Please attach a smaller file.`);
+        return;
+      }
+
       const reader = new FileReader();
       reader.onload = (event) => {
         const fileContent = event.target?.result as string;
@@ -90,13 +117,17 @@ export const PromptBox: React.FC<PromptBoxProps> = ({
           ...prev,
           {
             name: file.name,
-            type: file.type || "text/plain",
+            type: isImage ? file.type : file.type || "text/plain",
             size: file.size,
             content: fileContent,
           },
         ]);
       };
-      reader.readAsText(file);
+      if (isImage) {
+        reader.readAsDataURL(file);
+      } else {
+        reader.readAsText(file);
+      }
     });
     if (fileInputRef.current) fileInputRef.current.value = "";
   };

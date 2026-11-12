@@ -22,31 +22,30 @@ async function verifyEdgeSession(token: string): Promise<EdgeSessionPayload | nu
 
   try {
     const secret = process.env.SESSION_SECRET;
-    if (secret) {
-      const enc = new TextEncoder();
-      const key = await crypto.subtle.importKey(
-        "raw",
-        enc.encode(secret),
-        { name: "HMAC", hash: "SHA-256" },
-        false,
-        ["sign"]
-      );
-      const sigBytes = await crypto.subtle.sign("HMAC", key, enc.encode(data));
-      let binary = "";
-      const bytes = new Uint8Array(sigBytes);
-      for (let i = 0; i < bytes.byteLength; i++) {
-        binary += String.fromCharCode(bytes[i]);
-      }
-      const expectedSig = btoa(binary)
-        .replace(/\+/g, "-")
-        .replace(/\//g, "_")
-        .replace(/=+$/, "");
-
-      if (signature !== expectedSig) {
-        return null;
-      }
+    // Never accept an unsigned token. Without a configured secret, deny everything.
+    if (!secret || secret.length < 32) return null;
+    const enc = new TextEncoder();
+    const key = await crypto.subtle.importKey(
+      "raw",
+      enc.encode(secret),
+      { name: "HMAC", hash: "SHA-256" },
+      false,
+      ["sign"]
+    );
+    const sigBytes = await crypto.subtle.sign("HMAC", key, enc.encode(data));
+    let binary = "";
+    const bytes = new Uint8Array(sigBytes);
+    for (let i = 0; i < bytes.byteLength; i++) {
+      binary += String.fromCharCode(bytes[i]);
     }
+    const expectedSig = btoa(binary)
+      .replace(/\+/g, "-")
+      .replace(/\//g, "_")
+      .replace(/=+$/, "");
 
+    if (signature !== expectedSig) {
+      return null;
+    }
     // Decode base64url data payload in Edge environment
     const base64 = data.replace(/-/g, "+").replace(/_/g, "/");
     const jsonStr = decodeURIComponent(

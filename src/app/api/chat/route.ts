@@ -6,6 +6,9 @@ import { scanMessage } from "@/lib/moderation";
 import { sendSecurityAlertEmail } from "@/lib/email";
 import { getMemories, addMemory, removeMemory } from "@/lib/memory";
 import { getSessionFromRequest } from "@/lib/auth";
+import { checkRateLimit, RATE_LIMITS } from "@/lib/rate-limit";
+import { isImageAttachment } from "@/lib/ai-engine";
+import { buildAttachmentScanText, buildIncidentContext, classifyImagesForSafety } from "@/lib/attachments";
 
 const ALLOWED_MODELS: ModelId[] = ["roleflow-genesis-1", "roleflow-flash-1"];
 const ALLOWED_EFFORTS: EffortLevel[] = ["low", "medium", "high", "extra", "max"];
@@ -53,6 +56,27 @@ export async function POST(req: NextRequest) {
 
     const isGuest = !userId || userId.startsWith("guest_");
     const identifier = userEmail || userId || "guest_default";
+
+    // Per-minute abuse limits, separate from daily quotas. Guest IDs come from the client,
+    // so guests are limited per IP. Signed-in accounts are also capped per user.
+    const rateIp =
+      req.headers.get("x-forwarded-for")?.split(",")[0]?.trim() ||
+      req.headers.get("x-real-ip") ||
+      "unknown";
+    const ipLimit = checkRateLimit(
+      `ip:${rateIp}`,
+      isGuest ? RATE_LIMITS.guestIpPerMinute : RATE_LIMITS.ipPerMinute
+    );
+    const accountLimit = isGuest
+      ? { limited: false, retryAfterSeconds: 0 }
+      : checkRateLimit(`user:${userId}`, RATE_LIMITS.userPerMinute);
+    const rateLimited = ipLimit.limited ? ipLimit : accountLimit;
+    if (rateLimited.limited) {
+      return NextResponse.json(
+        { error: "Too many requests. Please wait a moment and try again.", rateLimited: true },
+        { status: 429, headers: { "Retry-After": String(rateLimited.retryAfterSeconds) } }
+      );
+    }
 
     // System Maintenance & Feature Flag Enforcements
     const sysConfig = await db.getSystemConfig();
@@ -147,7 +171,9 @@ export async function POST(req: NextRequest) {
 
     // 1. Run Trust & Safety Hybrid Scanner across current prompt and recent user messages
     const promptToScan = latestUserMsg ? latestUserMsg.content : "";
-    let moderationVerdict = scanMessage(promptToScan);
+    // Attachments are scanned as well: filenames and text file contents. Image pixels are checked below.
+    const attachmentScanText = buildAttachmentScanText(latestUserMsg);
+    let moderationVerdict = scanMessage([promptToScan, attachmentScanText].filter(Boolean).join("\n"));
 
     if (!moderationVerdict.flagged && cappedMessages.length > 1) {
       for (const m of cappedMessages) {
@@ -161,6 +187,13 @@ export async function POST(req: NextRequest) {
       }
     }
 
+    // Image review: the vision model checks uploaded images before any answer is generated.
+    const latestImages = (latestUserMsg?.attachments || []).filter(isImageAttachment);
+    if (!moderationVerdict.flagged && latestImages.length > 0) {
+      moderationVerdict = await classifyImagesForSafety(latestImages);
+    }
+    const incidentContext = buildIncidentContext(cappedMessages, latestUserMsg);
+
     if (moderationVerdict.flagged) {
       if (moderationVerdict.tier === 1) {
         // Zero tolerance: Hard block, Ban account, send Security Alert email
@@ -173,6 +206,7 @@ export async function POST(req: NextRequest) {
           userId: userId || "guest",
           userEmail: userEmail || "guest",
           prompt: promptToScan,
+          context: incidentContext,
           tier: 1,
           category: moderationVerdict.category || "VIOLENT_EXTREMISM",
           status: "BANNED",
@@ -284,6 +318,7 @@ export async function POST(req: NextRequest) {
           userId: userId || "guest",
           userEmail: userEmail || "guest",
           prompt: promptToScan,
+          context: incidentContext,
           tier: 2,
           category: moderationVerdict.category || "CYBERATTACK",
           status: "FLAGGED",
