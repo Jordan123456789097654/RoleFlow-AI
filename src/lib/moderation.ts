@@ -149,6 +149,8 @@ const SAFETY_RULES: PatternRule[] = [
       /\b(?:i\s*(?:am|will|gonna)\s+(?:kill|murder|shoot|slit\s*the\s*throat\s*of|assassinate|strangle))\s+[a-z0-9\s]{2,40}\s*(?:today|tonight|tomorrow|in\s*an?\s*hour|at\s*\d+\s*(?:am|pm)?)\b/i,
       /\b(?:how\s+to\s+hire|paying|contract\s*for)\s+(?:a\s+)?(?:hitman|assassin)\s+to\s+(?:kill|murder|execute)\b/i,
       /\b(?:planting\s+a\s+bomb\s+(?:at|in)|bomb\s+is\s+set\s+to\s+detonate)\b/i,
+      // Requests for help killing or poisoning a person without being caught.
+      /\bhow\s+(?:do\s+i|can\s+i|to|do\s+you)\s+(?:kill|murder|poison|strangle|drown|suffocate)\s+(?:someone|somebody|a\s+person|him|her|them|my\s+(?:neighbor|boss|wife|husband|ex|roommate|coworker|landlord|partner|girlfriend|boyfriend|brother|sister|mom|dad|mother|father))\b.*\b(?:without\s+(?:getting|being)\s+caught|get\s+away\s+with|leave\s+no\s+evidence|without\s+leaving\s+evidence)/i,
     ],
   },
 
@@ -182,6 +184,48 @@ const SAFETY_RULES: PatternRule[] = [
       /\b(?:encrypt\s*all\s*user\s*files|lock\s*system\s*files)\s+and\s+(?:demand\s*(?:bitcoin|crypto|ransom)|leave\s*a\s*ransom\s*note)\b/i,
       /\b(?:build|write|create)\s+(?:a\s+)?(?:stealth\s*keylogger|covert\s*rat|remote\s*access\s*trojan|rootkit\s*payload)\b/i,
       /\b(?:polymorphic|metamorphic)\s+(?:malware|virus|worm)\s*(?:generator|code)\b/i,
+    ],
+  },
+
+  // ---------------------------------------------------------------------------
+  // TIER 2: Threats of violence against a specific person (refusal, no auto-ban)
+  // ---------------------------------------------------------------------------
+  {
+    category: "VIOLENT_THREAT",
+    tier: 2,
+    reason: "Tier 2 violation: Stated intent to kill or seriously harm a specific person.",
+    confidence: 0.9,
+    patterns: [
+      /\bi(?:'m|\s+am|\s+m|\s+will|\s+want|\s+plan|\s+need|\s+gonna)?\s*(?:going\s+to\s+|gonna\s+|want\s+to\s+|plan\s+to\s+|need\s+to\s+|will\s+)?(?:kill|murder|shoot|stab|hurt|beat\s*up|maim|strangle)\s+(?:him|her|them|someone|somebody|my\s+(?:neighbor|boss|wife|husband|ex|roommate|coworker|landlord|partner|girlfriend|boyfriend|brother|sister|mom|dad|mother|father|son|daughter|teacher|classmate|friend))\b/i,
+    ],
+  },
+
+  // ---------------------------------------------------------------------------
+  // TIER 2: Fraud, phishing, and credential theft
+  // ---------------------------------------------------------------------------
+  {
+    category: "FRAUD_PHISHING",
+    tier: 2,
+    reason: "Tier 2 violation: Phishing, scam content, or credential theft.",
+    confidence: 0.9,
+    patterns: [
+      /\b(?:write|create|draft|build|make|generate|code)\s+(?:me\s+)?(?:a\s+|an\s+)?(?:phishing|scam)\s+(?:email|text|sms|page|site|website|message|kit|campaign|login)/i,
+      /\b(?:fake|cloned?|copy\s+of\s+(?:the\s+)?)\s*(?:bank|paypal|microsoft|google|apple|netflix|login|sign-?in)\s+(?:page|login\s*page|site|website)\b.*\b(?:password|credentials|credit\s*card)/i,
+      /\b(?:steal|harvest|collect)\s+(?:people'?s\s+|other\s+people'?s\s+|someone'?s\s+)?(?:bank\s+logins?|passwords|credit\s*card\s*(?:numbers|details)|login\s+credentials)\b/i,
+    ],
+  },
+
+  // ---------------------------------------------------------------------------
+  // TIER 2: Illegal drug synthesis
+  // ---------------------------------------------------------------------------
+  {
+    category: "DRUG_SYNTHESIS",
+    tier: 2,
+    reason: "Tier 2 violation: Synthesis or production of illegal drugs.",
+    confidence: 0.92,
+    patterns: [
+      /\b(?:how\s+(?:do\s+i|can\s+i|to|do\s+you)\s+(?:make|cook|synthesi[sz]e|produce|manufacture)|recipe\s+for|synthesi[sz]e|cook|produce|manufacture)\s+(?:a\s+|some\s+)?(?:meth|methamphetamine|crack\s+cocaine|fentanyl|heroin|mdma|lsd|pcp)\b/i,
+      /\b(?:synthesi[sz]e|cook|make)\s+(?:meth|fentanyl|heroin)\s+(?:at\s+home|in\s+a\s+lab|from\s+(?:pseudoephedrine|ephedrine))/i,
     ],
   },
 

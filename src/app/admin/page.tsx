@@ -236,6 +236,10 @@ export default function AdminPage() {
     maintenanceMode: false,
     broadcastBanner: "",
     allowHighEffort: true,
+    apiKeysEnabled: true,
+    apiKeyDefaultRpm: 30,
+    apiKeyDefaultRpd: 2500,
+    apiKeyMaxPerUser: 5,
   });
   const [configSaving, setConfigSaving] = useState(false);
   const [configSuccess, setConfigSuccess] = useState(false);
@@ -335,7 +339,7 @@ export default function AdminPage() {
       const res = await fetch("/api/admin/config");
       if (res.ok) {
         const data = await res.json();
-        if (data.config) setConfig(data.config);
+        if (data.config) setConfig((prev) => ({ ...prev, ...data.config }));
       }
     } catch (e) {
       console.error("Failed to fetch config:", e);
@@ -638,7 +642,7 @@ export default function AdminPage() {
                   icon={<Server className="h-4 w-4" />}
                   name="Inference pool"
                   description="Multi-key load balancing with automatic failover when a key is rate limited."
-                  status={<Badge tone="success" mono>{stats?.modelKeys.active || 0} keys active</Badge>}
+                  status={<Badge tone="success" mono>{stats?.modelKeys?.active || 0} keys active</Badge>}
                   stats={[
                     { label: "Pool health", value: "Operational" },
                     { label: "Failover", value: "Round-robin" },
@@ -662,13 +666,13 @@ export default function AdminPage() {
                 <StatCard label="Memory" value="Active" hint="Personalized recall" />
               </div>
 
-              {stats?.modelKeys.keysMasked && stats.modelKeys.keysMasked.length > 0 && (
+              {stats?.modelKeys?.keysMasked && stats.modelKeys.keysMasked.length > 0 && (
                 <div className={`${cardClass} p-5`}>
                   <h2 className="mb-3 text-sm font-medium text-ink">
-                    Configured inference keys ({stats.modelKeys.keysMasked.length})
+                    Configured inference keys ({stats.modelKeys?.keysMasked?.length ?? 0})
                   </h2>
                   <ul className="grid grid-cols-1 gap-2 md:grid-cols-2">
-                    {stats.modelKeys.keysMasked.map((keyMask, idx) => (
+                    {(stats.modelKeys?.keysMasked ?? []).map((keyMask, idx) => (
                       <li
                         key={idx}
                         className="flex items-center justify-between rounded-xl border border-line bg-app px-3.5 py-2.5 text-xs"
@@ -793,7 +797,7 @@ export default function AdminPage() {
                     onChange={(e) => setConfig({ ...config, broadcastBanner: e.target.value })}
                     className={inputClass}
                   />
-                  {config.broadcastBanner.trim() && (
+                  {(config.broadcastBanner ?? "").trim() && (
                     <div className="flex items-center gap-2.5 rounded-xl border border-accent/30 bg-accent-soft px-3.5 py-2.5 text-sm text-ink">
                       <Sparkles className="h-4 w-4 shrink-0 text-accent" />
                       <span className="font-medium">Preview:</span>

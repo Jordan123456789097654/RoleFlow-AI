@@ -11,6 +11,10 @@ export interface SystemConfig {
   maintenanceMode: boolean;
   broadcastBanner: string;
   allowHighEffort: boolean;
+  apiKeysEnabled: boolean;
+  apiKeyDefaultRpm: number;
+  apiKeyDefaultRpd: number;
+  apiKeyMaxPerUser: number;
 }
 
 export type EffortLevel = "low" | "medium" | "high" | "extra" | "max";
@@ -127,6 +131,11 @@ export interface ApiKey {
   status: "active" | "revoked";
   requestCount: number;
   rateLimit: ApiKeyRateLimit;
+  expiresAt?: string;
+  /** Successful requests on dailyDate (UTC). Resets when the date changes. */
+  dailyCount?: number;
+  dailyDate?: string;
+  allowedModels?: ModelId[];
 }
 
 export type ModerationTier = 1 | 2;
@@ -140,6 +149,9 @@ export type ModerationCategory =
   | "IMMINENT_THREAT_TO_LIFE"
   | "CYBERATTACK"
   | "RANSOMWARE_MALWARE"
+  | "VIOLENT_THREAT"
+  | "FRAUD_PHISHING"
+  | "DRUG_SYNTHESIS"
   | "SELF_HARM"
   | "IMAGE_REVIEW";
 

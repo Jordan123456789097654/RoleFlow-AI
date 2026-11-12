@@ -2,7 +2,7 @@ import fs from "fs";
 import path from "path";
 import os from "os";
 import { sql } from "@vercel/postgres";
-import { Chat, Project, UserProfile, ModerationLogEntry, ModerationStatus, SystemConfig, MemoryItem } from "@/types";
+import { Chat, Project, UserProfile, ModerationLogEntry, ModerationStatus, SystemConfig, MemoryItem, ApiKey, ModelId } from "@/types";
 
 const DATA_DIR = process.env.VERCEL ? path.join(os.tmpdir(), "roleflow-data") : path.join(process.cwd(), ".data");
 const STORE_FILE = path.join(DATA_DIR, "store.json");
@@ -17,6 +17,10 @@ export const DEFAULT_SYSTEM_CONFIG: SystemConfig = {
   maintenanceMode: false,
   broadcastBanner: "",
   allowHighEffort: true,
+  apiKeysEnabled: true,
+  apiKeyDefaultRpm: 30,
+  apiKeyDefaultRpd: 2500,
+  apiKeyMaxPerUser: 5,
 };
 
 interface LocalStore {
@@ -31,10 +35,42 @@ interface LocalStore {
   moderationLogs?: Record<string, ModerationLogEntry>;
   memories?: Record<string, MemoryItem[]>;
   systemConfig?: SystemConfig;
+  apiKeys?: Record<string, ApiKey>;
 }
 
 export function getTodayDateString(): string {
   return new Date().toISOString().slice(0, 10);
+}
+
+const ALL_API_MODELS: ModelId[] = ["roleflow-genesis-1", "roleflow-flash-1"];
+
+/** Maps a roleflow_api_keys row (snake_case) to the ApiKey shape. */
+function rowToApiKey(r: any): ApiKey {
+  let allowedModels: ModelId[] = ALL_API_MODELS;
+  if (typeof r.allowed_models === "string" && r.allowed_models) {
+    try {
+      allowedModels = JSON.parse(r.allowed_models) as ModelId[];
+    } catch {
+      allowedModels = ALL_API_MODELS;
+    }
+  }
+  return {
+    id: r.id,
+    userId: r.user_id,
+    userEmail: r.user_email,
+    name: r.name,
+    keyHash: r.key_hash,
+    keyPrefix: r.key_prefix,
+    createdAt: new Date(r.created_at).toISOString(),
+    lastUsedAt: r.last_used_at ? new Date(r.last_used_at).toISOString() : undefined,
+    status: r.status === "revoked" ? "revoked" : "active",
+    requestCount: Number(r.request_count) || 0,
+    rateLimit: { rpm: Number(r.rpm), rpd: Number(r.rpd) },
+    expiresAt: r.expires_at ? new Date(r.expires_at).toISOString() : undefined,
+    dailyCount: Number(r.daily_count) || 0,
+    dailyDate: r.daily_date || undefined,
+    allowedModels,
+  };
 }
 
 export function patchUserProfile(user: UserProfile): UserProfile {
@@ -217,6 +253,27 @@ async function ensureDb() {
         id VARCHAR(255) PRIMARY KEY,
         user_id VARCHAR(255) NOT NULL,
         memory TEXT NOT NULL,
+        created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+      );
+    `;
+
+    await sql`
+      CREATE TABLE IF NOT EXISTS roleflow_api_keys (
+        id VARCHAR(255) PRIMARY KEY,
+        user_id VARCHAR(255) NOT NULL,
+        user_email VARCHAR(255) NOT NULL,
+        name VARCHAR(120) NOT NULL,
+        key_hash VARCHAR(128) UNIQUE NOT NULL,
+        key_prefix VARCHAR(32) NOT NULL,
+        status VARCHAR(20) NOT NULL DEFAULT 'active',
+        request_count INTEGER DEFAULT 0,
+        rpm INTEGER NOT NULL,
+        rpd INTEGER NOT NULL,
+        expires_at TIMESTAMP WITH TIME ZONE,
+        last_used_at TIMESTAMP WITH TIME ZONE,
+        daily_count INTEGER DEFAULT 0,
+        daily_date VARCHAR(20),
+        allowed_models TEXT,
         created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
       );
     `;
@@ -1177,6 +1234,10 @@ export const db = {
       maintenanceMode: typeof patch.maintenanceMode === "boolean" ? patch.maintenanceMode : current.maintenanceMode,
       broadcastBanner: typeof patch.broadcastBanner === "string" ? patch.broadcastBanner.trim() : current.broadcastBanner,
       allowHighEffort: typeof patch.allowHighEffort === "boolean" ? patch.allowHighEffort : current.allowHighEffort,
+      apiKeysEnabled: typeof patch.apiKeysEnabled === "boolean" ? patch.apiKeysEnabled : current.apiKeysEnabled,
+      apiKeyDefaultRpm: typeof patch.apiKeyDefaultRpm === "number" && patch.apiKeyDefaultRpm >= 1 ? patch.apiKeyDefaultRpm : current.apiKeyDefaultRpm,
+      apiKeyDefaultRpd: typeof patch.apiKeyDefaultRpd === "number" && patch.apiKeyDefaultRpd >= 1 ? patch.apiKeyDefaultRpd : current.apiKeyDefaultRpd,
+      apiKeyMaxPerUser: typeof patch.apiKeyMaxPerUser === "number" && patch.apiKeyMaxPerUser >= 1 ? patch.apiKeyMaxPerUser : current.apiKeyMaxPerUser,
     };
 
     if (isPostgresConfigured) {
@@ -1268,5 +1329,123 @@ export const db = {
     user.messageCount = 0;
     user.lastResetDate = getTodayDateString();
     return await this.upsertUser(user);
+  },
+
+  // ───────────────────────────────────────────────────────────────────────────
+  // API keys. Postgres when configured; errors propagate there, because a key must
+  // never be written to the ephemeral local fallback. Otherwise the local store.
+  // Only the SHA-256 hash of a key is ever stored.
+  // ───────────────────────────────────────────────────────────────────────────
+  async createApiKey(record: ApiKey): Promise<ApiKey> {
+    await ensureDb();
+    if (isPostgresConfigured) {
+      const allowed = JSON.stringify(record.allowedModels ?? ALL_API_MODELS);
+      await sql`
+        INSERT INTO roleflow_api_keys
+          (id, user_id, user_email, name, key_hash, key_prefix, status, request_count,
+           rpm, rpd, expires_at, last_used_at, daily_count, daily_date, allowed_models, created_at)
+        VALUES
+          (${record.id}, ${record.userId}, ${record.userEmail}, ${record.name}, ${record.keyHash},
+           ${record.keyPrefix}, ${record.status}, ${record.requestCount}, ${record.rateLimit.rpm},
+           ${record.rateLimit.rpd}, ${record.expiresAt ?? null}, ${record.lastUsedAt ?? null},
+           ${record.dailyCount ?? 0}, ${record.dailyDate ?? null}, ${allowed}, ${record.createdAt});
+      `;
+      return record;
+    }
+    const store = getLocalStore();
+    store.apiKeys = store.apiKeys || {};
+    store.apiKeys[record.id] = record;
+    saveLocalStore(store);
+    return record;
+  },
+
+  async listApiKeysByUser(userId: string): Promise<ApiKey[]> {
+    await ensureDb();
+    if (isPostgresConfigured) {
+      const { rows } = await sql`
+        SELECT * FROM roleflow_api_keys WHERE user_id = ${userId} ORDER BY created_at DESC;
+      `;
+      return rows.map(rowToApiKey);
+    }
+    const store = getLocalStore();
+    return Object.values(store.apiKeys || {})
+      .filter((k) => k.userId === userId)
+      .sort((a, b) => b.createdAt.localeCompare(a.createdAt));
+  },
+
+  async getApiKeyByHash(keyHash: string): Promise<ApiKey | null> {
+    await ensureDb();
+    if (isPostgresConfigured) {
+      const { rows } = await sql`
+        SELECT * FROM roleflow_api_keys WHERE key_hash = ${keyHash} LIMIT 1;
+      `;
+      return rows[0] ? rowToApiKey(rows[0]) : null;
+    }
+    const store = getLocalStore();
+    return Object.values(store.apiKeys || {}).find((k) => k.keyHash === keyHash) ?? null;
+  },
+
+  /** Revokes one key owned by userId. Returns false if no such key belongs to that user. */
+  async revokeApiKey(id: string, userId: string): Promise<boolean> {
+    await ensureDb();
+    if (isPostgresConfigured) {
+      const result = await sql`
+        UPDATE roleflow_api_keys SET status = 'revoked'
+        WHERE id = ${id} AND user_id = ${userId};
+      `;
+      return (result.rowCount ?? 0) > 0;
+    }
+    const store = getLocalStore();
+    const key = store.apiKeys?.[id];
+    if (!key || key.userId !== userId) return false;
+    key.status = "revoked";
+    saveLocalStore(store);
+    return true;
+  },
+
+  /** Used when an account is banned: every active key it owns stops working. */
+  async revokeAllApiKeysForUser(userId: string): Promise<void> {
+    await ensureDb();
+    if (isPostgresConfigured) {
+      await sql`
+        UPDATE roleflow_api_keys SET status = 'revoked'
+        WHERE user_id = ${userId} AND status = 'active';
+      `;
+      return;
+    }
+    const store = getLocalStore();
+    let changed = false;
+    for (const key of Object.values(store.apiKeys || {})) {
+      if (key.userId === userId && key.status === "active") {
+        key.status = "revoked";
+        changed = true;
+      }
+    }
+    if (changed) saveLocalStore(store);
+  },
+
+  /** Records one successful API request: last used, lifetime count, and the UTC daily counter. */
+  async touchApiKeyUsage(id: string): Promise<void> {
+    await ensureDb();
+    const today = getTodayDateString();
+    if (isPostgresConfigured) {
+      await sql`
+        UPDATE roleflow_api_keys SET
+          last_used_at = NOW(),
+          request_count = COALESCE(request_count, 0) + 1,
+          daily_count = CASE WHEN daily_date = ${today} THEN COALESCE(daily_count, 0) + 1 ELSE 1 END,
+          daily_date = ${today}
+        WHERE id = ${id};
+      `;
+      return;
+    }
+    const store = getLocalStore();
+    const key = store.apiKeys?.[id];
+    if (!key) return;
+    key.lastUsedAt = new Date().toISOString();
+    key.requestCount = (key.requestCount || 0) + 1;
+    key.dailyCount = key.dailyDate === today ? (key.dailyCount || 0) + 1 : 1;
+    key.dailyDate = today;
+    saveLocalStore(store);
   },
 };

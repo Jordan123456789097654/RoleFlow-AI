@@ -29,10 +29,11 @@ import {
   UserCheck,
   Ban,
   Settings as SettingsIcon,
+  Key,
 } from "lucide-react";
+import { ApiKeysPanel } from "@/components/ApiKeysPanel";
 import { UserProfile, ModerationLogEntry, UsageStats, MemoryItem } from "@/types";
 
-const ADMIN_EMAIL = "jordanedanield13@gmail.com";
 
 /** localStorage key for the theme choice. Values: "light" | "dark" | "system". */
 const THEME_STORAGE_KEY = "roleflow_theme";
@@ -42,6 +43,7 @@ export type SettingsTab =
   | "account"
   | "memory"
   | "instructions"
+  | "api"
   | "privacy"
   | "admin";
 
@@ -124,6 +126,7 @@ const NAV_ITEMS: { id: SettingsTab; label: string; icon: React.ReactNode; adminO
   { id: "account", label: "Account & quota", icon: <Clock className="w-4 h-4" /> },
   { id: "memory", label: "Memory", icon: <Brain className="w-4 h-4" /> },
   { id: "instructions", label: "Custom instructions", icon: <Sparkles className="w-4 h-4" /> },
+  { id: "api", label: "API keys", icon: <Key className="w-4 h-4" /> },
   { id: "privacy", label: "Data & privacy", icon: <Database className="w-4 h-4" /> },
   { id: "admin", label: "Admin queue", icon: <ShieldAlert className="w-4 h-4" />, adminOnly: true },
 ];
@@ -155,7 +158,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
   onAllChatsDeleted,
 }) => {
   const isAdmin = Boolean(
-    user.isAdmin || user.email?.toLowerCase() === ADMIN_EMAIL.toLowerCase()
+    user.isAdmin
   );
 
   const [activeTab, setActiveTab] = useState<SettingsTab>(defaultTab);
@@ -904,6 +907,17 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                     <span>{saving ? "Saving..." : "Save instructions"}</span>
                   </button>
                 </div>
+              </div>
+            )}
+
+            {/* TAB: API KEYS */}
+            {activeTab === "api" && (
+              <div className="space-y-8">
+                <SectionHeader
+                  title="API keys"
+                  description="Use your RoleFlow account from your own code. Keys share your daily message quota."
+                />
+                <ApiKeysPanel />
               </div>
             )}
 

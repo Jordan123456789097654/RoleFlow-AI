@@ -6,7 +6,6 @@ import { Settings, Shield, Trash2, LogOut } from "lucide-react";
 import { UserProfile } from "@/types";
 import { formatCleanName } from "@/lib/format";
 
-const ADMIN_EMAIL = "jordanedanield13@gmail.com";
 
 interface UserAvatarMenuProps {
   user: UserProfile;
@@ -27,7 +26,7 @@ export const UserAvatarMenu: React.FC<UserAvatarMenuProps> = ({
   const menuRef = useRef<HTMLDivElement>(null);
 
   const isAdmin = Boolean(
-    user.isAdmin || user.email?.toLowerCase() === ADMIN_EMAIL.toLowerCase()
+    user.isAdmin
   );
 
   const cleanName = formatCleanName(user.name, user.email);

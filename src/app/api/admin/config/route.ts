@@ -73,6 +73,31 @@ export async function PUT(req: NextRequest) {
       patch.allowHighEffort = Boolean(body.allowHighEffort);
     }
 
+    if (body.apiKeysEnabled !== undefined) {
+      patch.apiKeysEnabled = Boolean(body.apiKeysEnabled);
+    }
+
+    if (body.apiKeyDefaultRpm !== undefined) {
+      const val = parseInt(body.apiKeyDefaultRpm, 10);
+      if (!isNaN(val) && val >= 1 && val <= 120) {
+        patch.apiKeyDefaultRpm = val;
+      }
+    }
+
+    if (body.apiKeyDefaultRpd !== undefined) {
+      const val = parseInt(body.apiKeyDefaultRpd, 10);
+      if (!isNaN(val) && val >= 1 && val <= 10000) {
+        patch.apiKeyDefaultRpd = val;
+      }
+    }
+
+    if (body.apiKeyMaxPerUser !== undefined) {
+      const val = parseInt(body.apiKeyMaxPerUser, 10);
+      if (!isNaN(val) && val >= 1 && val <= 50) {
+        patch.apiKeyMaxPerUser = val;
+      }
+    }
+
     const updatedConfig = await db.updateSystemConfig(patch);
 
     return NextResponse.json({

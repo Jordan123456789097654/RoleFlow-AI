@@ -278,11 +278,9 @@ Only emit memory tags when truly relevant to remember long-term. Do not announce
 // ─────────────────────────────────────────────────────────────────────────────
 
 /**
- * Vision model for image turns, set via GROQ_VISION_MODEL. Deliberately no default:
- * Groq shut down its Llama 4 Scout vision model on 17 July 2026, and Groq's current
- * production text models are not vision models. When unset, images are not read.
+ * Vision model for image turns, set via GROQ_VISION_MODEL, defaulting to Qwen 3.8 27B multimodal on Groq.
  */
-export const VISION_MODEL: string | null = process.env.GROQ_VISION_MODEL || null;
+export const VISION_MODEL: string = process.env.GROQ_VISION_MODEL || "qwen/qwen3.8-27b";
 
 const MAX_IMAGES_PER_TURN = 4;
 const MAX_TEXT_ATTACHMENT_CHARS = 60_000;
@@ -328,7 +326,11 @@ export function buildModelMessages(messages: Message[]): {
 
     const images = attachments.filter(isImageAttachment);
     const textBlocks = attachments.filter((a) => !isImageAttachment(a)).map(textAttachmentBlock);
-    const text = [m.content, ...textBlocks].filter(Boolean).join("\n\n");
+    const userPrompt = m.content?.trim();
+    let text = [userPrompt, ...textBlocks].filter(Boolean).join("\n\n");
+    if (!userPrompt && textBlocks.length > 0) {
+      text = `Please examine and analyze the following attached file(s):\n\n${textBlocks.join("\n\n")}`;
+    }
 
     if (images.length === 0 || idx !== lastUserIndex || !VISION_MODEL) {
       const note =
@@ -342,7 +344,7 @@ export function buildModelMessages(messages: Message[]): {
 
     hasImages = true;
     const parts: ContentPart[] = [
-      { type: "text", text: text || "Please look at the attached image(s)." },
+      { type: "text", text: text || "Please examine, describe, and analyze the attached image(s)." },
     ];
     for (const img of images.slice(0, MAX_IMAGES_PER_TURN)) {
       parts.push({ type: "image_url", image_url: { url: img.content } });

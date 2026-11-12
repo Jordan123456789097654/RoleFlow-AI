@@ -106,7 +106,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
     [filteredChats]
   );
 
-  const isAdmin = Boolean(user?.isAdmin || user?.email?.toLowerCase() === "jordanedanield13@gmail.com");
+  const isAdmin = Boolean(user?.isAdmin);
 
   const rowClass = (active: boolean) =>
     `group flex items-center gap-2 min-h-[36px] pl-2.5 pr-1.5 rounded-lg text-sm cursor-pointer transition-colors duration-150 ${
