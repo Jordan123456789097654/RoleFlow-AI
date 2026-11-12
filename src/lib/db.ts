@@ -287,6 +287,17 @@ async function ensureDb() {
 }
 
 export const db = {
+  /**
+   * Readiness check for uptime monitors. Unlike getSystemConfig, this does not swallow errors:
+   * it throws when Postgres is configured but unreachable. Without Postgres (local store) it passes.
+   */
+  async ping(): Promise<void> {
+    await ensureDb();
+    if (isPostgresConfigured) {
+      await sql`SELECT 1;`;
+    }
+  },
+
   // Auth Codes
   async saveAuthCode(email: string, code: string, token: string, expiresAt: number) {
     await ensureDb();
