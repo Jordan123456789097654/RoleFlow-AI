@@ -1,7 +1,7 @@
 # Moderation and Appeals Policy
 
-**Effective date:** [DATE]
-**Last updated:** [DATE]
+**Effective date:** November 12, 2026
+**Last updated:** November 12, 2026
 
 This policy explains how RoleFlow reviews content, what happens when a request or upload is flagged, how enforcement decisions are made, and how you can appeal. It applies to prompts, messages, text attachments, images, custom instructions, project content, shared conversations, and API requests.
 
@@ -111,7 +111,7 @@ Please keep appeal statements factual and concise. You may attach a short explan
 
 ### 6.3 Review timeline
 
-We aim to acknowledge appeals within [2] business days and to decide them within [10] business days. Complex matters or those requiring law enforcement coordination may take longer. We will tell you if we need more time.
+We aim to acknowledge appeals within two (2) business days and to decide them within ten (10) business days. Complex matters or those requiring law enforcement coordination may take longer. We will tell you if we need more time.
 
 ### 6.4 Who decides
 
@@ -153,3 +153,4 @@ API customers are responsible for their own end users' compliance and must imple
 
 Moderation questions, appeals, and reports: support@roleflow.site
 Safety and security reports: security@roleflow.site
+

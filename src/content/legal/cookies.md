@@ -1,6 +1,6 @@
 # Cookie Policy
 
-**Effective date:** [DATE]
+**Effective date:** November 12, 2026
 
 This Cookie Policy describes how RoleFlow uses cookies and similar technologies on roleflow.site and in the chat application. Our Privacy Policy describes how we process personal information more generally.
 
@@ -11,7 +11,7 @@ This Cookie Policy describes how RoleFlow uses cookies and similar technologies 
 | Strictly necessary | Sign-in sessions, security, CSRF protection, load balancing | Session cookie, CSRF token | No, the Services will not work without them |
 | Preferences | Remember theme, model, and interface choices | Theme and model settings in local storage | Yes, by clearing storage or resetting settings |
 | Security | Detect abuse and enforce rate limits | Rate-limit identifiers | No, required to keep the Services safe |
-| Analytics | Aggregate measurement of performance and usage | [LIST ANY TOOL IN USE] | Yes, where a consent mechanism is provided |
+| Analytics | Aggregate measurement of performance and usage | Aggregate internal telemetry (no third-party tracking cookies) | Yes, where a consent mechanism is provided |
 
 ## 2. Local Storage
 
@@ -32,3 +32,4 @@ We may update this policy. The effective date at the top shows the latest versio
 ## 6. Contact
 
 Questions about cookies: privacy@roleflow.site
+

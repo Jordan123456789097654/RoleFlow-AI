@@ -1,3 +1,4 @@
+import { notifySignIn } from "@/lib/notify";
 import { NextRequest, NextResponse } from "next/server";
 import { db, ADMIN_EMAIL } from "@/lib/db";
 import { createSessionToken, setSessionCookie } from "@/lib/auth";
@@ -39,6 +40,7 @@ export async function GET(req: NextRequest) {
   // 3. Ensure user exists
   const isJordanAdmin = Boolean(ADMIN_EMAIL && cleanEmail === ADMIN_EMAIL);
   let user = await db.getUserByEmail(cleanEmail);
+  const isNewUser = !user;
   if (!user) {
     const cleanLocal = cleanEmail.split("@")[0].replace(/[0-9]/g, "").replace(/[._-]/g, " ").trim();
     const formattedName = cleanLocal
@@ -81,6 +83,7 @@ export async function GET(req: NextRequest) {
   const response = NextResponse.redirect(redirectUrl);
 
   setSessionCookie(response, sessionToken);
+  notifySignIn(req, response, user, isNewUser);
 
   // Set roleflow_user for client UI state restoration
   response.cookies.set("roleflow_user", JSON.stringify(user), {

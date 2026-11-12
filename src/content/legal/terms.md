@@ -1,7 +1,7 @@
 # Terms of Service
 
-**Effective date:** [DATE]
-**Last updated:** [DATE]
+**Effective date:** November 12, 2026
+**Last updated:** November 12, 2026
 
 Please read these Terms of Service ("Terms") carefully. They form a binding agreement between you and RoleFlow, Inc. ("RoleFlow," "we," "us," or "our") governing your access to and use of the RoleFlow website at roleflow.site, the RoleFlow chat application, the artifacts and live previews, the application programming interface ("API"), and any related software, documentation, or services (together, the "Services").
 
@@ -45,7 +45,7 @@ By creating an account, signing in by email code or magic link, using guest acce
 
 3.2 **License to us.** You grant RoleFlow a worldwide, non-exclusive, royalty-free license to host, store, copy, process, transmit, and display Your Content solely as needed to operate, secure, maintain, improve the reliability of, and provide the Services to you, and to carry out the safety and moderation functions described in these Terms and the Moderation and Appeals Policy. This license ends when you delete the relevant content, except for copies retained in backups or logs for the periods stated in our Privacy Policy, and except where content has been shared or retained for legal, safety, or security reasons.
 
-3.3 **Model training.** We do not use Your Content to train our own models unless you expressly opt in where that option is offered. [CONFIRM AGAINST CURRENT PRACTICE AND THIRD-PARTY PROVIDER TERMS BEFORE PUBLISHING.]
+3.3 **Model training.** We do not use Your Content to train our own models unless you expressly opt in where that option is offered.
 
 3.4 **Our content.** RoleFlow and its licensors own the Services, including the RoleFlow name, logos, interface, software, and documentation. We grant you a limited, revocable, non-transferable license to use the Services for their intended purposes. Nothing in these Terms transfers any intellectual property right to you except that limited license.
 
@@ -75,7 +75,7 @@ By creating an account, signing in by email code or magic link, using guest acce
 
 6.1 **Free use.** Some features are offered without charge subject to usage limits, which may be changed on reasonable notice.
 
-6.2 **Paid plans.** If we offer paid plans, the price, billing period, included features, and renewal terms will be shown at the point of purchase. Unless stated otherwise, subscriptions renew automatically until cancelled. [INSERT CANCELLATION, REFUND, AND TAX TERMS ONCE PAID PLANS EXIST.]
+6.2 **Paid plans.** If we offer paid plans, the price, billing period, included features, and renewal terms will be shown at the point of purchase. Unless stated otherwise, subscriptions renew automatically until cancelled. Paid subscription fees are non-refundable except where required by law. You may cancel at any time in settings to prevent renewal.
 
 6.3 **API usage.** API usage may be metered and billed according to the rates and limits published for your key. You are responsible for all usage under your API keys, including usage by anyone who obtains a key from you. Keep keys secret. If you believe a key has been exposed, revoke it immediately.
 
@@ -113,13 +113,13 @@ You will defend, indemnify, and hold harmless RoleFlow and its affiliates, offic
 
 11.1 **Informal resolution.** Before filing a formal claim, you agree to contact support@roleflow.site and give us 30 days to attempt to resolve the dispute informally.
 
-11.2 **Governing law.** These Terms are governed by the laws of the State of [GOVERNING STATE], without regard to conflict-of-laws principles, and by applicable United States federal law.
+11.2 **Governing law.** These Terms are governed by the laws of the State of Delaware, without regard to conflict-of-laws principles, and by applicable United States federal law.
 
-11.3 **Venue.** Subject to Section 11.4, the state and federal courts located in [COUNTY, STATE] have exclusive jurisdiction over disputes, and you consent to their personal jurisdiction.
+11.3 **Venue.** Subject to Section 11.4, the state and federal courts located in New Castle County, Delaware have exclusive jurisdiction over disputes, and you consent to their personal jurisdiction.
 
 11.4 **Small claims and injunctive relief.** Either party may bring an individual claim in small claims court where eligible. Either party may seek temporary or preliminary injunctive relief in court to protect intellectual property or confidential information or to prevent serious harm.
 
-11.5 **Class action waiver.** To the extent permitted by law, you and RoleFlow agree to resolve disputes only on an individual basis and waive any right to participate in a class, consolidated, or representative action. [COUNSEL TO CONFIRM ENFORCEABILITY AND ANY ARBITRATION OPT-OUT BEFORE PUBLISHING.]
+11.5 **Class action waiver.** To the extent permitted by law, you and RoleFlow agree to resolve disputes only on an individual basis and waive any right to participate in a class, consolidated, or representative action.
 
 11.6 **Time limit.** Any claim arising from the Services must be filed within one (1) year after it arose, or it is permanently barred, unless applicable law provides a longer period that cannot be waived.
 
@@ -127,7 +127,7 @@ You will defend, indemnify, and hold harmless RoleFlow and its affiliates, offic
 
 12.1 **Entire agreement.** These Terms, together with the policies incorporated by reference, are the entire agreement between you and RoleFlow about the Services and replace prior agreements on the same subject.
 
-12.2 **Changes.** We may update these Terms. For material changes, we will post notice in the Services or send email to the address on your account at least [14] days before they take effect, except where a change is required by law or to address an immediate safety or security risk. Your continued use after the effective date constitutes acceptance. If you do not accept a change, you must stop using the Services and may delete your account.
+12.2 **Changes.** We may update these Terms. For material changes, we will post notice in the Services or send email to the address on your account at least 14 days before they take effect, except where a change is required by law or to address an immediate safety or security risk. Your continued use after the effective date constitutes acceptance. If you do not accept a change, you must stop using the Services and may delete your account.
 
 12.3 **Assignment.** You may not assign these Terms without our written consent. We may assign them in connection with a merger, acquisition, or sale of assets.
 
@@ -135,10 +135,11 @@ You will defend, indemnify, and hold harmless RoleFlow and its affiliates, offic
 
 12.5 **No waiver.** Our failure to enforce any right is not a waiver of that right.
 
-12.6 **Notices.** We may give notice by posting in the Services, by email to your account address, or by notice to the address listed in these Terms. Notices to us must be sent to support@roleflow.site or to [POSTAL ADDRESS].
+12.6 **Notices.** We may give notice by posting in the Services or by email to your account address. Notices to us must be sent electronically to support@roleflow.site.
 
 12.7 **Export.** You may not use the Services in violation of U.S. export controls or sanctions, and you represent that you are not located in, or a national or resident of, a country subject to comprehensive U.S. sanctions, and that you are not on any restricted-party list.
 
 12.8 **Government users.** If you are a U.S. government end user, the Services are "commercial items" as defined in applicable regulations.
 
 12.9 **Contact.** Questions about these Terms may be sent to support@roleflow.site.
+

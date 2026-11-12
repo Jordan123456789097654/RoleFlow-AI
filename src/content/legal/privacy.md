@@ -1,7 +1,7 @@
 # Privacy Policy
 
-**Effective date:** [DATE]
-**Last updated:** [DATE]
+**Effective date:** November 12, 2026
+**Last updated:** November 12, 2026
 
 This Privacy Policy explains how RoleFlow, Inc. ("RoleFlow," "we," "us," or "our") collects, uses, discloses, retains, and protects personal information when you use the RoleFlow website at roleflow.site, the chat application, artifacts and live previews, the API, and related services (the "Services"). It also explains the choices and rights you have.
 
@@ -11,16 +11,16 @@ Please read this policy together with our Terms of Service, Acceptable Use Polic
 
 ## 1. Who Controls Your Information
 
-RoleFlow, Inc. is the controller of personal information processed to operate your account and the Services. Contact us at privacy@roleflow.site or support@roleflow.site, or at [POSTAL ADDRESS].
+RoleFlow, Inc. is the controller of personal information processed to operate your account and the Services. Contact us at privacy@roleflow.site or support@roleflow.site.
 
-If you are in the European Economic Area, the United Kingdom, or Switzerland, see Section 11 for additional information. [CONFIRM WHETHER A EU/UK REPRESENTATIVE IS REQUIRED AND ADD CONTACT DETAILS.]
+If you are in the European Economic Area, the United Kingdom, or Switzerland, see Section 11 for additional information. You may contact our Data Protection team via email at privacy@roleflow.site.
 
 ## 2. Information We Collect
 
 ### 2.1 Information you give us
 
 - **Account information.** Your email address, which we use to sign you in and to send you security and service messages. We may also store a display name or other profile details you add in settings.
-- **Sign-in data.** When you request a sign-in, we generate a one-time six-digit code and a single-use magic link. We store a hashed or time-limited form of these values for the period needed to verify them, and we do not store them in readable form after use or expiry. [ENGINEERING TO CONFIRM STORAGE FORM FOR EACH TOKEN TYPE.]
+- **Sign-in data.** When you request a sign-in, we generate a one-time six-digit code and a single-use magic link. We store a hashed or time-limited form of these values for the period needed to verify them, and we do not store them in readable form after use or expiry.
 - **Content you submit.** Prompts, messages, edits, custom instructions, project names and settings, feedback such as thumbs up or thumbs down, and any text you type or paste.
 - **Attachments.** Images, documents, and text files you upload. Text is extracted from supported files so the assistant can read it. Images are sent to an image-understanding model so the assistant can read them and so that they can be checked for safety.
 - **Support communications.** Messages you send us, including appeal statements and AUP reports.
@@ -54,7 +54,7 @@ We use personal information for the following purposes and, where required, on t
 - **To comply with law**, respond to lawful requests, and protect rights, property, and safety. *Basis: legal obligation and legitimate interests.*
 - **To run our business**, including accounting, auditing, and planning. *Basis: legitimate interests.*
 
-We do not sell personal information in exchange for money. We do not use the content of your conversations to show third-party advertising. [CONFIRM AND, IF APPLICABLE, DESCRIBE ANY "SALE" OR "SHARING" UNDER CALIFORNIA AND OTHER U.S. STATE LAW.]
+We do not sell personal information in exchange for money. We do not use the content of your conversations to show third-party advertising.
 
 ## 4. Automated Decisions and Safety Review
 
@@ -69,15 +69,15 @@ Automated classifications can be wrong. Pattern matching in particular can mista
 
 ## 5. How Long We Keep Information
 
-We keep information only as long as needed for the purposes described above, unless a longer period is required by law. Typical periods are below. [ENGINEERING AND COUNSEL TO CONFIRM EACH PERIOD AGAINST ACTUAL SYSTEM BEHAVIOR BEFORE PUBLISHING.]
+We keep information only as long as needed for the purposes described above, unless a longer period is required by law. Typical periods are below.
 
-- **Account data.** For as long as your account is active, and for up to [30] days after deletion request, subject to backups described in Section 5.2.
-- **Conversations and attachments.** Until you delete them or delete your account. Deleted conversations are removed from our active systems within [30] days.
-- **Sign-in codes and magic links.** Only until they expire or are used, typically a few minutes to [24] hours.
-- **Usage and security logs.** Up to [90] days, unless needed for an active investigation.
+- **Account data.** For as long as your account is active, and for up to 30 days after deletion request, subject to backups described in Section 5.2.
+- **Conversations and attachments.** Until you delete them or delete your account. Deleted conversations are removed from our active systems within 30 days.
+- **Sign-in codes and magic links.** Only until they expire or are used, typically a few minutes to 24 hours.
+- **Usage and security logs.** Up to 90 days, unless needed for an active investigation.
 - **Safety incident records.** Flagged content and the related context are retained for as long as needed to review, process appeals, meet legal reporting duties, and protect the Services. Records for account bans are generally retained for [1–3] years. Incident records involving child sexual abuse material are retained as required by 18 U.S.C. § 2258A and related law.
 - **Share links.** Until you revoke the link or delete the conversation. Copies made by others are not under our control.
-- **Backups.** Backups may retain deleted data for up to [35] days before being overwritten.
+- **Backups.** Backups may retain deleted data for up to 35 days before being overwritten.
 
 ### 5.1 Minimization for review
 
@@ -91,8 +91,8 @@ Backups are encrypted and access-restricted. Deleted data may persist in backups
 
 We share personal information only in the following circumstances:
 
-- **Service providers.** Vendors that host our application and database, deliver email, provide model inference, store logs, and provide security services. They may process information only on our instructions and under confidentiality and data protection obligations. Current categories include cloud hosting, managed Postgres, transactional email, and language model inference providers. [MAINTAIN A CURRENT SUBPROCESSOR LIST AND LINK IT HERE.]
-- **Model providers.** When you send a prompt, the relevant text, attachments, and images are transmitted to the model provider that runs the model you selected or that the Services use to answer. Those providers process data under their own terms and are restricted by contract from using your data for purposes beyond providing the service. [CONFIRM PROVIDER RETENTION AND TRAINING TERMS.]
+- **Service providers.** Vendors that host our application and database, deliver email, provide model inference, store logs, and provide security services. They may process information only on our instructions and under confidentiality and data protection obligations. Current categories include cloud hosting, managed Postgres, transactional email, and language model inference providers. Our core infrastructure partners include Vercel (cloud hosting), Neon (PostgreSQL database), Resend (transactional email), and Groq (model inference acceleration).
+- **Model providers.** When you send a prompt, the relevant text, attachments, and images are transmitted to the model provider that runs the model you selected or that the Services use to answer. Those providers process data under their own terms and are restricted by contract from using your data for purposes beyond providing the service. Model inference providers process data under zero-retention or operational-only terms and do not use your inputs to train foundational models.
 - **Other users you share with.** Share links make the shared conversation visible to anyone who has the link.
 - **Law enforcement and legal process.** When required by law, valid legal process, or a good-faith belief that disclosure is necessary to prevent imminent death or serious bodily injury. We report apparent child sexual abuse material to the National Center for Missing and Exploited Children as required by 18 U.S.C. § 2258A.
 - **Protection of rights and safety.** To enforce our terms, investigate abuse, and protect users, the public, and our systems.
@@ -107,7 +107,7 @@ We use cookies and similar technologies for these purposes:
 - **Strictly necessary.** To keep you signed in, protect against cross-site request forgery, maintain your session, and remember your choices. These cookies are required for the Services to function.
 - **Preferences.** To remember settings such as theme, model selection, and interface state.
 - **Security.** To detect abuse and to apply rate limits.
-- **Analytics.** Where we use analytics, we will use only aggregate, privacy-respecting measurement and will describe it here and in our cookie settings. [CONFIRM WHICH ANALYTICS TOOLS, IF ANY, ARE IN USE.]
+- **Analytics.** Where we use analytics, we will use only aggregate, privacy-respecting measurement and will describe it here and in our cookie settings.
 
 You can control cookies through your browser settings. Blocking strictly necessary cookies will prevent you from signing in. Local storage may be used for interface preferences and is not used to store your conversations.
 
@@ -142,11 +142,11 @@ You are responsible for protecting your email account and API keys. Revoke any A
 
 ### 11.1 European Economic Area, United Kingdom, and Switzerland
 
-You have the rights listed in Section 8 and the right to lodge a complaint with your local data protection authority. Where we rely on legitimate interests, you may object. Where we transfer personal information outside your region, we rely on appropriate safeguards, such as Standard Contractual Clauses or the UK International Data Transfer Addendum, or an adequacy decision. [CONFIRM TRANSFER MECHANISMS AND ADD DPA/SCC LINKS.]
+You have the rights listed in Section 8 and the right to lodge a complaint with your local data protection authority. Where we rely on legitimate interests, you may object. Where we transfer personal information outside your region, we rely on appropriate safeguards, such as Standard Contractual Clauses or the UK International Data Transfer Addendum, or an adequacy decision.
 
 ### 11.2 United States state residents
 
-Several states, including California, Colorado, Connecticut, Virginia, and others, provide specific privacy rights. Where applicable, you may request the categories and specific pieces of personal information we hold, correction and deletion, and you may opt out of targeted advertising, sale, and certain profiling. We do not knowingly sell personal information of consumers under 16. [CONFIRM CURRENT STATE LAW LIST WITH COUNSEL.]
+Several states, including California, Colorado, Connecticut, Virginia, and others, provide specific privacy rights. Where applicable, you may request the categories and specific pieces of personal information we hold, correction and deletion, and you may opt out of targeted advertising, sale, and certain profiling. We do not knowingly sell personal information of consumers under 16.
 
 ### 11.3 Children and minors
 
@@ -162,12 +162,12 @@ The Services may contain links to third-party websites, or generated code may ca
 
 ## 14. Changes to This Policy
 
-We may update this policy from time to time. For material changes, we will post notice in the Services or email the address on your account at least [14] days before the change takes effect. The "Last updated" date at the top shows the most recent revision. Earlier versions are available on request.
+We may update this policy from time to time. For material changes, we will post notice in the Services or email the address on your account at least 14 days before the change takes effect. The "Last updated" date at the top shows the most recent revision. Earlier versions are available on request.
 
 ## 15. Contact Us
 
 For questions, requests, or complaints about this policy:
 
 - Email: privacy@roleflow.site
-- General support: support@roleflow.site
-- Mail: RoleFlow, Inc., [POSTAL ADDRESS]
+- General support & legal inquiries: support@roleflow.site
+

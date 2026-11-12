@@ -1,7 +1,7 @@
 import { Resend } from "resend";
 
 const resendApiKey = process.env.RESEND_API_KEY || "";
-const fromEmail = process.env.RESEND_FROM_EMAIL || "RoleFlow <noreply@roleflow.site>";
+export const fromEmail = process.env.RESEND_FROM_EMAIL || "RoleFlow <noreply@roleflow.site>";
 
 export const resend = new Resend(resendApiKey);
 

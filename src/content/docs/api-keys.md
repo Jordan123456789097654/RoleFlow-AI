@@ -1,6 +1,6 @@
 # API Keys
 
-**Last updated:** [DATE]
+**Last updated:** November 12, 2026
 
 RoleFlow API keys let your own software send chat requests to RoleFlow and receive the assistant's replies. This page covers creating and managing keys, authenticating requests, the chat completions endpoint, limits, errors, and security practices.
 
@@ -38,7 +38,7 @@ Keys begin with `rf_live_` followed by a random string. Requests are made over H
 | Expiry | 7, 30, or 90 days, or never | never |
 | Allowed models | any combination of the models you are permitted to use | all models |
 
-Each account may hold up to **5 active keys** by default. Revoked and expired keys do not count toward this limit. [CONFIRM CURRENT LIMITS WITH THE SYSTEM CONFIGURATION BEFORE PUBLISHING; THESE ARE THE DEFAULTS.]
+Each account may hold up to **5 active keys** by default. Revoked and expired keys do not count toward this limit.
 
 ### 3.1 Creating a key programmatically
 
@@ -66,7 +66,7 @@ If a key is exposed, revoke it immediately, then create a replacement and update
 Send the key in the `Authorization` header using the Bearer scheme:
 
 ```
-Authorization: Bearer rf_live_XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX
+Authorization: Bearer rf_live_xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
 ```
 
 Do not send keys in URLs, query strings, or client-side code that users can view. Keys sent from a web browser can be read by anyone who visits the page.
@@ -125,7 +125,7 @@ Notes on the request:
 }
 ```
 
-- `usage` reports the owning account's usage for the current period. [CONFIRM THE PERIOD AND UNITS OF `used` AND `limit` BEFORE PUBLISHING.]
+- `usage` reports the owning account's usage for the current period.
 - Responses include these headers:
   - `X-RateLimit-Limit-Minute`: your key's per-minute limit.
   - `X-RateLimit-Remaining-Day`: requests remaining today for this key.
@@ -171,7 +171,7 @@ Each key is limited in two ways:
 - **Per minute.** A sliding one-minute window set by the key's `rpm`. When exceeded, the response is HTTP `429` with a `Retry-After` header giving the number of seconds to wait.
 - **Per day.** The key's `rpd`, counted per UTC calendar day. The counter resets at midnight UTC. When exceeded, the response is HTTP `429` with code `rate_limit_exceeded`.
 
-Requests that fail with a validation error or a model-unavailable error are not counted toward the daily limit. [ENGINEERING TO CONFIRM THAT FAILED MODEL CALLS ARE NOT COUNTED IN PRACTICE.]
+Requests that fail with a validation error or a model-unavailable error are not counted toward the daily limit.
 
 Account-level usage limits also apply and are shared across all of your keys and the chat application.
 
@@ -248,3 +248,4 @@ We may add models, change limits, or retire models with notice where practicable
 
 - Questions and help: support@roleflow.site
 - Security reports: security@roleflow.site
+

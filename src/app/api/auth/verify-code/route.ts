@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { db, ADMIN_EMAIL } from "@/lib/db";
 import { createSessionToken, setSessionCookie } from "@/lib/auth";
 import crypto from "crypto";
+import { notifySignIn } from "@/lib/notify";
 
 export async function POST(req: NextRequest) {
   try {
@@ -60,6 +61,7 @@ export async function POST(req: NextRequest) {
     // 5. Get or create user
     const isJordanAdmin = Boolean(ADMIN_EMAIL && cleanEmail === ADMIN_EMAIL);
     let user = await db.getUserByEmail(cleanEmail);
+    const isNewUser = !user;
     if (!user) {
       const cleanLocal = cleanEmail.split("@")[0].replace(/[0-9]/g, "").replace(/[._-]/g, " ").trim();
       const formattedName = cleanLocal
@@ -100,6 +102,7 @@ export async function POST(req: NextRequest) {
 
     // 7. Set httpOnly, secure, sameSite="lax" cookie named roleflow_session
     setSessionCookie(response, sessionToken);
+    notifySignIn(req, response, user, isNewUser);
 
     // Also set unprivileged roleflow_user cookie for smooth frontend state restoration
     response.cookies.set("roleflow_user", JSON.stringify(user), {

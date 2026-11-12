@@ -10,6 +10,7 @@ import { checkRateLimit, RATE_LIMITS } from "@/lib/rate-limit";
 import { isImageAttachment } from "@/lib/ai-engine";
 import { convertPdfAttachments } from "@/lib/pdf";
 import { buildAttachmentScanText, buildIncidentContext, classifyImagesForSafety } from "@/lib/attachments";
+import { imageHeldNotice, moderationRefusalNotice, notifyUser, suspensionNotice, usageWarningNotice } from "@/lib/notify";
 
 const ALLOWED_MODELS: ModelId[] = ["roleflow-genesis-1", "roleflow-flash-1"];
 const ALLOWED_EFFORTS: EffortLevel[] = ["low", "medium", "high", "extra", "max"];
@@ -225,6 +226,8 @@ export async function POST(req: NextRequest) {
 
         await db.saveModerationLog(logEntry);
 
+        notifyUser(userEmail, suspensionNotice({ logId }));
+
         // Instant security alert email via Resend
         sendSecurityAlertEmail({
           userEmail: userEmail || "Guest User",
@@ -336,6 +339,13 @@ export async function POST(req: NextRequest) {
         };
 
         await db.saveModerationLog(logEntry);
+
+        notifyUser(
+          userEmail,
+          moderationVerdict.category === "IMAGE_REVIEW"
+            ? imageHeldNotice({ logId })
+            : moderationRefusalNotice({ category: moderationVerdict.category || undefined, logId, strikes: newStrikes })
+        );
 
         const categoryReadable =
           moderationVerdict.category?.toLowerCase().replace(/_/g, " ") || "security policy";
@@ -552,6 +562,14 @@ export async function POST(req: NextRequest) {
     let updatedUsage = usageCheck;
     if (result.content && !result.isFallback) {
       updatedUsage = await db.incrementUsage(identifier, isGuest);
+
+      // Warn signed-in users at 5 and 1 remaining messages.
+      if (!isGuest && !updatedUsage.isUnlimited && (updatedUsage.remaining === 5 || updatedUsage.remaining === 1)) {
+        notifyUser(
+          userEmail,
+          usageWarningNotice({ remaining: updatedUsage.remaining, limit: updatedUsage.limit, resetsAt: updatedUsage.resetsAt })
+        );
+      }
     }
 
     return NextResponse.json({

@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/lib/db";
 import { getSessionFromRequest } from "@/lib/auth";
+import { appealReceivedNotice, notifyUser } from "@/lib/notify";
 
 export async function POST(req: NextRequest) {
   try {
@@ -47,6 +48,8 @@ export async function POST(req: NextRequest) {
       "APPEALED",
       appealNote.trim()
     );
+
+    notifyUser(existingLog.userEmail, appealReceivedNotice({ logId }));
 
     return NextResponse.json({
       success: true,

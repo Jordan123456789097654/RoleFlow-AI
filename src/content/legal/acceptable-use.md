@@ -1,7 +1,7 @@
 # Acceptable Use Policy
 
-**Effective date:** [DATE]
-**Last updated:** [DATE]
+**Effective date:** November 12, 2026
+**Last updated:** November 12, 2026
 
 This Acceptable Use Policy ("AUP") sets out what you may and may not do with RoleFlow, including the chat application, artifacts and live previews, the API, and related services (the "Services"). It is part of our Terms of Service. Violations may result in content being blocked, held, or removed; feature limits; suspension or termination; and, where required by law, reports to authorities.
 
@@ -169,3 +169,4 @@ We may update this policy. We will post the updated version with a new effective
 ## 12. Questions
 
 Questions about this policy may be sent to support@roleflow.site.
+

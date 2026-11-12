@@ -3,6 +3,7 @@ import { db } from "@/lib/db";
 import { getSessionFromRequest } from "@/lib/auth";
 import { generateApiKey, newApiKeyId } from "@/lib/api-keys";
 import { ApiKey, ApiKeyRateLimit, ModelId } from "@/types";
+import { apiKeyCreatedNotice, notifyUser } from "@/lib/notify";
 
 export const dynamic = "force-dynamic";
 
@@ -129,6 +130,16 @@ export async function POST(req: NextRequest) {
     };
 
     const saved = await db.createApiKey(record);
+    notifyUser(
+      session.email,
+      apiKeyCreatedNotice({
+        name: saved.name,
+        prefix: saved.keyPrefix,
+        rpm: saved.rateLimit.rpm,
+        rpd: saved.rateLimit.rpd,
+        expiresAt: saved.expiresAt,
+      })
+    );
 
     // The plaintext key is returned exactly once. It is never stored or shown again.
     return NextResponse.json(

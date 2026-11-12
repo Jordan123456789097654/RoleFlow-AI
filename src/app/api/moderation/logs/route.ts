@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { db, ADMIN_EMAIL } from "@/lib/db";
 import { getSessionFromRequest } from "@/lib/auth";
 import { ModerationStatus } from "@/types";
+import { appealDecisionNotice, notifyUser } from "@/lib/notify";
 
 export const dynamic = "force-dynamic";
 
@@ -84,6 +85,10 @@ export async function POST(req: NextRequest) {
     }
 
     const updated = await db.updateModerationLogStatus(logId, targetStatus);
+
+    if (targetStatus === "RESOLVED" || targetStatus === "BANNED") {
+      notifyUser(logEntry.userEmail, appealDecisionNotice({ logId, outcome: targetStatus }));
+    }
 
     return NextResponse.json({
       success: true,
