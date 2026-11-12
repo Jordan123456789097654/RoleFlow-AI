@@ -442,6 +442,24 @@ export const MessageItem: React.FC<MessageItemProps> = ({
           )}
         </div>
 
+        {/* Generated files */}
+        {message.generatedFiles && message.generatedFiles.length > 0 && (
+          <div className="flex flex-wrap gap-2">
+            {message.generatedFiles.map((f, i) => (
+              <a
+                key={i}
+                href={f.dataUrl}
+                download={f.name}
+                className="flex items-center gap-2 px-3 py-2 rounded-xl bg-[#1d1c1b] border border-[#2f2e2c] hover:border-[#d97706]/70 transition-colors text-xs text-[#f4f4f0]"
+              >
+                <FileText className="w-3.5 h-3.5 text-[#d97706]" />
+                <span className="font-mono">{f.name}</span>
+                <span className="text-[#8f8e8a]">{Math.max(1, Math.round(f.size / 1024))} KB · Download</span>
+              </a>
+            ))}
+          </div>
+        )}
+
         {/* Artifact Slideout Card */}
         {message.artifact && (
           <div

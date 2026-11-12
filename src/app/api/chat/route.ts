@@ -8,6 +8,7 @@ import { getMemories, addMemory, removeMemory } from "@/lib/memory";
 import { getSessionFromRequest } from "@/lib/auth";
 import { checkRateLimit, RATE_LIMITS } from "@/lib/rate-limit";
 import { isImageAttachment } from "@/lib/ai-engine";
+import { convertPdfAttachments } from "@/lib/pdf";
 import { buildAttachmentScanText, buildIncidentContext, classifyImagesForSafety } from "@/lib/attachments";
 
 const ALLOWED_MODELS: ModelId[] = ["roleflow-genesis-1", "roleflow-flash-1"];
@@ -116,6 +117,12 @@ export async function POST(req: NextRequest) {
 
     if (safeMessages.length === 0) {
       return NextResponse.json({ error: "Valid user or assistant messages required" }, { status: 400 });
+    }
+
+    // PDFs become extracted text here, so every later step handles them like any text file.
+    const pdfError = await convertPdfAttachments(safeMessages);
+    if (pdfError) {
+      return NextResponse.json({ error: pdfError }, { status: 400 });
     }
 
     // Cap conversation history to 30 messages to prevent token budget abuse
@@ -441,6 +448,7 @@ export async function POST(req: NextRequest) {
       content: result.content,
       thinkingTime: result.thinkingTime || 1.2,
       artifact: result.artifact,
+      generatedFiles: result.generatedFiles,
       createdAt: new Date().toISOString(),
     };
 

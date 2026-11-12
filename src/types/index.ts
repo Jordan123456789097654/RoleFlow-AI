@@ -54,6 +54,7 @@ export interface Message {
   thinking?: string;
   thinkingTime?: number;
   attachments?: Attachment[];
+  generatedFiles?: GeneratedFile[];
   artifact?: Artifact;
   createdAt: string;
   moderationBlocked?: boolean;
@@ -190,4 +191,11 @@ export interface IncidentTurn {
 export interface IncidentContext {
   capturedAt: string;
   turns: IncidentTurn[];
+}
+
+export interface GeneratedFile {
+  name: string;
+  type: string;
+  size: number;
+  dataUrl: string;
 }

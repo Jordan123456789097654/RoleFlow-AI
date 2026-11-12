@@ -46,6 +46,9 @@ RESEND_API_KEY=your_resend_api_key
 RESEND_FROM_EMAIL=RoleFlow <noreply@roleflow.site>
 NEXT_PUBLIC_APP_URL=https://roleflow.site
 GROQ_API_KEYS=key1,key2,key3,key4,key5
+# Optional. Enables reading uploaded images. Check Groq's current model list first.
+# GROQ_VISION_MODEL=qwen/qwen3.8-27b   # PREVIEW tier: Groq may discontinue it at short notice.
+#   When it's gone, images fail closed (held for review) until you set a new model.
 
 # When deployed to Vercel, link Vercel Postgres to automatically populate:
 # POSTGRES_URL=

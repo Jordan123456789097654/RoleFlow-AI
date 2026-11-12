@@ -43,6 +43,19 @@ const KNOWN_IMAGE_CATEGORIES: Record<string, ModerationCategory> = {
  * image uploads. Failures are logged; the keyword scanner still runs on text.
  */
 export async function classifyImagesForSafety(images: Attachment[]): Promise<ModerationVerdict> {
+  // No vision model means images can't be checked. Fail closed: route them to review
+  // instead of letting unchecked images through.
+  if (!VISION_MODEL) {
+    return {
+      flagged: true,
+      tier: 2,
+      category: "IMAGE_REVIEW",
+      reason: "Image uploads can't be checked automatically on this server (no vision model configured).",
+      confidence: 1,
+      action: "REFUSE_WITH_WARNING",
+    };
+  }
+
   const allow: ModerationVerdict = {
     flagged: false,
     tier: null,
