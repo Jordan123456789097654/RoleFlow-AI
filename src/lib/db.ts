@@ -5,6 +5,7 @@ import { sql } from "@vercel/postgres";
 import { Chat, Project, UserProfile, ModerationLogEntry, ModerationStatus, SystemConfig, MemoryItem, ApiKey, ModelId, EffortLevel, EmailBroadcastLog, LicenseKeyRecord, ReferralRecord, LawRequestRecord, LawRequestStatus, AdminNote, Punishment, SystemIncident } from "@/types";
 import { MODEL_IDS, resolveModelList } from "@/lib/models";
 import { getKeyPoolStatus } from "@/lib/groq-keys";
+import { SEED_BLOG_POSTS } from "@/lib/blog";
 
 const DATA_DIR = process.env.VERCEL ? path.join(os.tmpdir(), "roleflow-data") : path.join(process.cwd(), ".data");
 const STORE_FILE = path.join(DATA_DIR, "store.json");
@@ -41,6 +42,24 @@ export interface CustomEmailTemplateRecord {
   updatedAt: string;
 }
 
+/** A published or draft blog post. */
+export interface BlogPostRecord {
+  id: string; // URL slug, e.g. "introducing-roleflow-v5"
+  title: string;
+  summary: string;
+  content: string; // Markdown
+  category: string;
+  icon: string;
+  author: string;
+  authorRole?: string;
+  readTime: string;
+  publishedAt: string;
+  isPublished: boolean;
+  tags: string[];
+  createdAt?: string;
+  updatedAt: string;
+}
+
 interface LocalStore {
   users: Record<string, UserProfile>;
   chats: Record<string, Chat>;
@@ -60,6 +79,7 @@ interface LocalStore {
   emailBroadcasts?: EmailBroadcastLog[];
   licenseKeys?: Record<string, LicenseKeyRecord>;
   emailTemplates?: Record<string, CustomEmailTemplateRecord>;
+  blogPosts?: Record<string, BlogPostRecord>;
   referrals?: Record<string, ReferralRecord>;
   lawRequests?: Record<string, LawRequestRecord>;
   systemIncidents?: Record<string, SystemIncident>;
@@ -458,6 +478,25 @@ async function ensureDb() {
         cta_text TEXT,
         cta_url TEXT,
         created_by VARCHAR(255) NOT NULL,
+        created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+        updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+      );
+    `;
+
+    await sql`
+      CREATE TABLE IF NOT EXISTS roleflow_blog_posts (
+        id VARCHAR(160) PRIMARY KEY,
+        title TEXT NOT NULL,
+        summary TEXT NOT NULL,
+        content TEXT NOT NULL,
+        category VARCHAR(60) NOT NULL,
+        icon VARCHAR(40) NOT NULL,
+        author VARCHAR(255) NOT NULL,
+        author_role TEXT,
+        read_time VARCHAR(50) NOT NULL,
+        published_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+        is_published BOOLEAN DEFAULT true,
+        tags JSONB DEFAULT '[]'::jsonb,
         created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
         updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
       );
@@ -920,6 +959,173 @@ export const db = {
     const store = getLocalStore();
     if (!store.emailTemplates?.[id]) return false;
     delete store.emailTemplates[id];
+    saveLocalStore(store);
+    return true;
+  },
+
+  // Blog posts
+  async listBlogPosts(onlyPublished = false): Promise<BlogPostRecord[]> {
+    await ensureDb();
+    if (isPostgresConfigured) {
+      let { rows } = onlyPublished
+        ? await sql`SELECT * FROM roleflow_blog_posts WHERE is_published = true ORDER BY published_at DESC;`
+        : await sql`SELECT * FROM roleflow_blog_posts ORDER BY published_at DESC;`;
+
+      if (rows.length === 0 && !onlyPublished) {
+        // Seed default articles
+        for (const s of SEED_BLOG_POSTS) {
+          const tagsJson = JSON.stringify(s.tags || []);
+          await sql`
+            INSERT INTO roleflow_blog_posts
+              (id, title, summary, content, category, icon, author, author_role, read_time, published_at, is_published, tags, created_at, updated_at)
+            VALUES
+              (${s.id}, ${s.title}, ${s.summary}, ${s.content}, ${s.category}, ${s.icon},
+               ${s.author}, ${s.authorRole ?? null}, ${s.readTime}, ${s.publishedAt}, ${s.isPublished},
+               ${tagsJson}, ${s.publishedAt}, ${s.publishedAt})
+            ON CONFLICT (id) DO NOTHING;
+          `;
+        }
+        const refetch = await sql`SELECT * FROM roleflow_blog_posts ORDER BY published_at DESC;`;
+        rows = refetch.rows;
+      }
+
+      return rows.map((r) => {
+        let tags: string[] = [];
+        if (Array.isArray(r.tags)) tags = r.tags.map(String);
+        else if (typeof r.tags === "string") {
+          try {
+            const parsed = JSON.parse(r.tags);
+            if (Array.isArray(parsed)) tags = parsed.map(String);
+          } catch {}
+        }
+        return {
+          id: String(r.id),
+          title: String(r.title),
+          summary: String(r.summary),
+          content: String(r.content),
+          category: String(r.category),
+          icon: String(r.icon),
+          author: String(r.author),
+          authorRole: r.author_role ?? undefined,
+          readTime: String(r.read_time),
+          publishedAt: new Date(r.published_at).toISOString(),
+          isPublished: Boolean(r.is_published),
+          tags,
+          createdAt: r.created_at ? new Date(r.created_at).toISOString() : undefined,
+          updatedAt: new Date(r.updated_at).toISOString(),
+        };
+      });
+    }
+
+    const store = getLocalStore();
+    if (!store.blogPosts || Object.keys(store.blogPosts).length === 0) {
+      store.blogPosts = {};
+      for (const s of SEED_BLOG_POSTS) {
+        store.blogPosts[s.id] = {
+          ...s,
+          createdAt: s.publishedAt,
+          updatedAt: s.publishedAt,
+        };
+      }
+      saveLocalStore(store);
+    }
+
+    let posts = Object.values(store.blogPosts || {});
+    if (onlyPublished) {
+      posts = posts.filter((p) => p.isPublished);
+    }
+    return posts.sort((a, b) => (b.publishedAt || b.updatedAt).localeCompare(a.publishedAt || a.updatedAt));
+  },
+
+  async getBlogPost(id: string): Promise<BlogPostRecord | null> {
+    await ensureDb();
+    if (isPostgresConfigured) {
+      const { rows } = await sql`SELECT * FROM roleflow_blog_posts WHERE id = ${id} LIMIT 1;`;
+      if (rows.length > 0) {
+        const r = rows[0];
+        let tags: string[] = [];
+        if (Array.isArray(r.tags)) tags = r.tags.map(String);
+        else if (typeof r.tags === "string") {
+          try {
+            const parsed = JSON.parse(r.tags);
+            if (Array.isArray(parsed)) tags = parsed.map(String);
+          } catch {}
+        }
+        return {
+          id: String(r.id),
+          title: String(r.title),
+          summary: String(r.summary),
+          content: String(r.content),
+          category: String(r.category),
+          icon: String(r.icon),
+          author: String(r.author),
+          authorRole: r.author_role ?? undefined,
+          readTime: String(r.read_time),
+          publishedAt: new Date(r.published_at).toISOString(),
+          isPublished: Boolean(r.is_published),
+          tags,
+          createdAt: r.created_at ? new Date(r.created_at).toISOString() : undefined,
+          updatedAt: new Date(r.updated_at).toISOString(),
+        };
+      }
+      const seed = SEED_BLOG_POSTS.find((p) => p.id === id);
+      return seed ? { ...seed, createdAt: seed.publishedAt, updatedAt: seed.publishedAt } : null;
+    }
+    const store = getLocalStore();
+    if (store.blogPosts?.[id]) {
+      return store.blogPosts[id];
+    }
+    const seed = SEED_BLOG_POSTS.find((p) => p.id === id);
+    return seed ? { ...seed, createdAt: seed.publishedAt, updatedAt: seed.publishedAt } : null;
+  },
+
+  async upsertBlogPost(record: BlogPostRecord): Promise<BlogPostRecord> {
+    await ensureDb();
+    if (isPostgresConfigured) {
+      const tagsJson = JSON.stringify(record.tags || []);
+      await sql`
+        INSERT INTO roleflow_blog_posts
+          (id, title, summary, content, category, icon, author, author_role, read_time, published_at, is_published, tags, created_at, updated_at)
+        VALUES
+          (${record.id}, ${record.title}, ${record.summary}, ${record.content}, ${record.category}, ${record.icon},
+           ${record.author}, ${record.authorRole ?? null}, ${record.readTime}, ${record.publishedAt}, ${record.isPublished},
+           ${tagsJson}, ${record.createdAt || record.publishedAt}, ${record.updatedAt})
+        ON CONFLICT (id) DO UPDATE SET
+          title = EXCLUDED.title,
+          summary = EXCLUDED.summary,
+          content = EXCLUDED.content,
+          category = EXCLUDED.category,
+          icon = EXCLUDED.icon,
+          author = EXCLUDED.author,
+          author_role = EXCLUDED.author_role,
+          read_time = EXCLUDED.read_time,
+          published_at = EXCLUDED.published_at,
+          is_published = EXCLUDED.is_published,
+          tags = EXCLUDED.tags,
+          updated_at = EXCLUDED.updated_at;
+      `;
+      return record;
+    }
+    const store = getLocalStore();
+    store.blogPosts = store.blogPosts || {};
+    const existing = store.blogPosts[record.id];
+    store.blogPosts[record.id] = {
+      ...record,
+      createdAt: existing?.createdAt || record.createdAt || record.publishedAt,
+    };
+    saveLocalStore(store);
+    return store.blogPosts[record.id];
+  },
+
+  async deleteBlogPost(id: string): Promise<boolean> {
+    await ensureDb();
+    if (isPostgresConfigured) {
+      const { rowCount } = await sql`DELETE FROM roleflow_blog_posts WHERE id = ${id};`;
+      return (rowCount ?? 0) > 0;
+    }
+    const store = getLocalStore();
+    if (!store.blogPosts?.[id]) return false;
+    delete store.blogPosts[id];
     saveLocalStore(store);
     return true;
   },

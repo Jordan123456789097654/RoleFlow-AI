@@ -24,6 +24,18 @@ export const EMAIL_ICONS = [
   { id: "signin", label: "Sign-in (access)" },
   { id: "check", label: "Check (resolved, done)" },
   { id: "ban", label: "Ban (restrictions)" },
+  { id: "terminal", label: "Terminal (CLI, developer tools)" },
+  { id: "rocket", label: "Rocket (launches, releases)" },
+  { id: "cpu", label: "CPU (models, neural engine)" },
+  { id: "code", label: "Code (engineering, syntax)" },
+  { id: "database", label: "Database (memory, data)" },
+  { id: "book", label: "Book (handbook, guides)" },
+  { id: "server", label: "Server (infrastructure, telemetry)" },
+  { id: "flame", label: "Flame (performance, speed)" },
+  { id: "star", label: "Star (highlights, featured)" },
+  { id: "pen", label: "Pen (writing, blog, editorial)" },
+  { id: "cloud", label: "Cloud (serverless, clusters)" },
+  { id: "compass", label: "Compass (architecture, roadmap)" },
 ] as const;
 
 export type EmailIconId = (typeof EMAIL_ICONS)[number]["id"];

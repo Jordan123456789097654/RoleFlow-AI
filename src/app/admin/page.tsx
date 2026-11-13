@@ -24,16 +24,17 @@ import {
 } from "lucide-react";
 import { UserProfile, SystemConfig, ModerationLogEntry, IncidentContext, IncidentTurn } from "@/types";
 import AdminEmailsPanel from "@/components/AdminEmailsPanel";
+import AdminBlogPanel from "@/components/AdminBlogPanel";
 import AdminLicenseKeysPanel from "@/components/AdminLicenseKeysPanel";
 import AdminLawRequestsPanel from "@/components/AdminLawRequestsPanel";
-import { Scale, Ticket, BookOpen, Gavel, Radio } from "lucide-react";
+import { Scale, Ticket, BookOpen, Gavel, Radio, PenLine } from "lucide-react";
 import AdminPunishmentsPanel from "@/components/AdminPunishmentsPanel";
 import AdminHandbookPanel from "@/components/AdminHandbookPanel";
 import AdminIncidentsPanel from "@/components/AdminIncidentsPanel";
 import ReferralModal from "@/components/ReferralModal";
 import AdminChatsPanel from "@/components/AdminChatsPanel";
 
-type AdminTab = "attention" | "config" | "users" | "chats" | "moderation" | "emails" | "licenses" | "law" | "handbook" | "punishments" | "incidents";
+type AdminTab = "attention" | "config" | "users" | "chats" | "moderation" | "blog" | "emails" | "licenses" | "law" | "handbook" | "punishments" | "incidents";
 
 const focusRing = "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/40";
 
@@ -54,6 +55,7 @@ const NAV: { id: AdminTab; label: string; icon: React.ReactNode }[] = [
   { id: "users", label: "Users", icon: <Users className="h-4 w-4" /> },
   { id: "punishments", label: "Punishments", icon: <Gavel className="h-4 w-4" /> },
   { id: "chats", label: "User Chats (Support)", icon: <MessageSquare className="h-4 w-4" /> },
+  { id: "blog", label: "Blog Posts", icon: <PenLine className="h-4 w-4" /> },
   { id: "moderation", label: "Moderation", icon: <AlertTriangle className="h-4 w-4" /> },
   { id: "emails", label: "Emails", icon: <Mail className="h-4 w-4" /> },
   { id: "licenses", label: "License keys", icon: <Ticket className="h-4 w-4" /> },
@@ -1165,6 +1167,9 @@ export default function AdminPage() {
 
           {/* USER CHATS (SUPPORT & BUG INSPECTOR) */}
           {activeTab === "chats" && <AdminChatsPanel initialUserFilter={selectedUserForChats} />}
+
+          {/* BLOG POSTS */}
+          {activeTab === "blog" && <AdminBlogPanel />}
 
           {/* EMAILS */}
           {activeTab === "emails" && <AdminEmailsPanel />}

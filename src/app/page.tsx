@@ -139,6 +139,9 @@ export default function MarketingLandingPage() {
             <a href="#models" className="rf-link inline-flex min-h-10 items-center rounded-lg px-3 text-sm text-muted transition-colors hover:text-ink">
               Models
             </a>
+            <Link href="/blog" className="rf-link inline-flex min-h-10 items-center rounded-lg px-3 text-sm text-muted transition-colors hover:text-ink">
+              Blog
+            </Link>
             <a href="#faq" className="rf-link inline-flex min-h-10 items-center rounded-lg px-3 text-sm text-muted transition-colors hover:text-ink">
               FAQ
             </a>
