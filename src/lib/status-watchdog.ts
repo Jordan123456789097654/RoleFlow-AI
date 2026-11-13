@@ -107,6 +107,56 @@ export async function runStatusWatchdogCheck(): Promise<WatchdogCheckResult> {
       }
     }
 
+    // 2. Fetch live status reports from Better Stack Status Page (269433)
+    try {
+      const repRes = await fetch(
+        `${BASE_URL}/status-pages/${BETTERSTACK_STATUS_PAGE_ID}/status-reports`,
+        { headers: getHeaders(), cache: "no-store" }
+      );
+      if (repRes.ok) {
+        const repJson = await repRes.json();
+        const reports: any[] = repJson.data || [];
+        for (const rep of reports) {
+          const rid = String(rep.id);
+          const rAttrs = rep.attributes || {};
+          const isClosed = Boolean(rAttrs.closed_at);
+          const activeRepInc = await getActiveIncidentForReport(rid);
+
+          if (!isClosed) {
+            if (!activeRepInc) {
+              const state = String(rAttrs.aggregate_state || "degraded").toLowerCase();
+              const isMaintenance = rAttrs.report_type === "maintenance" || state.includes("maintenance");
+              const isOutage = state.includes("outage") || state.includes("down");
+
+              const newInc = await createSystemIncident({
+                title: rAttrs.title || "Degraded Performance",
+                description: rAttrs.title || "Elevated latency and degraded performance across services",
+                status: "investigating",
+                severity: isMaintenance ? "maintenance" : isOutage ? "critical" : "minor",
+                affectedServices: ["Neural Inference Clusters (Apex, Omni, Genesis, Flash)"],
+                source: "betterstack",
+                sourceReportId: rid,
+                monitorName: "Neural Inference Clusters (Apex, Omni, Genesis, Flash)",
+                monitorCheck: "roleflow.site",
+              });
+              result.incidentsCreated.push(newInc.id);
+            }
+          } else {
+            if (activeRepInc) {
+              const res = await resolveSystemIncident(activeRepInc.id, {
+                monitorName: "Neural Inference Clusters (Apex, Omni, Genesis, Flash)",
+                monitorCheck: "roleflow.site",
+                resolutionMessage: "Operational — Issue resolved and nominal performance restored.",
+              });
+              if (res) result.incidentsResolved.push(activeRepInc.id);
+            }
+          }
+        }
+      }
+    } catch (repErr) {
+      console.error("Watchdog status reports error:", repErr);
+    }
+
     const activeList = await getActiveSystemIncidents();
     result.activeIncidentCount = activeList.length;
   } catch (err) {
