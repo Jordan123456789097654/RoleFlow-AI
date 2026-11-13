@@ -54,7 +54,8 @@ async function summarize(previous: string | undefined, chunk: Message[]): Promis
     .filter(Boolean)
     .join("\n\n");
 
-  const summaryModel = getModelSpec("roleflow-flash-2").backend;
+  // Summaries persist for the rest of the chat, so a weak summary would spread errors. Use the balanced tier.
+  const summaryModel = getModelSpec("roleflow-genesis-1").backend;
   const text = await groqChatCompletion({
     model: summaryModel,
     messages: [

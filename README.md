@@ -53,6 +53,13 @@ RESEND_API_KEY=your_resend_api_key
 RESEND_FROM_EMAIL=RoleFlow <noreply@roleflow.site>
 NEXT_PUBLIC_APP_URL=https://roleflow.site
 GROQ_API_KEYS=key1,key2,key3,key4,key5
+# Keys are tried in turn. A key that is out of credits, rejected, or rate-limited is skipped for
+# a cooldown (30 min for credits or auth, 1 min for rate limits) and the next key answers.
+# Only keys starting with gsk_ are used. Others are ignored, and a warning is logged.
+# Optional tuning. The defaults fit Groq's 8,000 tokens-per-minute free tier.
+# GROQ_PROMPT_TOKEN_BUDGET=4500   # tokens for system prompt + earlier turns
+# GROQ_MAX_OUTPUT_TOKENS=3072     # cap per reply (reasoning tokens count toward it)
+# GROQ_REQUEST_TIMEOUT_MS=90000   # give up on a key that stalls
 # Optional. Enables reading uploaded images. Check Groq's current model list first.
 # GROQ_VISION_MODEL=qwen/qwen3.8-27b   # PREVIEW tier: Groq may discontinue it at short notice.
 #   When it's gone, images fail closed (held for review) until you set a new model.

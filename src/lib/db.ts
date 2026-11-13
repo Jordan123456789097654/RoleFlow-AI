@@ -4,6 +4,7 @@ import os from "os";
 import { sql } from "@vercel/postgres";
 import { Chat, Project, UserProfile, ModerationLogEntry, ModerationStatus, SystemConfig, MemoryItem, ApiKey, ModelId, EffortLevel, EmailBroadcastLog, LicenseKeyRecord, ReferralRecord, LawRequestRecord, LawRequestStatus } from "@/types";
 import { MODEL_IDS, resolveModelList } from "@/lib/models";
+import { getKeyPoolStatus } from "@/lib/groq-keys";
 
 const DATA_DIR = process.env.VERCEL ? path.join(os.tmpdir(), "roleflow-data") : path.join(process.cwd(), ".data");
 const STORE_FILE = path.join(DATA_DIR, "store.json");
@@ -1163,20 +1164,17 @@ export const db = {
       }
     }
 
-    // Check Groq pool keys safely without exposing full prefix/suffix
-    const envKeys = process.env.GROQ_API_KEYS || "";
-    const keyList = envKeys
-      .split(",")
-      .map((k) => k.trim())
-      .filter((k) => k.startsWith("gsk_"));
+    // Key health from the live pool: keys on cooldown after a failure are not counted as active.
+    const keyStatus = getKeyPoolStatus();
 
     return {
       totalUsers,
       totalChats,
       modelKeys: {
-        total: keyList.length,
-        active: keyList.length,
-        keysMasked: keyList.map((k) => `${k.slice(0, 7)}...${k.slice(-3)}`),
+        total: keyStatus.total,
+        active: keyStatus.available,
+        keysMasked: keyStatus.labels,
+        cooling: keyStatus.cooling,
       },
       users: usersList.map((u) => ({
         id: u.id,

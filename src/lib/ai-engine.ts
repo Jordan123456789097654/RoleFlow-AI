@@ -3,6 +3,48 @@ import { extractFileBlocks, renderGeneratedFile } from "@/lib/files";
 import { DEFAULT_MODEL, getModelSpec, resolveModelId } from "@/lib/models";
 import { buildSystemPrompt } from "@/lib/prompts";
 import { IMAGE_UPLOADS_ENABLED } from "@/lib/features";
+import {
+  classifyGroqError,
+  getKeyOrder,
+  getKeyPoolStatus,
+  reportKeyFailure,
+  reportKeySuccess,
+} from "@/lib/groq-keys";
+
+const GROQ_URL = "https://api.groq.com/openai/v1/chat/completions";
+
+function envNumber(name: string, fallback: number): number {
+  const value = Number(process.env[name]);
+  return Number.isFinite(value) && value > 0 ? value : fallback;
+}
+
+/**
+ * Tokens the prompt may use: system prompt, earlier turns, and summary. The system prompt alone
+ * is about 2,100 tokens, so the budget must leave room for history. Groq's free tier allows
+ * 8,000 tokens per minute, and the budget plus the output cap stays under that. Raise both
+ * with GROQ_PROMPT_TOKEN_BUDGET and GROQ_MAX_OUTPUT_TOKENS on a higher tier.
+ */
+const PROMPT_TOKEN_BUDGET = envNumber("GROQ_PROMPT_TOKEN_BUDGET", 4500);
+/** Output cap per reply. Reasoning tokens count against it, so it must stay above the tier caps. */
+const OUTPUT_TOKEN_CAP = envNumber("GROQ_MAX_OUTPUT_TOKENS", 3072);
+const REQUEST_TIMEOUT_MS = envNumber("GROQ_REQUEST_TIMEOUT_MS", 90_000);
+/** Rough English-and-code estimate. The old 2.2 figure overcounted by about 40% and starved history. */
+const CHARS_PER_TOKEN = 3.2;
+/** Most recent messages considered before the budget trims further. */
+const RECENT_MESSAGE_COUNT = 12;
+const OLD_USER_CHARS = 3000;
+const OLD_ASSISTANT_CHARS = 1200;
+
+/**
+ * Optional second Groq model. Used only when every key fails on the primary model and the
+ * request has no images (the vision model has no text fallback).
+ */
+export function getFallbackBackend(primary: string): string | null {
+  const fallback = process.env.GROQ_FALLBACK_MODEL?.trim();
+  if (fallback && fallback !== primary) return fallback;
+  if (primary === "openai/gpt-oss-120b") return "openai/gpt-oss-20b";
+  return null;
+}
 
 interface GenerateParams {
   messages: Message[];
@@ -23,17 +65,6 @@ interface GroqUsage {
   prompt_tokens?: number;
   completion_tokens?: number;
   total_tokens?: number;
-}
-
-/**
- * Optional second Groq model. Used only when every key fails on the primary model and the
- * request has no images (the vision model has no text fallback).
- */
-export function getFallbackBackend(primary: string): string | null {
-  const fallback = process.env.GROQ_FALLBACK_MODEL?.trim();
-  if (fallback && fallback !== primary) return fallback;
-  if (primary === "openai/gpt-oss-120b") return "openai/gpt-oss-20b";
-  return null;
 }
 
 function buildMeta(model: string, usage: GroqUsage | null, elapsedMs: number, usedFallback: boolean): MessageMeta {
@@ -76,19 +107,6 @@ export function isUpstreamSafetyBlock(status: number, body: string): boolean {
   return false;
 }
 
-function getGroqKeyPool(): string[] {
-  const envKeys = process.env.GROQ_API_KEYS;
-  if (envKeys) {
-    return envKeys
-      .split(",")
-      .map((k) => k.trim())
-      .filter((k) => k.startsWith("gsk_"));
-  }
-  return [];
-}
-
-let keyIndex = 0;
-
 /**
  * Removes memory tags from streamed text so users never see them, including a tag that is
  * still arriving. The final reply is cleaned again after the stream ends.
@@ -100,14 +118,22 @@ export function visibleStreamText(raw: string): string {
     .replace(/<(m|me|mem|memo|memor|memory)?$/i, "");
 }
 
+interface StreamResult {
+  text: string;
+  finishReason: string | null;
+  usage: GroqUsage | null;
+  /** True when the connection dropped before the stream finished. */
+  interrupted: boolean;
+}
+
 /**
- * Reads a Groq server-sent event stream. Emits only new visible text through onDelta and
- * returns the full raw text plus the final finish_reason.
+ * Reads a Groq server-sent event stream. Emits only new visible text through onDelta. A dropped
+ * connection is reported in the result rather than thrown, so the caller can keep partial text.
  */
 async function readGroqStream(
   body: ReadableStream<Uint8Array>,
   onDelta: (text: string) => void
-): Promise<{ text: string; finishReason: string | null; usage: GroqUsage | null }> {
+): Promise<StreamResult> {
   const reader = body.getReader();
   const decoder = new TextDecoder();
   let buffer = "";
@@ -115,51 +141,58 @@ async function readGroqStream(
   let emitted = "";
   let finishReason: string | null = null;
   let usage: GroqUsage | null = null;
+  let interrupted = false;
 
-  while (true) {
-    const { done, value } = await reader.read();
-    if (done) break;
-    buffer += decoder.decode(value, { stream: true });
+  try {
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      buffer += decoder.decode(value, { stream: true });
 
-    let newline = buffer.indexOf("\n");
-    while (newline !== -1) {
-      const line = buffer.slice(0, newline).trim();
-      buffer = buffer.slice(newline + 1);
-      newline = buffer.indexOf("\n");
-      if (!line.startsWith("data:")) continue;
-      const payload = line.slice(5).trim();
-      if (!payload || payload === "[DONE]") continue;
-      try {
-        const json = JSON.parse(payload);
-        const choice = json.choices?.[0];
-        const piece = choice?.delta?.content;
-        if (typeof piece === "string" && piece) {
-          text += piece;
-          const visible = visibleStreamText(text);
-          if (visible.length > emitted.length && visible.startsWith(emitted)) {
-            const fresh = visible.slice(emitted.length);
-            emitted = visible;
-            onDelta(fresh);
+      let newline = buffer.indexOf("\n");
+      while (newline !== -1) {
+        const line = buffer.slice(0, newline).trim();
+        buffer = buffer.slice(newline + 1);
+        newline = buffer.indexOf("\n");
+        if (!line.startsWith("data:")) continue;
+        const payload = line.slice(5).trim();
+        if (!payload || payload === "[DONE]") continue;
+        try {
+          const json = JSON.parse(payload);
+          const choice = json.choices?.[0];
+          const piece = choice?.delta?.content;
+          if (typeof piece === "string" && piece) {
+            text += piece;
+            const visible = visibleStreamText(text);
+            if (visible.length > emitted.length && visible.startsWith(emitted)) {
+              const fresh = visible.slice(emitted.length);
+              emitted = visible;
+              onDelta(fresh);
+            }
           }
+          if (choice?.finish_reason) finishReason = choice.finish_reason;
+          const reported = json.usage ?? json.x_groq?.usage;
+          if (reported) usage = reported;
+        } catch {
+          // Ignore a malformed event and keep reading.
         }
-        if (choice?.finish_reason) finishReason = choice.finish_reason;
-        const reported = json.usage ?? json.x_groq?.usage;
-        if (reported) usage = reported;
-      } catch {
-        // Ignore a malformed event and keep reading.
       }
     }
+  } catch (err) {
+    interrupted = true;
+    console.warn("Groq stream interrupted:", err);
   }
 
-  return { text, finishReason, usage };
+  return { text, finishReason, usage, interrupted };
 }
 
+/** Rough token count. Images are counted as a fixed 1,000 tokens. */
 function estimateTokens(content: string | ContentPart[] | undefined): number {
   if (!content) return 0;
-  if (typeof content === "string") return Math.ceil(content.length / 2.2);
+  if (typeof content === "string") return Math.ceil(content.length / CHARS_PER_TOKEN);
   if (Array.isArray(content)) {
     return content.reduce((sum, part) => {
-      if (part.type === "text") return sum + Math.ceil((part.text || "").length / 2.2);
+      if (part.type === "text") return sum + Math.ceil((part.text || "").length / CHARS_PER_TOKEN);
       if (part.type === "image_url") return sum + 1000;
       return sum;
     }, 0);
@@ -168,47 +201,180 @@ function estimateTokens(content: string | ContentPart[] | undefined): number {
 }
 
 /**
- * Ensures total messages stay strictly within Groq's 8,000 TPM limit
- * across all existing conversation turns by pruning older history and clipping giant assistant outputs.
+ * Keeps the system prompt and as much recent history as fits the budget. The newest message is
+ * never dropped. Older turns are clipped first, then removed from the oldest end. The result
+ * says how many earlier turns were removed, so the caller can tell the model.
  */
 function pruneMessagesForTokenLimit(
   messages: ModelMessage[],
-  maxPromptTokens = 2200
-): ModelMessage[] {
-  if (messages.length <= 2) return messages;
+  maxPromptTokens: number
+): { messages: ModelMessage[]; droppedTurns: number } {
+  const [systemMsg, ...rest] = messages;
+  if (!systemMsg) return { messages, droppedTurns: 0 };
 
-  const systemMsg = messages[0];
-  // Keep at most the last 6 turns (3 user, 3 assistant)
-  const recentTurns = messages.slice(1).slice(-6);
-
-  // 1. Clip any older assistant message to 500 chars (prevents giant HTML/code blocks from blowing TPM)
-  const clipped: ModelMessage[] = recentTurns.map((m, idx) => {
-    // Keep the very latest turn intact
-    if (idx === recentTurns.length - 1) return m;
-    if (typeof m.content === "string") {
-      const maxLen = m.role === "assistant" ? 500 : 800;
-      if (m.content.length > maxLen) {
-        return {
-          ...m,
-          content: m.content.slice(0, maxLen) + "\n\n[...earlier output truncated to fit token limits...]",
-        };
-      }
-    }
-    return m;
+  const recent = rest.slice(-RECENT_MESSAGE_COUNT);
+  const clipped: ModelMessage[] = recent.map((m, idx) => {
+    if (idx === recent.length - 1 || typeof m.content !== "string") return m;
+    const maxLen = m.role === "assistant" ? OLD_ASSISTANT_CHARS : OLD_USER_CHARS;
+    if (m.content.length <= maxLen) return m;
+    return {
+      ...m,
+      content: `${m.content.slice(0, maxLen)}\n\n[...earlier text truncated to fit the context window...]`,
+    };
   });
 
-  // 2. If still over token limit, drop the oldest user/assistant turns
-  let currentTotal = estimateTokens(systemMsg.content) + clipped.reduce((s, m) => s + estimateTokens(m.content), 0);
   const result = [...clipped];
-
-  while (currentTotal > maxPromptTokens && result.length > 1) {
+  let total = estimateTokens(systemMsg.content) + result.reduce((s, m) => s + estimateTokens(m.content), 0);
+  while (total > maxPromptTokens && result.length > 1) {
     const dropped = result.shift();
-    if (dropped) {
-      currentTotal -= estimateTokens(dropped.content);
-    }
+    if (dropped) total -= estimateTokens(dropped.content);
   }
 
-  return [systemMsg, ...result];
+  return { messages: [systemMsg, ...result], droppedTurns: rest.length - result.length };
+}
+
+type RunOutcome<T> =
+  | { status: "ok"; value: T }
+  | { status: "safety"; body: string; httpStatus: number }
+  | { status: "exhausted" };
+
+/**
+ * Sends one request to Groq, trying each key in pool order until one returns a usable result.
+ * Failed keys go on cooldown, so later requests skip them. A request-level error (400, 404, 422)
+ * stops the loop, since other keys would fail the same way. The handler returns null when the
+ * response has no usable content, which moves on to the next key.
+ */
+async function runWithKeys<T>(
+  model: string,
+  payload: unknown,
+  handle: (res: Response) => Promise<T | null>
+): Promise<RunOutcome<T>> {
+  for (const state of getKeyOrder()) {
+    let res: Response;
+    try {
+      res = await fetch(GROQ_URL, {
+        method: "POST",
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${state.key}` },
+        body: JSON.stringify(payload),
+        signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS),
+      });
+    } catch (err) {
+      console.warn(`Groq network error: model=${model} key=${state.label}`, err);
+      reportKeyFailure(state, "server");
+      continue;
+    }
+
+    if (!res.ok) {
+      const body = await res.text().catch(() => "");
+      console.error(`Groq request failed: model=${model} key=${state.label} status=${res.status} body=${body.slice(0, 500)}`);
+      // A safety rejection applies to the content, not the key, so stop trying other keys.
+      if (isUpstreamSafetyBlock(res.status, body)) {
+        return { status: "safety", body, httpStatus: res.status };
+      }
+      const failure = classifyGroqError(res.status, body, res.headers.get("retry-after"));
+      if (!failure) return { status: "exhausted" };
+      reportKeyFailure(state, failure.kind, failure.retryAfterMs);
+      continue;
+    }
+
+    try {
+      const value = await handle(res);
+      if (value !== null) {
+        reportKeySuccess(state);
+        return { status: "ok", value };
+      }
+    } catch (err) {
+      console.warn(`Groq response unreadable: model=${model} key=${state.label}`, err);
+      reportKeyFailure(state, "server");
+    }
+  }
+  return { status: "exhausted" };
+}
+
+interface UpstreamReply {
+  text: string;
+  finishReason: string | null;
+  usage: GroqUsage | null;
+  interrupted: boolean;
+}
+
+/**
+ * Turns a raw model reply into the chat result: strips memory tags, extracts generated files and
+ * the first code block as an artifact.
+ */
+async function finishReply(
+  reply: UpstreamReply,
+  modelName: string,
+  thinkingTime: number,
+  usedFallback: boolean,
+  startTime: number
+): Promise<GenerateResult> {
+  const memoriesAdded: string[] = [];
+  const memoriesRemoved: string[] = [];
+
+  let cleanedText = reply.text.replace(/<memory action="add">([\s\S]*?)<\/memory>/gi, (_: string, mem: string) => {
+    const trimmed = mem.trim();
+    if (trimmed) memoriesAdded.push(trimmed);
+    return "";
+  });
+
+  cleanedText = cleanedText.replace(/<memory action="remove"[^>]*>([\s\S]*?)<\/memory>/gi, (_: string, mem: string) => {
+    const trimmed = mem.trim();
+    if (trimmed) memoriesRemoved.push(trimmed);
+    return "";
+  });
+
+  cleanedText = cleanedText.trim();
+  if (reply.interrupted) {
+    cleanedText += "\n\n[The reply was cut off because the connection to the model was interrupted. Ask me to continue.]";
+  }
+
+  // Generated files: file blocks become downloads and are removed from the reply text.
+  const extracted = extractFileBlocks(cleanedText);
+  cleanedText = extracted.text;
+  const generatedFiles: GeneratedFile[] = [];
+  for (const f of extracted.files) {
+    const rendered = await renderGeneratedFile(f.name, f.content);
+    if (rendered) generatedFiles.push(rendered);
+    else console.warn(`Skipped generated file "${f.name}": unsupported type, invalid JSON, or over 1 MB.`);
+  }
+
+  // Artifact extraction
+  const codeMatch = cleanedText.match(/```([a-zA-Z0-9_-]+)?\n([\s\S]*?)```/);
+  let generatedArtifact: Artifact | undefined;
+
+  if (codeMatch) {
+    const lang = (codeMatch[1] || "text").toLowerCase();
+    const code = codeMatch[2];
+    const isWeb = ["html", "svg", "javascript", "js"].includes(lang);
+
+    generatedArtifact = {
+      id: "art-" + Date.now(),
+      title: isWeb ? "Interactive Web Preview" : `${lang.toUpperCase()} Script`,
+      type: isWeb ? "web" : "code",
+      primaryLanguage: lang,
+      files: [
+        {
+          filename: isWeb
+            ? "index.html"
+            : `script.${lang === "python" ? "py" : lang === "typescript" ? "ts" : "txt"}`,
+          language: lang,
+          content: code,
+        },
+      ],
+      createdAt: new Date().toISOString(),
+    };
+  }
+
+  return {
+    content: cleanedText,
+    thinkingTime,
+    meta: buildMeta(modelName, reply.usage, Date.now() - startTime, usedFallback),
+    artifact: generatedArtifact,
+    memoriesAdded: memoriesAdded.length > 0 ? memoriesAdded : undefined,
+    memoriesRemoved: memoriesRemoved.length > 0 ? memoriesRemoved : undefined,
+    generatedFiles: generatedFiles.length > 0 ? generatedFiles : undefined,
+  };
 }
 
 export async function generateRoleFlowResponse({
@@ -246,223 +412,121 @@ export async function generateRoleFlowResponse({
     };
   }
 
-  // Multi-Key Groq Pool with Automatic Failover
-  const keyPool = getGroqKeyPool();
-  if (keyPool.length > 0) {
-    // Attachments are folded into the messages here. Turns with images need a vision model.
-    const { messages: modelMessages, hasImages } = buildModelMessages(messages);
-    // Image turns go to the vision model with Genesis sampling, since tier-specific
-    // gpt-oss parameters do not apply to a vision model.
-    const backendModel = hasImages ? VISION_MODEL : spec.backend;
-    const sampling = hasImages ? getModelSpec("roleflow-genesis-1") : spec;
+  const fallbackResult = (): GenerateResult => {
+    // Fallback when Groq is unavailable or unconfigured. This must not look like a real answer.
+    return {
+      content: `RoleFlow couldn't get a response from its model just now. Please try again in a moment.`,
+      thinkingTime: Math.max(0.6, Number(((Date.now() - startTime) / 1000).toFixed(1))),
+      isFallback: true,
+    };
+  };
 
-    const systemPrompt = buildSystemPrompt(spec, {
-      effort,
-      customInstructions,
-      projectInstructions,
-      memories,
-      userName,
-      userEmail,
+  if (getKeyPoolStatus().total === 0) {
+    console.error("No usable Groq key: GROQ_API_KEYS is unset, or no key starts with 'gsk_'.");
+    return fallbackResult();
+  }
+
+  // Attachments are folded into the messages here. Turns with images need a vision model.
+  const { messages: modelMessages, hasImages } = buildModelMessages(messages);
+  // Image turns go to the vision model with Genesis sampling, since tier-specific
+  // gpt-oss parameters do not apply to a vision model.
+  const backendModel = hasImages ? VISION_MODEL : spec.backend;
+  const sampling = hasImages ? getModelSpec("roleflow-genesis-1") : spec;
+
+  const systemPrompt = buildSystemPrompt(spec, {
+    effort,
+    customInstructions,
+    projectInstructions,
+    memories,
+    userName,
+    userEmail,
+  });
+
+  const systemWithSummary = conversationSummary
+    ? `${systemPrompt}\n\n<earlier_conversation_summary>\nThe earlier part of this conversation was condensed to save context. Treat this summary as what was said before, and do not repeat it back unless asked.\n\n${conversationSummary}\n</earlier_conversation_summary>`
+    : systemPrompt;
+
+  const pruned = pruneMessagesForTokenLimit(
+    [{ role: "system", content: systemWithSummary }, ...modelMessages],
+    PROMPT_TOKEN_BUDGET
+  );
+  const systemContent =
+    pruned.droppedTurns > 0
+      ? `${systemWithSummary}\n\n<context_note>Some earlier messages in this conversation were left out to fit the context window. If the user refers to something you cannot see, say so and ask them to restate it. Do not guess what it said.</context_note>`
+      : systemWithSummary;
+  const safeMessages: ModelMessage[] = [{ ...pruned.messages[0], content: systemContent }, ...pruned.messages.slice(1)];
+
+  const maxTokens = Math.min(sampling.maxTokens[effort] ?? 1024, OUTPUT_TOKEN_CAP);
+
+  // The primary model is tried with every key first. The fallback model, if configured, is tried next.
+  const fallbackBackend = hasImages ? null : getFallbackBackend(backendModel);
+  const backendsToTry = fallbackBackend ? [backendModel, fallbackBackend] : [backendModel];
+
+  for (let modelIndex = 0; modelIndex < backendsToTry.length; modelIndex++) {
+    const modelName = backendsToTry[modelIndex];
+    const payload = {
+      model: modelName,
+      messages: safeMessages,
+      temperature: sampling.temperature[effort],
+      ...(sampling.topP !== undefined ? { top_p: sampling.topP } : {}),
+      max_tokens: maxTokens,
+      ...(!hasImages
+        ? { reasoning_effort: effort === "low" ? "low" : sampling.reasoningEffort || "low" }
+        : {}),
+      ...(onDelta ? { stream: true, stream_options: { include_usage: true } } : {}),
+    };
+
+    const outcome = await runWithKeys<UpstreamReply>(modelName, payload, async (res) => {
+      let reply: UpstreamReply;
+      if (onDelta && res.body) {
+        const streamed = await readGroqStream(res.body, onDelta);
+        // Nothing was shown yet, so a dropped connection can safely retry on another key.
+        if (!streamed.text && streamed.interrupted) return null;
+        reply = {
+          text: streamed.text,
+          finishReason: streamed.finishReason,
+          usage: streamed.usage,
+          interrupted: streamed.interrupted,
+        };
+      } else {
+        const data = await res.json();
+        const choice = data.choices?.[0];
+        reply = {
+          text: choice?.message?.content || "",
+          finishReason: choice?.finish_reason ?? null,
+          usage: data.usage ?? null,
+          interrupted: false,
+        };
+      }
+      if (reply.finishReason !== "content_filter" && !reply.text) return null;
+      return reply;
     });
 
-    const systemWithSummary = conversationSummary
-      ? `${systemPrompt}\n\n<earlier_conversation_summary>\nThe earlier part of this conversation was condensed to save context. Treat this summary as what was said before, and do not repeat it back unless asked.\n\n${conversationSummary}\n</earlier_conversation_summary>`
-      : systemPrompt;
+    const thinkingTime = Math.max(0.8, Number(((Date.now() - startTime) / 1000).toFixed(1)));
 
-    const formattedMessages: ModelMessage[] = [
-      { role: "system", content: systemWithSummary },
-      ...modelMessages,
-    ];
+    if (outcome.status === "safety") {
+      return {
+        content: "",
+        thinkingTime,
+        isSafetyRefusal: true,
+        safetyReason: "upstream_content_policy",
+      };
+    }
 
-    // Safe dynamic token budgeting to strictly honor Groq's 8,000 TPM limit
-    const safeMessages = pruneMessagesForTokenLimit(formattedMessages, 2200);
-    const promptTokens = safeMessages.reduce((sum, m) => sum + estimateTokens(m.content), 0);
-    const GROQ_SAFE_LIMIT = 3200;
-    const requestedMax = sampling.maxTokens[effort] ?? 1024;
-    const safeMaxTokens = Math.max(256, Math.min(requestedMax, 1024, Math.max(256, GROQ_SAFE_LIMIT - promptTokens)));
-
-    // The primary model is tried with every key first. The fallback model, if configured, is tried next.
-    const fallbackBackend = hasImages ? null : getFallbackBackend(backendModel);
-    const backendsToTry = fallbackBackend ? [backendModel, fallbackBackend] : [backendModel];
-
-    for (let modelIndex = 0; modelIndex < backendsToTry.length; modelIndex++) {
-    const modelName = backendsToTry[modelIndex];
-    // Try keys sequentially if one hits a rate limit
-    for (let attempt = 0; attempt < keyPool.length; attempt++) {
-      const activeKey = keyPool[(keyIndex + attempt) % keyPool.length];
-
-      try {
-        const res = await fetch("https://api.groq.com/openai/v1/chat/completions", {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-            Authorization: `Bearer ${activeKey}`,
-          },
-          body: JSON.stringify({
-            model: modelName,
-            messages: safeMessages,
-            temperature: sampling.temperature[effort],
-            ...(sampling.topP !== undefined ? { top_p: sampling.topP } : {}),
-            max_tokens: safeMaxTokens,
-            ...(!hasImages
-              ? { reasoning_effort: effort === "low" ? "low" : (sampling.reasoningEffort || "low") }
-              : {}),
-            ...(onDelta ? { stream: true, stream_options: { include_usage: true } } : {}),
-          }),
-        });
-
-        if (!res.ok) {
-          const body = await res.text().catch(() => "");
-          console.error(
-            `Groq request failed: model=${modelName} key#${(keyIndex + attempt) % keyPool.length} status=${res.status} body=${body.slice(0, 500)}`
-          );
-          // A safety rejection applies to the content, not the key, so stop retrying other keys.
-          if (isUpstreamSafetyBlock(res.status, body)) {
-            return {
-              content: "",
-              thinkingTime: Math.max(0.8, Number(((Date.now() - startTime) / 1000).toFixed(1))),
-              isSafetyRefusal: true,
-              safetyReason: "upstream_content_policy",
-            };
-          }
-          continue;
-        }
-
-        if (res.ok) {
-          keyIndex = (keyIndex + attempt + 1) % keyPool.length;
-
-          let serverText = "";
-          let finishReason: string | null = null;
-          let usage: GroqUsage | null = null;
-          if (onDelta && res.body) {
-            const streamed = await readGroqStream(res.body, onDelta);
-            serverText = streamed.text;
-            finishReason = streamed.finishReason;
-            usage = streamed.usage;
-          } else {
-            const data = await res.json();
-            const choice = data.choices?.[0];
-            serverText = choice?.message?.content || "";
-            finishReason = choice?.finish_reason ?? null;
-            usage = data.usage ?? null;
-          }
-          const thinkingTime = Math.max(
-            0.8,
-            Number(((Date.now() - startTime) / 1000).toFixed(1))
-          );
-
-          // Groq reports a filtered generation as finish_reason "content_filter" on a 200 response.
-          if (finishReason === "content_filter") {
-            return {
-              content: "",
-              thinkingTime,
-              isSafetyRefusal: true,
-              safetyReason: "upstream_content_filter",
-            };
-          }
-
-          if (serverText) {
-            // Extract AI memory actions
-            const memoriesAdded: string[] = [];
-            const memoriesRemoved: string[] = [];
-
-            let cleanedText = serverText.replace(
-              /<memory action="add">([\s\S]*?)<\/memory>/gi,
-              (_: string, mem: string) => {
-                const trimmed = mem.trim();
-                if (trimmed) memoriesAdded.push(trimmed);
-                return "";
-              }
-            );
-
-            cleanedText = cleanedText.replace(
-              /<memory action="remove"[^>]*>([\s\S]*?)<\/memory>/gi,
-              (_: string, mem: string) => {
-                const trimmed = mem.trim();
-                if (trimmed) memoriesRemoved.push(trimmed);
-                return "";
-              }
-            );
-
-            cleanedText = cleanedText.trim();
-
-            // Generated files: file blocks become downloads and are removed from the reply text.
-            const extracted = extractFileBlocks(cleanedText);
-            cleanedText = extracted.text;
-            const generatedFiles: GeneratedFile[] = [];
-            for (const f of extracted.files) {
-              const rendered = await renderGeneratedFile(f.name, f.content);
-              if (rendered) generatedFiles.push(rendered);
-              else console.warn(`Skipped generated file "${f.name}": unsupported type, invalid JSON, or over 1 MB.`);
-            }
-
-            // Artifact extraction
-            const codeMatch = cleanedText.match(/```([a-zA-Z0-9_-]+)?\n([\s\S]*?)```/);
-            let generatedArtifact: Artifact | undefined;
-
-            if (codeMatch) {
-              const lang = (codeMatch[1] || "text").toLowerCase();
-              const code = codeMatch[2];
-              const isWeb = ["html", "svg", "javascript", "js"].includes(lang);
-
-              generatedArtifact = {
-                id: "art-" + Date.now(),
-                title: isWeb ? "Interactive Web Preview" : `${lang.toUpperCase()} Script`,
-                type: isWeb ? "web" : "code",
-                primaryLanguage: lang,
-                files: [
-                  {
-                    filename: isWeb
-                      ? "index.html"
-                      : `script.${lang === "python" ? "py" : lang === "typescript" ? "ts" : "txt"}`,
-                    language: lang,
-                    content: code,
-                  },
-                ],
-                createdAt: new Date().toISOString(),
-              };
-            }
-
-            return {
-              content: cleanedText,
-              thinkingTime,
-              meta: buildMeta(modelName, usage, Date.now() - startTime, modelIndex > 0),
-              artifact: generatedArtifact,
-              memoriesAdded: memoriesAdded.length > 0 ? memoriesAdded : undefined,
-              memoriesRemoved: memoriesRemoved.length > 0 ? memoriesRemoved : undefined,
-              generatedFiles: generatedFiles.length > 0 ? generatedFiles : undefined,
-            };
-          }
-        }
-      } catch (err) {
-        console.warn(`Groq attempt ${attempt + 1} network error:`, err);
+    if (outcome.status === "ok") {
+      // Groq reports a filtered generation as finish_reason "content_filter" on a 200 response.
+      if (outcome.value.finishReason === "content_filter") {
+        return { content: "", thinkingTime, isSafetyRefusal: true, safetyReason: "upstream_content_filter" };
       }
+      return finishReply(outcome.value, modelName, thinkingTime, modelIndex > 0, startTime);
     }
-    }
+    // Every key failed on this model. Move on to the fallback model if one is configured.
   }
 
-  const elapsed = Math.max(0.6, Number(((Date.now() - startTime) / 1000).toFixed(1)));
-  if (keyPool.length === 0) {
-    console.error("No usable Groq key: GROQ_API_KEYS is unset, or no key starts with 'gsk_'.");
-  } else {
-    console.error(`All ${keyPool.length} Groq key(s) failed. See the preceding 'Groq request failed' entries for status and body.`);
-  }
-  // Fallback when Groq is unavailable or unconfigured. This must not look like a real answer.
-  return {
-    content: `RoleFlow couldn't get a response from its model just now. Please try again in a moment.`,
-    thinkingTime: elapsed,
-    isFallback: true,
-  };
+  console.error(`All Groq keys failed on ${backendsToTry.join(", ")}. See the preceding 'Groq request failed' entries.`);
+  return fallbackResult();
 }
 
-
-// ─────────────────────────────────────────────────────────────────────────────
-// Attachments and vision
-// ─────────────────────────────────────────────────────────────────────────────
-
-/**
- * Vision model for image turns, set via GROQ_VISION_MODEL, defaulting to Qwen 3.8 27B multimodal on Groq.
- */
 export const VISION_MODEL: string = process.env.GROQ_VISION_MODEL || "qwen/qwen3.8-27b";
 
 const MAX_IMAGES_PER_TURN = 4;
@@ -540,6 +604,7 @@ export function buildModelMessages(messages: Message[]): {
   return { messages: out, hasImages };
 }
 
+
 /**
  * One-shot, non-streaming completion with the same key failover as the chat path.
  * Returns null if no key is configured or every key fails.
@@ -551,31 +616,21 @@ export async function groqChatCompletion(opts: {
   maxTokens?: number;
   reasoningEffort?: "low" | "medium" | "high";
 }): Promise<string | null> {
-  const keyPool = getGroqKeyPool();
-  for (let attempt = 0; attempt < keyPool.length; attempt++) {
-    const key = keyPool[(keyIndex + attempt) % keyPool.length];
-    try {
-      const res = await fetch("https://api.groq.com/openai/v1/chat/completions", {
-        method: "POST",
-        headers: { "Content-Type": "application/json", Authorization: `Bearer ${key}` },
-        body: JSON.stringify({
-          model: opts.model,
-          messages: opts.messages,
-          temperature: opts.temperature ?? 0,
-          max_tokens: opts.maxTokens ?? 512,
-          ...(opts.reasoningEffort ? { reasoning_effort: opts.reasoningEffort } : {}),
-        }),
-      });
-      if (res.ok) {
-        keyIndex = (keyIndex + attempt + 1) % keyPool.length;
-        const data = await res.json();
-        const text: string | undefined = data.choices?.[0]?.message?.content;
-        // Reasoning models can emit <think> blocks. Strip them so callers parse only the answer.
-        return text ? text.replace(/<think>[\s\S]*?<\/think>/gi, "").trim() || null : null;
-      }
-    } catch {
-      // Try the next key.
+  const outcome = await runWithKeys<string>(
+    opts.model,
+    {
+      model: opts.model,
+      messages: opts.messages,
+      temperature: opts.temperature ?? 0,
+      max_tokens: opts.maxTokens ?? 512,
+      ...(opts.reasoningEffort ? { reasoning_effort: opts.reasoningEffort } : {}),
+    },
+    async (res) => {
+      const data = await res.json();
+      const text: string = data.choices?.[0]?.message?.content ?? "";
+      // Reasoning models can emit <think> blocks. Strip them so callers parse only the answer.
+      return text.replace(/<think>[\s\S]*?<\/think>/gi, "").trim();
     }
-  }
-  return null;
+  );
+  return outcome.status === "ok" ? outcome.value || null : null;
 }

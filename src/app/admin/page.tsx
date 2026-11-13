@@ -237,7 +237,7 @@ export default function AdminPage() {
   const [stats, setStats] = useState<{
     totalUsers: number;
     totalChats: number;
-    modelKeys: { total: number; active: number; keysMasked: string[] };
+    modelKeys: { total: number; active: number; keysMasked: string[]; cooling?: { label: string; reason: string; retryAt: string }[] };
     users: any[];
   } | null>(null);
   const [moderationLogs, setModerationLogs] = useState<ModerationLogEntry[]>([]);
