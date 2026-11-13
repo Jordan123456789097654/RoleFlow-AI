@@ -4,8 +4,8 @@
  * Monitor: RoleFlow API & Database Health (Monitor ID: 5147818)
  */
 
-export const BETTERSTACK_API_TOKEN =
-  process.env.BETTERSTACK_API_TOKEN || "MXuYEq5B3HrrDxPpGqaVeET9";
+// The token must come from the environment. Never commit a fallback value here.
+export const BETTERSTACK_API_TOKEN = process.env.BETTERSTACK_API_TOKEN || "";
 export const BETTERSTACK_STATUS_PAGE_ID =
   process.env.BETTERSTACK_STATUS_PAGE_ID || "269433";
 export const BETTERSTACK_MONITOR_ID =
@@ -18,6 +18,25 @@ function getHeaders() {
     Authorization: `Bearer ${BETTERSTACK_API_TOKEN}`,
     "Content-Type": "application/json",
   };
+}
+
+/** Per-model monitors, comma separated, e.g. "111,222,333,444". They pause with the main monitor. */
+export const BETTERSTACK_MODEL_MONITOR_IDS = (process.env.BETTERSTACK_MODEL_MONITOR_IDS || "")
+  .split(",")
+  .map((id) => id.trim())
+  .filter(Boolean);
+
+async function setMonitorsPaused(paused: boolean): Promise<void> {
+  const ids = [BETTERSTACK_MONITOR_ID, ...BETTERSTACK_MODEL_MONITOR_IDS];
+  await Promise.all(
+    ids.map((id) =>
+      fetch(`${BASE_URL}/monitors/${id}`, {
+        method: "PATCH",
+        headers: getHeaders(),
+        body: JSON.stringify({ paused }),
+      }).catch((e) => console.error(`BetterStack ${paused ? "pause" : "unpause"} monitor ${id} err:`, e))
+    )
+  );
 }
 
 /**
@@ -70,11 +89,7 @@ export async function enableBetterStackMaintenance(): Promise<{
     }
 
     // 2. Pause the uptime monitor
-    await fetch(`${BASE_URL}/monitors/${BETTERSTACK_MONITOR_ID}`, {
-      method: "PATCH",
-      headers: getHeaders(),
-      body: JSON.stringify({ paused: true }),
-    }).catch((e) => console.error("BetterStack pause monitor err:", e));
+    await setMonitorsPaused(true);
 
     // 3. Set the announcement banner on status.roleflow.site
     await fetch(`${BASE_URL}/status-pages/${BETTERSTACK_STATUS_PAGE_ID}`, {
@@ -109,11 +124,7 @@ export async function disableBetterStackMaintenance(): Promise<{
 
   try {
     // 1. Unpause the uptime monitor
-    await fetch(`${BASE_URL}/monitors/${BETTERSTACK_MONITOR_ID}`, {
-      method: "PATCH",
-      headers: getHeaders(),
-      body: JSON.stringify({ paused: false }),
-    }).catch((e) => console.error("BetterStack unpause monitor err:", e));
+    await setMonitorsPaused(false);
 
     // 2. Clear status page announcement banner
     await fetch(`${BASE_URL}/status-pages/${BETTERSTACK_STATUS_PAGE_ID}`, {

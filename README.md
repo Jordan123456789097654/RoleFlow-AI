@@ -72,6 +72,14 @@ GROQ_API_KEYS=key1,key2,key3,key4,key5
 # Set to "true" to show the Web search toggle in the composer (needs BRAVE_SEARCH_API_KEY on the server).
 # NEXT_PUBLIC_WEB_SEARCH_ENABLED=true
 
+# Required for the Better Stack maintenance toggle. Never commit this value.
+# BETTERSTACK_API_TOKEN=
+
+# Protects GET /api/health/models (32+ chars). Public status is at GET /api/status (no token).
+# HEALTH_CHECK_TOKEN=
+# Per-model Better Stack monitor IDs, comma separated. They pause during maintenance with the main monitor.
+# BETTERSTACK_MODEL_MONITOR_IDS=
+
 # When deployed to Vercel, link Vercel Postgres to automatically populate:
 # POSTGRES_URL=
 ```

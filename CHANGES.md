@@ -27,3 +27,23 @@
 - `GROQ_REQUEST_TIMEOUT_MS` (default 90000)
 
 Cooldown state lives in server memory, so each serverless instance tracks its own keys.
+
+## Status page and model monitoring
+- **Broken status embed fixed.** The home page iframe of status.roleflow.site was blocked by the
+  status host, so it showed an error icon. The page now renders live status itself (`SystemStatus`).
+- **Per-model status.** `GET /api/status` is public and returns each model's status, latency and a
+  generic note. It never returns key labels or provider errors. Results are cached for 5 minutes.
+- **Degraded state.** A model is degraded when it answers slowly (5 s or more) or is rate limited.
+  Degraded shows amber, down shows red, and the overall banner reports the worst state.
+- **Admin overview is live.** The model cards show real status and latency instead of fixed
+  "Online" labels and a hardcoded "~840 ms".
+- **Better Stack token removed from source.** `BETTERSTACK_API_TOKEN` must now come from the
+  environment. The old fallback value was committed in the repo and should be rotated.
+- **CSP.** Removed the `frame-src` entry, since nothing is embedded any more.
+
+## One monitor per model
+- `GET /api/health/models/<model-id>` checks one model. IDs: `roleflow-apex-1`, `roleflow-omni-1`,
+  `roleflow-genesis-1`, `roleflow-flash-2`. It returns 503 when that model is down, and 200 otherwise.
+- The token check is shared by both health routes (`src/lib/health-auth.ts`).
+- Maintenance mode pauses every monitor listed in `BETTERSTACK_MODEL_MONITOR_IDS`, so planned
+  downtime does not page anyone.

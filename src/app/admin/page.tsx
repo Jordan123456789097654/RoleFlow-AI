@@ -1,6 +1,8 @@
 "use client";
 
 import React, { useState, useEffect } from "react";
+import { useSystemStatus } from "@/lib/use-system-status";
+import { STATUS_LABEL, type HealthStatus } from "@/lib/status";
 import Link from "next/link";
 import {
   Shield,
@@ -138,6 +140,12 @@ function StatCard({
 }
 
 /** Model status card on the overview. */
+function StatusBadge({ status }: { status?: HealthStatus }) {
+  if (!status) return <Badge tone="neutral">Checking</Badge>;
+  const tone = status === "operational" ? "success" : status === "degraded" ? "warning" : "danger";
+  return <Badge tone={tone}>{STATUS_LABEL[status]}</Badge>;
+}
+
 function ModelCard({
   icon,
   name,
@@ -242,6 +250,13 @@ export default function AdminPage() {
   } | null>(null);
   const [moderationLogs, setModerationLogs] = useState<ModerationLogEntry[]>([]);
   const [totalMemories, setTotalMemories] = useState<number>(0);
+  // Live per-model health from the public status endpoint, refreshed every minute.
+  const { data: liveStatus } = useSystemStatus(60_000);
+  const liveFor = (id: string) => liveStatus?.models.find((m) => m.id === id);
+  const latencyLabel = (id: string) => {
+    const ms = liveFor(id)?.latencyMs;
+    return ms == null ? "Not measured yet" : `${ms} ms`;
+  };
 
   // System Configurations
   const [config, setConfig] = useState<SystemConfig>({
@@ -649,9 +664,9 @@ export default function AdminPage() {
                   icon={<Crown className="h-4 w-4" />}
                   name="RoleFlow Apex 1.0"
                   description="Highest-intelligence frontier model for proofs, systems architecture, and exhaustive reviews."
-                  status={<Badge tone="success">Online</Badge>}
+                  status={<StatusBadge status={liveFor("roleflow-apex-1")?.status} />}
                   stats={[
-                    { label: "Avg latency", value: "Not measured yet" },
+                    { label: "Avg latency", value: latencyLabel("roleflow-apex-1") },
                     { label: "Backend", value: "gpt-oss-120b, max reasoning" },
                   ]}
                 />
@@ -659,9 +674,9 @@ export default function AdminPage() {
                   icon={<Brain className="h-4 w-4" />}
                   name="RoleFlow Omni 1.0"
                   description="Frontier reasoning model for multi-step logic, advanced math, and enterprise engineering."
-                  status={<Badge tone="success">Online</Badge>}
+                  status={<StatusBadge status={liveFor("roleflow-omni-1")?.status} />}
                   stats={[
-                    { label: "Avg latency", value: "Not measured yet" },
+                    { label: "Avg latency", value: latencyLabel("roleflow-omni-1") },
                     { label: "Backend", value: "gpt-oss-120b, deep reasoning" },
                   ]}
                 />
@@ -669,9 +684,9 @@ export default function AdminPage() {
                   icon={<Cpu className="h-4 w-4" />}
                   name="RoleFlow Genesis 1.5"
                   description="Balanced flagship for general intelligence, system architecture, and creative writing."
-                  status={<Badge tone="success">Online</Badge>}
+                  status={<StatusBadge status={liveFor("roleflow-genesis-1")?.status} />}
                   stats={[
-                    { label: "Avg latency", value: "~840 ms" },
+                    { label: "Avg latency", value: latencyLabel("roleflow-genesis-1") },
                     { label: "Context window", value: "128k tokens" },
                   ]}
                 />
@@ -679,9 +694,9 @@ export default function AdminPage() {
                   icon={<Zap className="h-4 w-4" />}
                   name="RoleFlow Flash 2.0"
                   description="Ultra-fast model for quick questions, rapid coding, and higher reasoning throughput."
-                  status={<Badge tone="success">Online</Badge>}
+                  status={<StatusBadge status={liveFor("roleflow-flash-2")?.status} />}
                   stats={[
-                    { label: "Avg latency", value: "Not measured yet" },
+                    { label: "Avg latency", value: latencyLabel("roleflow-flash-2") },
                     { label: "Context window", value: "128k tokens" },
                   ]}
                 />
@@ -689,9 +704,9 @@ export default function AdminPage() {
                   icon={<Server className="h-4 w-4" />}
                   name="Inference pool"
                   description="Multi-key load balancing with automatic failover when a key is rate limited."
-                  status={<Badge tone="success" mono>{stats?.modelKeys?.active || 0} keys active</Badge>}
+                  status={<Badge tone="neutral" mono>{stats?.modelKeys?.active || 0} keys active</Badge>}
                   stats={[
-                    { label: "Pool health", value: "Operational" },
+                    { label: "Pool health", value: liveStatus ? STATUS_LABEL[liveStatus.overall] : "Checking" },
                     { label: "Failover", value: "Round-robin" },
                   ]}
                 />
