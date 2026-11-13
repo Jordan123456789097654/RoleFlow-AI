@@ -31,8 +31,8 @@ import { Code, Bug, Compass } from "lucide-react";
 /** Messages a signed-out visitor can send before being asked to sign in. */
 const GUEST_MESSAGE_LIMIT = 5;
 
-/** Web search is offered only when the server has a search key. The client must opt in with this flag. */
-const WEB_SEARCH_AVAILABLE = process.env.NEXT_PUBLIC_WEB_SEARCH_ENABLED === "true";
+/** Web search is powered by free zero-key DuckDuckGo search. Enabled by default. */
+const WEB_SEARCH_AVAILABLE = process.env.NEXT_PUBLIC_WEB_SEARCH_ENABLED !== "false";
 
 /** A chat as Markdown, for exporting. Sources are listed under the reply they support. */
 function chatToMarkdown(chat: Chat): string {
