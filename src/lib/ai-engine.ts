@@ -11,6 +11,8 @@ interface GenerateParams {
   customInstructions?: string;
   projectInstructions?: string;
   memories?: string[];
+  userName?: string;
+  userEmail?: string;
   /** When set, the reply is streamed from Groq and each new visible piece of text is passed here. */
   onDelta?: (text: string) => void;
   /** Summary of earlier turns of a long chat, added to the system prompt. */
@@ -157,6 +159,8 @@ export async function generateRoleFlowResponse({
   customInstructions,
   projectInstructions,
   memories,
+  userName,
+  userEmail,
   onDelta,
   conversationSummary,
 }: GenerateParams): Promise<GenerateResult> {
@@ -166,13 +170,19 @@ export async function generateRoleFlowResponse({
 
   const spec = getModelSpec(resolveModelId(model) ?? DEFAULT_MODEL);
 
-  // Check if user is explicitly asking about assistant identity
-  const identityRegex = /^(?:who\s+(?:are\s+you|built\s+you|made\s+you|created\s+you)|what\s+model\s+are\s+you)[\s?.!]*$/i;
+  // Check if user is explicitly asking about assistant identity or founder
+  const identityRegex = /^(?:who\s+(?:are\s+you|built\s+you|made\s+you|created\s+you|founded\s+you|founded\s+roleflow|made\s+roleflow|created\s+roleflow)|what\s+model\s+are\s+you|who\s+is\s+jordan\s+daniels)[\s?.!]*$/i;
   const isAskingIdentity = identityRegex.test(prompt);
 
   if (isAskingIdentity) {
+    if (/jordan\s+daniels/i.test(prompt)) {
+      return {
+        content: `Jordan Daniels is the founder and creator of RoleFlow. He created and built RoleFlow as an accessible, high-performance frontier AI platform featuring multi-tier intelligence (Apex 1.0, Omni 1.0, Genesis 1.5, Flash 2.0), real-time web search grounding, and deep document analysis.`,
+        thinkingTime: 0.8,
+      };
+    }
     return {
-      content: `I'm RoleFlow, an AI assistant made by RoleFlow. This version is ${spec.name}, ${spec.identity}. RoleFlow built me to be helpful, honest, and careful about avoiding harm.`,
+      content: `I'm RoleFlow, an AI assistant created and founded by Jordan Daniels. This version is ${spec.name}, ${spec.identity}. Jordan built RoleFlow to be a helpful, powerful, and honest AI platform for software engineering, deep analysis, and writing.`,
       thinkingTime: 0.8,
     };
   }
@@ -192,6 +202,8 @@ export async function generateRoleFlowResponse({
       customInstructions,
       projectInstructions,
       memories,
+      userName,
+      userEmail,
     });
 
     const systemWithSummary = conversationSummary

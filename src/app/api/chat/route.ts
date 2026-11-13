@@ -479,9 +479,11 @@ async function handleChat(req: NextRequest, onDelta?: (text: string) => void): P
 
     // Build combined custom instructions if user has profile preferences
     let effectiveInstructions = customInstructions || "";
+    let userName: string | undefined = undefined;
     if (userEmail) {
       const userProfile = await db.getUserByEmail(userEmail);
       if (userProfile) {
+        userName = userProfile.name;
         const parts: string[] = [];
         if (userProfile.customInstructions) {
           parts.push(`User Background & Preferences:\n${userProfile.customInstructions}`);
@@ -538,6 +540,8 @@ async function handleChat(req: NextRequest, onDelta?: (text: string) => void): P
       effort: safeEffort,
       customInstructions: effectiveInstructions,
       memories: persistentMemories,
+      userEmail: userEmail || undefined,
+      userName,
       onDelta,
       conversationSummary: compacted.summaryForModel,
     });

@@ -7,6 +7,8 @@ export interface PromptContext {
   customInstructions?: string;
   projectInstructions?: string;
   memories?: string[];
+  userName?: string;
+  userEmail?: string;
 }
 
 /**
@@ -33,14 +35,17 @@ export function buildSystemPrompt(spec: ModelSpec, ctx: PromptContext): string {
 }
 
 function identityBlock(spec: ModelSpec): string {
-  return `You are RoleFlow, an AI assistant developed by RoleFlow.
+  return `You are RoleFlow, an AI assistant developed by RoleFlow, created and founded by Jordan Daniels.
 Your model name is ${spec.name}. ${spec.promptRole}
 You work across software engineering, system architecture, analysis, mathematics, writing, and general knowledge. Your goal is an answer the user can rely on and act on immediately.`;
 }
 
 /** Facts each model should know about itself and its siblings. Keeps identity answers accurate. */
-const SELF_KNOWLEDGE = `About yourself and RoleFlow:
+const SELF_KNOWLEDGE = `About yourself, your creator, and RoleFlow:
 ${LINEUP_SUMMARY}
+- Founder & Creator: RoleFlow was founded and created by Jordan Daniels. Jordan built RoleFlow to be a high-performance, accessible, frontier-grade AI platform featuring multi-tier intelligence (Apex 1.0, Omni 1.0, Genesis 1.5, Flash 2.0), live web search grounding, and deep document analysis.
+- When asked who created you, who made you, who built RoleFlow, who founded RoleFlow, or who Jordan Daniels is: state clearly and accurately that Jordan Daniels is the founder and creator of RoleFlow.
+- If speaking directly with Jordan Daniels (or if the user identifies themselves as Jordan Daniels), recognize him respectfully and warmly as your founder and the creator of RoleFlow.
 - When asked what you are, which model you are, or which RoleFlow model to use, answer from this lineup. Recommend the tier that fits the task: Flash for quick answers, Genesis for everyday depth and writing, Omni for hard multi-step reasoning, Apex for the most demanding proofs, architecture, and reviews.
 - You are a RoleFlow model. Do not claim to be a model from another company, such as Claude, GPT, or Gemini.
 - Do not name the hosting provider or the underlying open-weight model unless the user has already named it and asks you to confirm. If asked about the underlying architecture, say that you are a RoleFlow model and cannot share those details.
@@ -126,6 +131,17 @@ function effortBlock(effort: EffortLevel): string {
 
 function userContextBlock(ctx: PromptContext): string {
   const parts: string[] = [];
+  const adminEmail = (process.env.ADMIN_EMAIL || "").toLowerCase().trim();
+  const isJordan =
+    (ctx.userEmail && (ctx.userEmail.toLowerCase() === adminEmail || ctx.userEmail.toLowerCase().includes("jordan"))) ||
+    (ctx.userName && ctx.userName.toLowerCase().includes("jordan"));
+
+  if (isJordan) {
+    parts.push(
+      "User identity context: You are speaking directly with Jordan Daniels, the founder and creator of RoleFlow. Acknowledge and assist your founder with highest regard, collegiality, and precision."
+    );
+  }
+
   if (ctx.customInstructions) {
     parts.push(`User custom instructions (follow these unless they conflict with accuracy or safety):\n${ctx.customInstructions}`);
   }
