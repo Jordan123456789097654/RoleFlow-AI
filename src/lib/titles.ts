@@ -32,7 +32,12 @@ export function sanitizeTitle(raw: string | null): string | null {
     .trim();
   if (!title) return null;
   const words = title.split(/\s+/);
-  if (words.length > 8 || title.length > 60) return null;
+  if (words.length > 7) {
+    title = words.slice(0, 6).join(" ");
+  }
+  if (title.length > 50) {
+    title = title.slice(0, 48).trimEnd() + "...";
+  }
   return title;
 }
 
@@ -43,17 +48,24 @@ export function sanitizeTitle(raw: string | null): string | null {
 export async function generateChatTitle(firstUserMessage: string): Promise<string> {
   const input = firstUserMessage.replace(/\s+/g, " ").trim().slice(0, 1000);
   if (!input) return FALLBACK_TITLE;
+
+  const timeoutPromise = new Promise<null>((resolve) => setTimeout(() => resolve(null), 3000));
+
   try {
-    const raw = await groqChatCompletion({
-      model: getModelSpec("roleflow-flash-2").backend,
-      messages: [
-        { role: "system", content: TITLE_SYSTEM_PROMPT },
-        { role: "user", content: input },
-      ],
-      temperature: 0.3,
-      maxTokens: 256,
-      reasoningEffort: "low",
-    });
+    const raw = await Promise.race([
+      groqChatCompletion({
+        model: getModelSpec("roleflow-flash-2").backend,
+        messages: [
+          { role: "system", content: TITLE_SYSTEM_PROMPT },
+          { role: "user", content: input },
+        ],
+        temperature: 0.3,
+        maxTokens: 128,
+        reasoningEffort: "low",
+      }),
+      timeoutPromise,
+    ]);
+
     return sanitizeTitle(raw) ?? fallbackTitle(input);
   } catch {
     return fallbackTitle(input);

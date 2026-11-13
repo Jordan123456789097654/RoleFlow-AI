@@ -31,7 +31,9 @@ interface GroqUsage {
  */
 export function getFallbackBackend(primary: string): string | null {
   const fallback = process.env.GROQ_FALLBACK_MODEL?.trim();
-  return fallback && fallback !== primary ? fallback : null;
+  if (fallback && fallback !== primary) return fallback;
+  if (primary === "openai/gpt-oss-120b") return "openai/gpt-oss-20b";
+  return null;
 }
 
 function buildMeta(model: string, usage: GroqUsage | null, elapsedMs: number, usedFallback: boolean): MessageMeta {
@@ -154,10 +156,10 @@ async function readGroqStream(
 
 function estimateTokens(content: string | ContentPart[] | undefined): number {
   if (!content) return 0;
-  if (typeof content === "string") return Math.ceil(content.length / 3.2);
+  if (typeof content === "string") return Math.ceil(content.length / 2.2);
   if (Array.isArray(content)) {
     return content.reduce((sum, part) => {
-      if (part.type === "text") return sum + Math.ceil((part.text || "").length / 3.2);
+      if (part.type === "text") return sum + Math.ceil((part.text || "").length / 2.2);
       if (part.type === "image_url") return sum + 1000;
       return sum;
     }, 0);
@@ -166,27 +168,31 @@ function estimateTokens(content: string | ContentPart[] | undefined): number {
 }
 
 /**
- * Ensures total messages stay well within Groq's 8,000 TPM limit
- * by trimming older turns and clipping oversized previous assistant outputs (e.g. game files).
+ * Ensures total messages stay strictly within Groq's 8,000 TPM limit
+ * across all existing conversation turns by pruning older history and clipping giant assistant outputs.
  */
 function pruneMessagesForTokenLimit(
   messages: ModelMessage[],
-  maxPromptTokens = 4200
+  maxPromptTokens = 2200
 ): ModelMessage[] {
   if (messages.length <= 2) return messages;
 
   const systemMsg = messages[0];
-  const turns = messages.slice(1);
+  // Keep at most the last 6 turns (3 user, 3 assistant)
+  const recentTurns = messages.slice(1).slice(-6);
 
-  // 1. Clip any older message that is excessively large (> 2000 chars) to prevent giant single-turn token bloat
-  const clipped: ModelMessage[] = turns.map((m, idx) => {
-    // Keep the very latest user message intact
-    if (idx === turns.length - 1) return m;
-    if (typeof m.content === "string" && m.content.length > 2000) {
-      return {
-        ...m,
-        content: m.content.slice(0, 1800) + "\n\n[...earlier long output omitted to fit model context...]",
-      };
+  // 1. Clip any older assistant message to 500 chars (prevents giant HTML/code blocks from blowing TPM)
+  const clipped: ModelMessage[] = recentTurns.map((m, idx) => {
+    // Keep the very latest turn intact
+    if (idx === recentTurns.length - 1) return m;
+    if (typeof m.content === "string") {
+      const maxLen = m.role === "assistant" ? 500 : 800;
+      if (m.content.length > maxLen) {
+        return {
+          ...m,
+          content: m.content.slice(0, maxLen) + "\n\n[...earlier output truncated to fit token limits...]",
+        };
+      }
     }
     return m;
   });
@@ -269,11 +275,11 @@ export async function generateRoleFlowResponse({
     ];
 
     // Safe dynamic token budgeting to strictly honor Groq's 8,000 TPM limit
-    const safeMessages = pruneMessagesForTokenLimit(formattedMessages, 4200);
+    const safeMessages = pruneMessagesForTokenLimit(formattedMessages, 2200);
     const promptTokens = safeMessages.reduce((sum, m) => sum + estimateTokens(m.content), 0);
-    const GROQ_SAFE_LIMIT = 7500;
-    const requestedMax = sampling.maxTokens[effort] ?? 2048;
-    const safeMaxTokens = Math.max(512, Math.min(requestedMax, GROQ_SAFE_LIMIT - promptTokens));
+    const GROQ_SAFE_LIMIT = 3200;
+    const requestedMax = sampling.maxTokens[effort] ?? 1024;
+    const safeMaxTokens = Math.max(256, Math.min(requestedMax, 1024, Math.max(256, GROQ_SAFE_LIMIT - promptTokens)));
 
     // The primary model is tried with every key first. The fallback model, if configured, is tried next.
     const fallbackBackend = hasImages ? null : getFallbackBackend(backendModel);
@@ -298,8 +304,8 @@ export async function generateRoleFlowResponse({
             temperature: sampling.temperature[effort],
             ...(sampling.topP !== undefined ? { top_p: sampling.topP } : {}),
             max_tokens: safeMaxTokens,
-            ...(!hasImages && sampling.reasoningEffort
-              ? { reasoning_effort: sampling.reasoningEffort }
+            ...(!hasImages
+              ? { reasoning_effort: effort === "low" ? "low" : (sampling.reasoningEffort || "low") }
               : {}),
             ...(onDelta ? { stream: true, stream_options: { include_usage: true } } : {}),
           }),

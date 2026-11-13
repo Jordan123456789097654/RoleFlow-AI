@@ -21,6 +21,15 @@ function extractUserId(req: NextRequest): string | undefined {
   const session = getSessionFromRequest(req);
   if (session?.userId) return session.userId;
 
+  const headerUserId = req.headers.get("x-user-id");
+  if (headerUserId && headerUserId.trim()) return headerUserId.trim();
+
+  const queryUserId = req.nextUrl.searchParams.get("userId");
+  if (queryUserId && queryUserId.trim()) return queryUserId.trim();
+
+  const guestCookie = req.cookies.get("roleflow_guest_id")?.value;
+  if (guestCookie && guestCookie.startsWith("guest_")) return guestCookie;
+
   // For unauthenticated guests, derive deterministic ID from IP hash
   const clientIp = getClientIp(req);
   const ipHash = clientIp.replace(/[^a-zA-Z0-9]/g, "");

@@ -2,7 +2,7 @@
 
 import React, { useState, useRef, useEffect } from "react";
 import Link from "next/link";
-import { Settings, Shield, Trash2, LogOut } from "lucide-react";
+import { Settings, Shield, Trash2, LogOut, Activity } from "lucide-react";
 import { UserProfile } from "@/types";
 import { formatCleanName } from "@/lib/format";
 
@@ -108,6 +108,17 @@ export const UserAvatarMenu: React.FC<UserAvatarMenuProps> = ({
               <Settings className="w-4 h-4 text-muted" strokeWidth={1.75} />
               <span>Settings</span>
             </button>
+
+            <a
+              href="https://status.roleflow.site"
+              target="_blank"
+              rel="noopener noreferrer"
+              onClick={() => setIsOpen(false)}
+              className={itemClass}
+            >
+              <Activity className="w-4 h-4 text-muted" strokeWidth={1.75} />
+              <span>System Status</span>
+            </a>
 
             {isAdmin && (
               <Link

@@ -152,7 +152,11 @@ async function handleChat(req: NextRequest, onDelta?: (text: string) => void): P
 
     if (sysConfig.maintenanceMode && !isAdmin) {
       return NextResponse.json(
-        { error: "RoleFlow is currently in scheduled maintenance. Please check back shortly." },
+        {
+          error: "RoleFlow is currently undergoing scheduled maintenance. Please check live status and updates at https://status.roleflow.site.",
+          isMaintenance: true,
+          statusUrl: "https://status.roleflow.site",
+        },
         { status: 503 }
       );
     }

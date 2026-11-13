@@ -40,6 +40,16 @@ export const Footer: React.FC = () => {
                   FAQ
                 </a>
               </li>
+              <li>
+                <a
+                  href="https://status.roleflow.site"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="inline-flex min-h-10 items-center hover:text-ink transition-colors"
+                >
+                  System Status
+                </a>
+              </li>
             </ul>
           </div>
 

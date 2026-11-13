@@ -26,7 +26,7 @@ import {
   UserProfile,
   UsageStats,
 } from "@/types";
-import { Code, Bug, Compass, AlertTriangle } from "lucide-react";
+import { Code, Bug, Compass, AlertTriangle, ExternalLink } from "lucide-react";
 
 /** Messages a signed-out visitor can send before being asked to sign in. */
 const GUEST_MESSAGE_LIMIT = 5;
@@ -190,10 +190,11 @@ export default function ChatPage() {
     forcedModelName: string | null;
     forcedEffort: EffortLevel | null;
     broadcastBanner: string;
+    maintenanceMode: boolean;
   } | null>(null);
   const [modelIncidentWarning, setModelIncidentWarning] = useState<string | null>(null);
 
-  // Poll/fetch public config for forced model, forced effort, and broadcast banner
+  // Poll/fetch public config for forced model, forced effort, maintenance, and broadcast banner
   useEffect(() => {
     let mounted = true;
     const fetchConfig = async () => {
@@ -207,6 +208,7 @@ export default function ChatPage() {
               forcedModelName: data.forcedModelName || null,
               forcedEffort: data.forcedEffort || null,
               broadcastBanner: data.broadcastBanner || "",
+              maintenanceMode: Boolean(data.maintenanceMode),
             });
 
             if (data.forcedModel && model !== data.forcedModel) {
@@ -558,6 +560,16 @@ export default function ChatPage() {
         setCurrentChatId(data.chatId);
       }
 
+      if (data.chat) {
+        setChats((prev) => {
+          const exists = prev.some((c) => c.id === data.chat.id);
+          if (exists) {
+            return prev.map((c) => (c.id === data.chat.id ? data.chat : c));
+          }
+          return [data.chat, ...prev];
+        });
+      }
+
       fetchUserChats(effectiveUserId);
     } catch (err: any) {
       stopThinking();
@@ -833,6 +845,30 @@ export default function ChatPage() {
           forcedModelName={systemConfig?.forcedModelName}
           forcedEffort={systemConfig?.forcedEffort}
         />
+
+        {/* Scheduled Maintenance Mode Banner */}
+        {systemConfig?.maintenanceMode && !user?.isAdmin && (
+          <div className="mx-4 mt-2.5 p-3.5 rounded-xl bg-amber-500/15 border border-amber-500/30 flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-xs text-ink animate-message shrink-0">
+            <div className="flex items-start gap-2.5">
+              <AlertTriangle className="w-4 h-4 text-amber-500 shrink-0 mt-0.5" />
+              <div>
+                <span className="font-semibold text-amber-600 dark:text-amber-400 block text-xs">
+                  RoleFlow Scheduled Maintenance
+                </span>
+                Services are temporarily paused for system upgrades. Check live updates on our status page.
+              </div>
+            </div>
+            <a
+              href="https://status.roleflow.site"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-amber-600 hover:bg-amber-700 text-white font-medium text-xs shrink-0 transition-colors"
+            >
+              <span>status.roleflow.site</span>
+              <ExternalLink className="w-3.5 h-3.5" />
+            </a>
+          </div>
+        )}
 
         {/* Emergency Model Incident Warning Banner */}
         {systemConfig?.forcedModel && activeModel !== systemConfig.forcedModel && (
