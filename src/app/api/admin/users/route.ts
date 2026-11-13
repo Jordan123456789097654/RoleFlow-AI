@@ -1,9 +1,30 @@
 import { NextRequest, NextResponse } from "next/server";
 import { db, ADMIN_EMAIL } from "@/lib/db";
 import { getSessionFromRequest } from "@/lib/auth";
+import type { Punishment, PunishmentKind } from "@/types";
 import { notifyUser, temporarySuspensionNotice, warningNotice } from "@/lib/notify";
 
 export const dynamic = "force-dynamic";
+
+const ACTIONS_NEEDING_REASON = ["warnUser", "suspendUser", "banUser"];
+
+/** Writes a permanent punishment record for an account. */
+async function recordPunishment(
+  target: string,
+  adminEmail: string,
+  fields: { kind: PunishmentKind; reason: string; incidentId?: string; durationDays?: number; until?: string }
+) {
+  const clean = String(target).toLowerCase().trim();
+  const account = clean.includes("@") ? await db.getUserByEmail(clean) : await db.getUserById(target);
+  const record: Punishment = {
+    id: `pun_${Date.now().toString(36)}${Math.random().toString(36).slice(2, 7)}`,
+    userEmail: (account?.email || clean).toLowerCase(),
+    adminEmail,
+    createdAt: new Date().toISOString(),
+    ...fields,
+  };
+  await db.addPunishment(record);
+}
 
 async function verifyAdminAuth(req: NextRequest): Promise<boolean> {
   const session = getSessionFromRequest(req);
@@ -48,6 +69,9 @@ export async function POST(req: NextRequest) {
 
     const body = await req.json();
     const { action, userId, email } = body;
+    const reason = typeof body.reason === "string" ? body.reason.trim() : "";
+    const incidentId = typeof body.incidentId === "string" && body.incidentId ? body.incidentId : undefined;
+    const actorEmail = getSessionFromRequest(req)?.email || "";
     const target = userId || email;
 
     if (!target) {
@@ -58,6 +82,13 @@ export async function POST(req: NextRequest) {
     }
 
     const targetClean = String(target).toLowerCase().trim();
+
+    if (ACTIONS_NEEDING_REASON.includes(action) && (reason.length < 3 || reason.length > 1000)) {
+      return NextResponse.json(
+        { error: "A reason is required (3 to 1,000 characters). It is kept in the punishment history." },
+        { status: 400 }
+      );
+    }
 
     switch (action) {
       case "toggleAdmin": {
@@ -86,6 +117,7 @@ export async function POST(req: NextRequest) {
           );
         }
         await db.banUser(target);
+        await recordPunishment(target, actorEmail, { kind: "BAN", reason, incidentId });
         const user = targetClean.includes("@")
           ? await db.getUserByEmail(targetClean)
           : await db.getUserById(target);
@@ -98,6 +130,7 @@ export async function POST(req: NextRequest) {
 
       case "unbanUser": {
         await db.unbanUser(target);
+        await recordPunishment(target, actorEmail, { kind: "LIFT", reason: reason || "Lifted without a reason given", incidentId });
         const user = targetClean.includes("@")
           ? await db.getUserByEmail(targetClean)
           : await db.getUserById(target);
@@ -122,6 +155,7 @@ export async function POST(req: NextRequest) {
 
       case "warnUser": {
         const strikes = await db.incrementStrikes(target);
+        await recordPunishment(target, actorEmail, { kind: "WARN", reason, incidentId });
         const warned = targetClean.includes("@")
           ? await db.getUserByEmail(targetClean)
           : await db.getUserById(target);
@@ -152,6 +186,7 @@ export async function POST(req: NextRequest) {
         if (!suspended) {
           return NextResponse.json({ error: "User not found" }, { status: 404 });
         }
+        await recordPunishment(target, actorEmail, { kind: "SUSPEND", reason, incidentId, durationDays: n, until });
         notifyUser(suspended.email, temporarySuspensionNotice({ until }));
         return NextResponse.json({
           success: true,

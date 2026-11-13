@@ -198,6 +198,21 @@ export type ModerationCategory =
 
 export type ModerationStatus = "FLAGGED" | "BANNED" | "APPEALED" | "RESOLVED" | "ESCALATED";
 
+export type PunishmentKind = "WARN" | "SUSPEND" | "BAN" | "LIFT";
+
+/** One enforcement action against an account, kept permanently with the reason and the admin who took it. */
+export interface Punishment {
+  id: string;
+  userEmail: string;
+  kind: PunishmentKind;
+  reason: string;
+  incidentId?: string;
+  durationDays?: number;
+  until?: string;
+  adminEmail: string;
+  createdAt: string;
+}
+
 /** A staff note or an audit entry written by an admin on an incident. */
 export interface AdminNote {
   id: string;

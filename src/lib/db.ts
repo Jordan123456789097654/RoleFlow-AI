@@ -2,7 +2,7 @@ import fs from "fs";
 import path from "path";
 import os from "os";
 import { sql } from "@vercel/postgres";
-import { Chat, Project, UserProfile, ModerationLogEntry, ModerationStatus, SystemConfig, MemoryItem, ApiKey, ModelId, EffortLevel, EmailBroadcastLog, LicenseKeyRecord, ReferralRecord, LawRequestRecord, LawRequestStatus, AdminNote } from "@/types";
+import { Chat, Project, UserProfile, ModerationLogEntry, ModerationStatus, SystemConfig, MemoryItem, ApiKey, ModelId, EffortLevel, EmailBroadcastLog, LicenseKeyRecord, ReferralRecord, LawRequestRecord, LawRequestStatus, AdminNote, Punishment } from "@/types";
 import { MODEL_IDS, resolveModelList } from "@/lib/models";
 import { getKeyPoolStatus } from "@/lib/groq-keys";
 
@@ -37,6 +37,9 @@ interface LocalStore {
   >;
   guestUsage?: Record<string, { count: number; lastResetDate: string }>;
   moderationLogs?: Record<string, ModerationLogEntry>;
+  punishments?: Record<string, Punishment>;
+  /** Chat IDs that users deleted. Holds only the ID, owner and time, never the content. */
+  deletedChats?: Record<string, { userId: string; deletedAt: string }>;
   memories?: Record<string, MemoryItem[]>;
   systemConfig?: SystemConfig;
   apiKeys?: Record<string, ApiKey>;
@@ -304,6 +307,28 @@ async function ensureDb() {
 
     await sql`
       ALTER TABLE roleflow_chats ADD COLUMN IF NOT EXISTS compaction JSONB;
+    `;
+
+    await sql`
+      CREATE TABLE IF NOT EXISTS roleflow_deleted_chats (
+        id VARCHAR(255) PRIMARY KEY,
+        user_id VARCHAR(255),
+        deleted_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+      );
+    `;
+
+    await sql`
+      CREATE TABLE IF NOT EXISTS roleflow_punishments (
+        id VARCHAR(255) PRIMARY KEY,
+        user_email VARCHAR(255) NOT NULL,
+        kind VARCHAR(20) NOT NULL,
+        reason TEXT NOT NULL,
+        incident_id VARCHAR(255),
+        duration_days INTEGER,
+        until TIMESTAMP WITH TIME ZONE,
+        admin_email VARCHAR(255) NOT NULL,
+        created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+      );
     `;
 
     await sql`
@@ -1322,8 +1347,53 @@ export const db = {
     return null;
   },
 
+  /** Records that these chats were deleted, so a later save cannot bring them back. */
+  async markChatsDeleted(chatIds: string[], userId: string): Promise<void> {
+    if (chatIds.length === 0) return;
+    await ensureDb();
+    if (isPostgresConfigured) {
+      try {
+        for (const id of chatIds) {
+          await sql`
+            INSERT INTO roleflow_deleted_chats (id, user_id) VALUES (${id}, ${userId})
+            ON CONFLICT (id) DO NOTHING;
+          `;
+        }
+        return;
+      } catch (e) {
+        console.error("Postgres mark chats deleted error:", e);
+      }
+    }
+    const store = getLocalStore();
+    const now = new Date().toISOString();
+    store.deletedChats = store.deletedChats || {};
+    for (const id of chatIds) {
+      store.deletedChats[id] = { userId, deletedAt: now };
+    }
+    saveLocalStore(store);
+  },
+
+  /** True when a user deleted this chat. Fails closed, so a database error never resurrects a chat. */
+  async isChatDeleted(chatId: string): Promise<boolean> {
+    if (!chatId) return false;
+    await ensureDb();
+    if (isPostgresConfigured) {
+      try {
+        const { rows } = await sql`SELECT 1 FROM roleflow_deleted_chats WHERE id = ${chatId} LIMIT 1;`;
+        return rows.length > 0;
+      } catch (e) {
+        console.error("Postgres check deleted chat error:", e);
+        return true;
+      }
+    }
+    const store = getLocalStore();
+    return Boolean(store.deletedChats?.[chatId]);
+  },
+
   async saveChat(chat: Chat, requesterId?: string): Promise<void> {
     await ensureDb();
+    // A deleted chat stays deleted. A later message or a stream that was still running must not recreate it.
+    if (await this.isChatDeleted(chat.id)) return;
     const existing = await this.getChat(chat.id, undefined, true);
     // Only the owner may write an existing chat. A chat with no owner cannot be written either.
     if (existing && (!requesterId || existing.userId !== requesterId)) {
@@ -1367,7 +1437,9 @@ export const db = {
           WHERE id = ${chatId} AND user_id = ${userId}
           RETURNING id;
         `;
-        return (result.rows?.length || 0) > 0;
+        const deleted = (result.rows?.length || 0) > 0;
+        if (deleted) await this.markChatsDeleted([chatId], userId);
+        return deleted;
       } catch (e) {
         console.error("Postgres delete chat error:", e);
       }
@@ -1379,6 +1451,8 @@ export const db = {
         return false;
       }
       delete store.chats[chatId];
+      store.deletedChats = store.deletedChats || {};
+      store.deletedChats[chatId] = { userId, deletedAt: new Date().toISOString() };
       saveLocalStore(store);
       return true;
     }
@@ -1394,6 +1468,8 @@ export const db = {
 
     if (isPostgresConfigured) {
       try {
+        const { rows: owned } = await sql`SELECT id FROM roleflow_chats WHERE user_id = ${cleanUserId};`;
+        await this.markChatsDeleted(owned.map((r: any) => r.id), cleanUserId);
         await sql`DELETE FROM roleflow_chats WHERE user_id = ${cleanUserId};`;
         return true;
       } catch (e) {
@@ -1402,9 +1478,11 @@ export const db = {
     }
     const store = getLocalStore();
     let changed = false;
+    store.deletedChats = store.deletedChats || {};
     for (const id of Object.keys(store.chats)) {
       if (store.chats[id].userId === cleanUserId) {
         delete store.chats[id];
+        store.deletedChats[id] = { userId: cleanUserId, deletedAt: new Date().toISOString() };
         changed = true;
       }
     }
@@ -1855,6 +1933,54 @@ export const db = {
     user.isBanned = true;
     user.suspendedUntil = until;
     return this.upsertUser(user);
+  },
+
+  // Punishment history: permanent record of every enforcement action on an account
+  async addPunishment(p: Punishment): Promise<void> {
+    await ensureDb();
+    if (isPostgresConfigured) {
+      try {
+        await sql`
+          INSERT INTO roleflow_punishments (id, user_email, kind, reason, incident_id, duration_days, until, admin_email, created_at)
+          VALUES (${p.id}, ${p.userEmail}, ${p.kind}, ${p.reason}, ${p.incidentId || null}, ${p.durationDays ?? null}, ${p.until || null}, ${p.adminEmail}, ${p.createdAt});
+        `;
+        return;
+      } catch (e) {
+        console.error("Postgres add punishment error:", e);
+      }
+    }
+    const store = getLocalStore();
+    if (!store.punishments) store.punishments = {};
+    store.punishments[p.id] = p;
+    saveLocalStore(store);
+  },
+
+  async getPunishments(userEmail: string): Promise<Punishment[]> {
+    await ensureDb();
+    const clean = userEmail.toLowerCase().trim();
+    if (isPostgresConfigured) {
+      try {
+        const { rows } = await sql`
+          SELECT id, user_email as "userEmail", kind, reason, incident_id as "incidentId", duration_days as "durationDays", until, admin_email as "adminEmail", created_at as "createdAt"
+          FROM roleflow_punishments
+          WHERE user_email = ${clean}
+          ORDER BY created_at DESC;
+        `;
+        return rows.map((r: any) => ({
+          ...r,
+          until: r.until ? new Date(r.until).toISOString() : undefined,
+          createdAt: new Date(r.createdAt).toISOString(),
+          durationDays: r.durationDays == null ? undefined : Number(r.durationDays),
+          incidentId: r.incidentId || undefined,
+        })) as Punishment[];
+      } catch (e) {
+        console.error("Postgres get punishments error:", e);
+      }
+    }
+    const store = getLocalStore();
+    return Object.values(store.punishments || {})
+      .filter((p) => p.userEmail === clean)
+      .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
   },
 
   async banUser(userIdOrEmail: string): Promise<void> {

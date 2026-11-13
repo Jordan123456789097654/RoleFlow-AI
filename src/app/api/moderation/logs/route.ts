@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/lib/db";
 import { getSessionFromRequest } from "@/lib/auth";
-import { AdminNote, ModerationLogEntry, ModerationStatus } from "@/types";
+import { AdminNote, ModerationLogEntry, ModerationStatus, PunishmentKind } from "@/types";
 import { appealDecisionNotice, notifyUser, temporarySuspensionNotice, warningNotice } from "@/lib/notify";
 
 export const dynamic = "force-dynamic";
@@ -100,6 +100,8 @@ export async function POST(req: NextRequest) {
       (status === "RESOLVED" ? "UNBAN_DISMISS" : status === "BANNED" ? "CONFIRM_BAN" : status ? "SET_STATUS" : undefined);
 
     let updated: ModerationLogEntry | null = null;
+    let suspendDays: number | undefined;
+    let suspendUntil: string | undefined;
     let auditText = "";
     let message = "";
 
@@ -140,6 +142,8 @@ export async function POST(req: NextRequest) {
           );
         }
         const until = new Date(Date.now() + n * 24 * 60 * 60 * 1000).toISOString();
+        suspendDays = n;
+        suspendUntil = until;
         const suspended = await db.suspendUserUntil(target, until);
         if (!suspended) {
           return NextResponse.json({ error: "The account for this incident no longer exists." }, { status: 404 });
@@ -176,6 +180,26 @@ export async function POST(req: NextRequest) {
 
       default:
         return NextResponse.json({ error: `Invalid action: ${action}` }, { status: 400 });
+    }
+
+    const punishmentKinds: Partial<Record<string, PunishmentKind>> = {
+      WARN: "WARN",
+      SUSPEND: "SUSPEND",
+      CONFIRM_BAN: "BAN",
+    };
+    const kind = effectiveAction ? punishmentKinds[effectiveAction] : undefined;
+    if (kind) {
+      await db.addPunishment({
+        id: `pun_${Date.now().toString(36)}${Math.random().toString(36).slice(2, 7)}`,
+        userEmail: (logEntry.userEmail && logEntry.userEmail !== "guest" ? logEntry.userEmail : logEntry.userId).toLowerCase(),
+        kind,
+        reason: `Incident ${logId}: ${logEntry.category}`,
+        incidentId: logId,
+        durationDays: suspendDays,
+        until: suspendUntil,
+        adminEmail: admin.email,
+        createdAt: new Date().toISOString(),
+      });
     }
 
     if (auditText) {

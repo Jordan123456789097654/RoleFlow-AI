@@ -142,6 +142,12 @@ Administrators can issue voucher keys to VIP users, enterprise partners, or educ
 
 - Administrators can inspect chat IDs to diagnose model truncation, failed streams, or API disconnections.
 
+- Deleted chats are not shown. When a user deletes a chat, or deletes all of their chats, the content is permanently removed. It is not kept for review and cannot be restored from this panel.
+
+- RoleFlow does not currently have an archive feature, so this panel shows no archived chats.
+
+- A deleted chat stays deleted. A later message, or a response still streaming when the chat was deleted, does not bring it back.
+
 - Never alter user chat transcripts. Respect user privacy outside active support investigations.
 
 ## 6. Incident Response & Key Contacts
@@ -160,4 +166,4 @@ In the event of an infrastructure outage or critical security incident, follow t
 
     - **Emergency Escalation Channel:** Direct platform administrator dispatch
 
-*Handbook Version 1.1 · Updated 13 November 2026 · RoleFlow Operations Team*
+*Handbook Version 1.2 · Updated 13 November 2026 · RoleFlow Operations Team*

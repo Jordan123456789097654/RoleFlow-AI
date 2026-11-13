@@ -26,12 +26,13 @@ import { UserProfile, SystemConfig, ModerationLogEntry, IncidentContext, Inciden
 import AdminEmailsPanel from "@/components/AdminEmailsPanel";
 import AdminLicenseKeysPanel from "@/components/AdminLicenseKeysPanel";
 import AdminLawRequestsPanel from "@/components/AdminLawRequestsPanel";
-import { Scale, Ticket, BookOpen } from "lucide-react";
+import { Scale, Ticket, BookOpen, Gavel } from "lucide-react";
+import AdminPunishmentsPanel from "@/components/AdminPunishmentsPanel";
 import AdminHandbookPanel from "@/components/AdminHandbookPanel";
 import ReferralModal from "@/components/ReferralModal";
 import AdminChatsPanel from "@/components/AdminChatsPanel";
 
-type AdminTab = "attention" | "config" | "users" | "chats" | "moderation" | "emails" | "licenses" | "law" | "handbook";
+type AdminTab = "attention" | "config" | "users" | "chats" | "moderation" | "emails" | "licenses" | "law" | "handbook" | "punishments";
 
 const focusRing = "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/40";
 
@@ -49,6 +50,7 @@ const NAV: { id: AdminTab; label: string; icon: React.ReactNode }[] = [
   { id: "attention", label: "Needs attention", icon: <Activity className="h-4 w-4" /> },
   { id: "config", label: "System settings", icon: <Sliders className="h-4 w-4" /> },
   { id: "users", label: "Users", icon: <Users className="h-4 w-4" /> },
+  { id: "punishments", label: "Punishments", icon: <Gavel className="h-4 w-4" /> },
   { id: "chats", label: "User Chats (Support)", icon: <MessageSquare className="h-4 w-4" /> },
   { id: "moderation", label: "Moderation", icon: <AlertTriangle className="h-4 w-4" /> },
   { id: "emails", label: "Emails", icon: <Mail className="h-4 w-4" /> },
@@ -395,12 +397,21 @@ export default function AdminPage() {
     targetUser: UserProfile,
     extra: Record<string, unknown> = {}
   ) => {
+    const payload: Record<string, unknown> = { ...extra };
+    if (action === "warnUser" || action === "suspendUser" || action === "banUser") {
+      const reason = window.prompt("Reason for this action. It is kept in the punishment history.")?.trim() || "";
+      if (reason.length < 3) {
+        showToast("A reason of at least 3 characters is required.");
+        return;
+      }
+      payload.reason = reason;
+    }
     setUserActionLoading(`${action}-${targetUser.id}`);
     try {
       const res = await fetch("/api/admin/users", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ action, userId: targetUser.id, email: targetUser.email, ...extra }),
+        body: JSON.stringify({ action, userId: targetUser.id, email: targetUser.email, ...payload }),
       });
       const data = await res.json();
       if (res.ok) {
@@ -874,7 +885,7 @@ export default function AdminPage() {
                     </span>
                   </div>
                   <p className="text-xs text-muted leading-relaxed">
-                    Lock the entire system to a single model or effort level during upstream provider outages or capacity spikes.
+                    Lock the entire system to a single model or effort level during upstream provider outages or TPM spikes.
                     When a model is forced, any attempts to use other models will display:
                     <span className="font-mono text-ink block mt-1 p-2 rounded bg-app border border-line">
                       &quot;We are experiencing issues reaching this model. Please switch to [allowed model name].&quot;
@@ -1157,6 +1168,20 @@ export default function AdminPage() {
           {activeTab === "emails" && <AdminEmailsPanel />}
           {activeTab === "licenses" && <AdminLicenseKeysPanel />}
           {activeTab === "law" && <AdminLawRequestsPanel />}
+          {activeTab === "punishments" && (
+            <AdminPunishmentsPanel
+              users={usersList}
+              logs={moderationLogs}
+              onChanged={async () => {
+                await fetchUsers();
+                await fetchModerationLogs();
+              }}
+              onOpenIncidents={(email) => {
+                setModUserFilter(email);
+                setActiveTab("moderation");
+              }}
+            />
+          )}
           {activeTab === "handbook" && <AdminHandbookPanel />}
 
           {/* MODERATION */}
