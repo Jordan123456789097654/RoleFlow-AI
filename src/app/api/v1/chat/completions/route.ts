@@ -396,17 +396,38 @@ export async function POST(req: NextRequest) {
     // Outcomes after generation (safety, unavailable model, quota charge) are the same whether the
     // reply is returned whole or streamed.
     const runGeneration = async (onDelta?: (text: string) => void): Promise<GenerationOutcome> => {
-      const result = await generateRoleFlowResponse({
-        messages: cappedMessages,
-        model,
-        effort,
-        customInstructions: "",
-        memories: [],
-        onDelta,
-      });
+      // Reserve the owner's message before generating, so parallel requests cannot all pass the quota check.
+      const reservation = await db.reserveUsage(identifier, false);
+      if (reservation.unverified) {
+        return { ok: false, status: 503, message: "We could not verify your account. Please try again in a moment.", type: "server_error", code: "account_unverified" };
+      }
+      if (!reservation.allowed) {
+        return {
+          ok: false,
+          status: 429,
+          message: `Daily message limit reached for your account (${reservation.limit} per day). It resets at midnight.`,
+          type: "rate_limit_error",
+          code: "account_daily_limit_exceeded",
+        };
+      }
+      let result;
+      try {
+        result = await generateRoleFlowResponse({
+          messages: cappedMessages,
+          model,
+          effort,
+          customInstructions: "",
+          memories: [],
+          onDelta,
+        });
+      } catch (error) {
+        await db.refundUsage(reservation.charge).catch((e) => console.error("Usage refund failed:", e));
+        throw error;
+      }
 
       // Upstream safety block that our scanner did not catch: audit as Tier 2 with an alert. No ban.
       if (result.isSafetyRefusal) {
+        await db.refundUsage(reservation.charge);
         const strikes = await db.incrementStrikes(identifier);
         const category = "UPSTREAM_SAFETY_BLOCK";
         const logId = await recordIncident({
@@ -431,6 +452,7 @@ export async function POST(req: NextRequest) {
 
       // Model unavailable: return an error and do not charge the owner or the key.
       if (result.isFallback) {
+        await db.refundUsage(reservation.charge);
         return {
           ok: false,
           status: 503,
@@ -440,8 +462,8 @@ export async function POST(req: NextRequest) {
         };
       }
 
-      // 8. Success: charge the owner's quota and the key's counters only now.
-      const updatedUsage = await db.incrementUsage(identifier, false);
+      // 8. Success: the reserved message is kept, and the key's counters are updated.
+      const updatedUsage = reservation;
       await db.touchApiKeyUsage(record.id);
       return {
         ok: true,

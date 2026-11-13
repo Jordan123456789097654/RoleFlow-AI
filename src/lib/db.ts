@@ -191,18 +191,21 @@ export function patchUserProfile(user: UserProfile): UserProfile {
 }
 
 function getLocalStore(): LocalStore {
-  try {
-    if (!fs.existsSync(DATA_DIR)) {
-      fs.mkdirSync(DATA_DIR, { recursive: true });
-    }
-    if (fs.existsSync(STORE_FILE)) {
-      const data = fs.readFileSync(STORE_FILE, "utf-8");
-      return JSON.parse(data);
-    }
-  } catch (err) {
-    console.error("Local store read error:", err);
+  if (!fs.existsSync(DATA_DIR)) {
+    fs.mkdirSync(DATA_DIR, { recursive: true });
   }
-  return { users: {}, chats: {}, projects: {}, authCodes: {} };
+  if (!fs.existsSync(STORE_FILE)) {
+    return { users: {}, chats: {}, projects: {}, authCodes: {} };
+  }
+  // A file that cannot be parsed is not treated as empty. An empty store here would be written
+  // back on the next save and overwrite all existing data.
+  const data = fs.readFileSync(STORE_FILE, "utf-8");
+  try {
+    return JSON.parse(data);
+  } catch (err) {
+    console.error("Local store is corrupt:", err);
+    throw new Error("Local data store is unreadable. Refusing to continue so existing data is not overwritten.");
+  }
 }
 
 function saveLocalStore(store: LocalStore) {
@@ -215,6 +218,7 @@ function saveLocalStore(store: LocalStore) {
     fs.renameSync(tempFile, STORE_FILE);
   } catch (err) {
     console.error("Local store save error:", err);
+    throw err;
   }
 }
 
@@ -449,6 +453,92 @@ async function ensureDb() {
     isInitialized = true;
   } catch (error) {
     console.warn("Postgres initialization notice (using fallback):", error);
+  }
+}
+
+/** What a reserved message was charged to, so the charge can be refunded if no reply is produced. */
+export type UsageCharge =
+  | { kind: "none" }
+  | { kind: "guest"; key: string }
+  | { kind: "daily"; userId: string; day: string }
+  | { kind: "license"; id: string };
+
+export interface UsageReservation {
+  allowed: boolean;
+  used: number;
+  limit: number;
+  remaining: number;
+  isUnlimited: boolean;
+  resetsAt: string;
+  /** Set when the account record cannot be found, so the quota cannot be checked. */
+  unverified?: boolean;
+  charge: UsageCharge;
+}
+
+function findStoredUser(store: LocalStore, user: UserProfile): UserProfile | undefined {
+  return Object.values(store.users).find(
+    (u) => u.id === user.id || u.email.toLowerCase() === user.email.toLowerCase()
+  );
+}
+
+/**
+ * Takes one message from the daily quota in a single statement, so two requests cannot both pass
+ * the check. Returns the new count, or null when the quota is used up.
+ */
+async function takeDailyMessage(user: UserProfile, today: string, dailyLimit: number): Promise<number | null> {
+  if (isPostgresConfigured) {
+    const { rows } = await sql`
+      UPDATE roleflow_users
+      SET message_count = CASE WHEN last_reset_date = ${today} THEN COALESCE(message_count, 0) + 1 ELSE 1 END,
+          last_reset_date = ${today}
+      WHERE id = ${user.id}
+        AND (last_reset_date IS DISTINCT FROM ${today} OR COALESCE(message_count, 0) < ${dailyLimit})
+      RETURNING message_count;
+    `;
+    return rows[0] ? Number(rows[0].message_count) || 0 : null;
+  }
+  const store = getLocalStore();
+  const stored = findStoredUser(store, user);
+  if (!stored) return null;
+  if (stored.lastResetDate !== today) {
+    stored.messageCount = 0;
+    stored.lastResetDate = today;
+  }
+  const count = stored.messageCount || 0;
+  if (count >= dailyLimit) return null;
+  stored.messageCount = count + 1;
+  saveLocalStore(store);
+  return count + 1;
+}
+
+async function refundDailyMessage(userId: string, day: string): Promise<void> {
+  if (isPostgresConfigured) {
+    // Only refund on the same day the message was charged, so a midnight rollover is not undone.
+    await sql`
+      UPDATE roleflow_users
+      SET message_count = GREATEST(COALESCE(message_count, 0) - 1, 0)
+      WHERE id = ${userId} AND last_reset_date = ${day};
+    `;
+    return;
+  }
+  const store = getLocalStore();
+  const stored = Object.values(store.users).find((u) => u.id === userId);
+  if (stored && stored.lastResetDate === day && (stored.messageCount || 0) > 0) {
+    stored.messageCount = (stored.messageCount || 0) - 1;
+    saveLocalStore(store);
+  }
+}
+
+async function refundLicenseMessage(id: string): Promise<void> {
+  if (isPostgresConfigured) {
+    await sql`UPDATE roleflow_license_keys SET remaining = remaining + 1 WHERE id = ${id};`;
+    return;
+  }
+  const store = getLocalStore();
+  const key = store.licenseKeys?.[id];
+  if (key) {
+    key.remaining += 1;
+    saveLocalStore(store);
   }
 }
 
@@ -782,7 +872,7 @@ export const db = {
   },
 
   /** Spends one message from the user's active key. Returns false when there is no balance. */
-  async spendLicenseMessage(email: string): Promise<boolean> {
+  async spendLicenseMessage(email: string): Promise<string | null> {
     await ensureDb();
     const cleanEmail = email.toLowerCase().trim();
     if (isPostgresConfigured) {
@@ -796,14 +886,14 @@ export const db = {
         )
         RETURNING id;
       `;
-      return rows.length > 0;
+      return rows[0] ? String(rows[0].id) : null;
     }
     const store = getLocalStore();
     const k = activeLocalLicenseKey(store, cleanEmail);
-    if (!k) return false;
+    if (!k) return null;
     k.remaining -= 1;
     saveLocalStore(store);
-    return true;
+    return k.id;
   },
 
   // ───────────────────────────────────────────────────────────────────────────
@@ -925,6 +1015,7 @@ export const db = {
     resetsAt: string;
     extraRemaining?: number;
     extraExpiresAt?: string | null;
+    unverified?: boolean;
   }> {
     const today = getTodayDateString();
     const config = await this.getSystemConfig();
@@ -961,13 +1052,15 @@ export const db = {
     }
 
     if (!user) {
+      // Fail closed: without the account record the quota cannot be checked.
       return {
-        allowed: true,
+        allowed: false,
         used: 0,
-        limit: dynamicGuestLimit,
-        remaining: dynamicGuestLimit,
+        limit: dynamicDailyLimit,
+        remaining: 0,
         isUnlimited: false,
-        resetsAt: "sign in",
+        resetsAt: "midnight",
+        unverified: true,
       };
     }
 
@@ -1005,113 +1098,99 @@ export const db = {
     };
   },
 
-  async incrementUsage(identifier?: string, isGuest: boolean = false): Promise<{
-    allowed: boolean;
-    used: number;
-    limit: number;
-    remaining: number;
-    isUnlimited: boolean;
-    resetsAt: string;
-    extraRemaining?: number;
-    extraExpiresAt?: string | null;
-  }> {
+  /**
+   * Reserves one message. The caller keeps the charge when a reply is produced and calls refundUsage
+   * otherwise. Denies by default when the account record cannot be found.
+   */
+  async reserveUsage(identifier?: string, isGuest: boolean = false): Promise<UsageReservation> {
     const today = getTodayDateString();
     const config = await this.getSystemConfig();
-    const dynamicGuestLimit = config.guestLimit || GUEST_TOTAL_LIMIT;
-    const dynamicDailyLimit = config.registeredDailyLimit || FREE_DAILY_LIMIT;
+    const guestLimit = config.guestLimit || GUEST_TOTAL_LIMIT;
+    const dailyLimit = config.registeredDailyLimit || FREE_DAILY_LIMIT;
 
     if (!identifier || isGuest || identifier.startsWith("guest_")) {
+      // The read and write below have no await between them, so concurrent requests in this
+      // process cannot interleave.
+      const key = identifier || "guest_default";
       const store = getLocalStore();
       if (!store.guestUsage) store.guestUsage = {};
-      const key = identifier || "guest_default";
       const entry = store.guestUsage[key] || { count: 0, lastResetDate: today };
+      if (entry.count >= guestLimit) {
+        return { allowed: false, used: entry.count, limit: guestLimit, remaining: 0, isUnlimited: false, resetsAt: "sign in", charge: { kind: "none" } };
+      }
       entry.count += 1;
       store.guestUsage[key] = entry;
       saveLocalStore(store);
-
-      const used = entry.count;
-      const limit = dynamicGuestLimit;
-      return {
-        allowed: used <= limit,
-        used,
-        limit,
-        remaining: Math.max(0, limit - used),
-        isUnlimited: false,
-        resetsAt: "sign in",
-      };
-    }
-
-    let user = identifier.includes("@")
-      ? await this.getUserByEmail(identifier)
-      : await this.getUserById(identifier);
-
-    if (!user) {
-      const store = getLocalStore();
-      const found = Object.values(store.users).find(
-        (u) => u.id === identifier || u.email.toLowerCase() === identifier.toLowerCase()
-      );
-      if (found) user = patchUserProfile(found);
-    }
-
-    if (!user) {
       return {
         allowed: true,
-        used: 1,
-        limit: dynamicGuestLimit,
-        remaining: Math.max(0, dynamicGuestLimit - 1),
+        used: entry.count,
+        limit: guestLimit,
+        remaining: Math.max(0, guestLimit - entry.count),
         isUnlimited: false,
         resetsAt: "sign in",
+        charge: { kind: "guest", key },
       };
+    }
+
+    const user = await this.findUserForUsage(identifier);
+    if (!user) {
+      return { allowed: false, used: 0, limit: dailyLimit, remaining: 0, isUnlimited: false, resetsAt: "midnight", unverified: true, charge: { kind: "none" } };
     }
 
     if (user.isAdmin || user.email.toLowerCase() === ADMIN_EMAIL.toLowerCase()) {
       user.messageCount = (user.messageCount || 0) + 1;
       await this.upsertUser(user);
-      return {
-        allowed: true,
-        used: user.messageCount,
-        limit: 999999,
-        remaining: 999999,
-        isUnlimited: true,
-        resetsAt: "never",
-      };
+      return { allowed: true, used: user.messageCount, limit: 999999, remaining: 999999, isUnlimited: true, resetsAt: "never", charge: { kind: "none" } };
     }
 
-    let count = user.messageCount || 0;
-    if (user.lastResetDate !== today) {
-      count = 0;
-      user.lastResetDate = today;
+    const dailyUsed = await takeDailyMessage(user, today, dailyLimit);
+    if (dailyUsed !== null) {
+      return {
+        allowed: true,
+        used: dailyUsed,
+        limit: dailyLimit,
+        remaining: Math.max(0, dailyLimit - dailyUsed),
+        isUnlimited: false,
+        resetsAt: "midnight",
+        charge: { kind: "daily", userId: user.id, day: today },
+      };
     }
 
     // Daily quota used up: spend one message from the user's license key instead.
-    if (count >= dynamicDailyLimit && (await this.spendLicenseMessage(user.email))) {
-      const spent = await this.getActiveLicenseBalance(user.email);
-      return {
-        allowed: true,
-        used: count,
-        limit: dynamicDailyLimit,
-        remaining: 0,
-        isUnlimited: false,
-        resetsAt: "midnight",
-        extraRemaining: spent?.remaining ?? 0,
-        extraExpiresAt: spent?.expiresAt ?? null,
-      };
+    const licenseId = await this.spendLicenseMessage(user.email);
+    if (licenseId) {
+      return { allowed: true, used: dailyLimit, limit: dailyLimit, remaining: 0, isUnlimited: false, resetsAt: "midnight", charge: { kind: "license", id: licenseId } };
     }
 
-    count += 1;
-    user.messageCount = count;
-    await this.upsertUser(user);
+    return { allowed: false, used: dailyLimit, limit: dailyLimit, remaining: 0, isUnlimited: false, resetsAt: "midnight", charge: { kind: "none" } };
+  },
 
-    const limit = dynamicDailyLimit;
-    return {
-      allowed: count <= limit,
-      used: count,
-      limit,
-      remaining: Math.max(0, limit - count),
-      isUnlimited: false,
-      resetsAt: "midnight",
-      extraRemaining: (await this.getActiveLicenseBalance(user.email))?.remaining ?? 0,
-    };
+  async findUserForUsage(identifier: string): Promise<UserProfile | null> {
+    const user = identifier.includes("@")
+      ? await this.getUserByEmail(identifier)
+      : await this.getUserById(identifier);
+    if (user) return user;
+    const store = getLocalStore();
+    const found = Object.values(store.users).find(
+      (u) => u.id === identifier || u.email.toLowerCase() === identifier.toLowerCase()
+    );
+    return found ? patchUserProfile(found) : null;
+  },
+
+  /** Gives back a message reserved by reserveUsage. Used when no reply was produced. */
+  async refundUsage(charge: UsageCharge): Promise<void> {
+    if (charge.kind === "guest") {
+      const store = getLocalStore();
+      const entry = store.guestUsage?.[charge.key];
+      if (entry && entry.count > 0) {
+        entry.count -= 1;
+        saveLocalStore(store);
+      }
+    } else if (charge.kind === "daily") {
+      await refundDailyMessage(charge.userId, charge.day);
+    } else if (charge.kind === "license") {
+      await refundLicenseMessage(charge.id);
+    }
   },
 
   async resetAllUsage(): Promise<{ success: boolean; usersReset: number; guestsReset: number }> {
@@ -1203,7 +1282,7 @@ export const db = {
           const chat = rows[0] as unknown as Chat;
           if (isShared) return chat;
           if (!userId) return null; // Private chat requires user
-          if (chat.userId && chat.userId !== userId) {
+          if (!chat.userId || chat.userId !== userId) {
             return null; // Restricted
           }
           return chat;
@@ -1217,7 +1296,7 @@ export const db = {
     if (chat) {
       if (isShared) return chat;
       if (!userId) return null;
-      if (chat.userId && chat.userId !== userId) {
+      if (!chat.userId || chat.userId !== userId) {
         return null; // Restricted
       }
       return chat;
@@ -1228,27 +1307,31 @@ export const db = {
   async saveChat(chat: Chat, requesterId?: string): Promise<void> {
     await ensureDb();
     const existing = await this.getChat(chat.id, undefined, true);
-    if (existing && existing.userId) {
-      if (requesterId && existing.userId !== requesterId) {
-        throw new Error("Forbidden: You do not own this chat.");
-      }
+    // Only the owner may write an existing chat. A chat with no owner cannot be written either.
+    if (existing && (!requesterId || existing.userId !== requesterId)) {
+      throw new Error("Forbidden: You do not own this chat.");
     }
 
-    const assignedUserId = existing?.userId || chat.userId || requesterId || null;
+    const assignedUserId = requesterId || chat.userId || null;
 
     if (isPostgresConfigured) {
+      let written: boolean | null = null;
       try {
-        await sql`
+        const { rows } = await sql`
           INSERT INTO roleflow_chats (id, user_id, title, project_id, pinned, model, effort, messages, compaction, updated_at)
           VALUES (${chat.id}, ${assignedUserId}, ${chat.title}, ${chat.projectId || null}, ${chat.pinned || false}, ${chat.model}, ${chat.effort}, ${JSON.stringify(chat.messages)}, ${chat.compaction ? JSON.stringify(chat.compaction) : null}, NOW())
           ON CONFLICT (id) DO UPDATE
           SET title = ${chat.title}, project_id = ${chat.projectId || null}, pinned = ${chat.pinned || false}, model = ${chat.model}, effort = ${chat.effort}, messages = ${JSON.stringify(chat.messages)}, compaction = ${chat.compaction ? JSON.stringify(chat.compaction) : null}, updated_at = NOW()
-          WHERE roleflow_chats.user_id = ${assignedUserId} OR roleflow_chats.user_id IS NULL;
+          WHERE roleflow_chats.user_id = ${assignedUserId}
+          RETURNING id;
         `;
-        return;
+        written = rows.length > 0;
       } catch (e) {
         console.error("Postgres save chat error:", e);
       }
+      if (written === true) return;
+      // The row exists and belongs to someone else. Report it instead of claiming the save worked.
+      if (written === false) throw new Error("Forbidden: You do not own this chat.");
     }
     const store = getLocalStore();
     store.chats[chat.id] = { ...chat, userId: assignedUserId || undefined };

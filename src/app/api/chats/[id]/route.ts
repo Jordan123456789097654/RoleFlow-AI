@@ -1,33 +1,20 @@
 import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/lib/db";
 import { getSessionFromRequest } from "@/lib/auth";
+import { getClientIp } from "@/lib/client-ip";
 
-function getClientIp(req: NextRequest): string {
-  const forwarded = req.headers.get("x-forwarded-for");
-  if (forwarded) {
-    const first = forwarded.split(",")[0].trim();
-    if (first) return first;
-  }
-  const realIp = req.headers.get("x-real-ip");
-  if (realIp) return realIp.trim();
-  return "127.0.0.1";
-}
-
+/**
+ * Identifies the caller from the verified session. Client-supplied values (the x-user-id header and
+ * the userId query parameter) are ignored, so one caller cannot read or change another user's chats.
+ */
 function extractUserId(req: NextRequest): string | undefined {
   const session = getSessionFromRequest(req);
   if (session?.userId) return session.userId;
 
-  const headerUserId = req.headers.get("x-user-id");
-  if (headerUserId && headerUserId.trim()) return headerUserId.trim();
-
-  const queryUserId = req.nextUrl.searchParams.get("userId");
-  if (queryUserId && queryUserId.trim()) return queryUserId.trim();
-
   const guestCookie = req.cookies.get("roleflow_guest_id")?.value;
   if (guestCookie && guestCookie.startsWith("guest_")) return guestCookie;
 
-  const clientIp = getClientIp(req);
-  const ipHash = clientIp.replace(/[^a-zA-Z0-9]/g, "");
+  const ipHash = getClientIp(req).replace(/[^a-zA-Z0-9]/g, "");
   return `guest_${ipHash.slice(0, 16)}`;
 }
 

@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { generateRoleFlowResponse } from "@/lib/ai-engine";
-import { db, ADMIN_EMAIL } from "@/lib/db";
+import { db, ADMIN_EMAIL, type UsageCharge } from "@/lib/db";
+import { getClientIp } from "@/lib/client-ip";
 import { Attachment, Chat, Message, ModerationLogEntry, ModelId, EffortLevel, WebSource } from "@/types";
 import { scanMessage } from "@/lib/moderation";
 import { sendSecurityAlertEmail } from "@/lib/email";
@@ -20,6 +21,34 @@ import { generateChatTitle } from "@/lib/titles";
 
 const ALLOWED_MODELS: ModelId[] = [...MODEL_IDS];
 const ALLOWED_EFFORTS: EffortLevel[] = ["low", "medium", "high", "extra", "max"];
+
+/** Response for a request that cannot be charged. Unverified accounts are a server-side problem, not a limit. */
+function usageLimitResponse(usage: { limit: number; unverified?: boolean }, isGuest: boolean): NextResponse {
+  if (usage.unverified) {
+    return NextResponse.json(
+      { error: "We could not verify your account. Please try again in a moment." },
+      { status: 503 }
+    );
+  }
+  if (isGuest) {
+    return NextResponse.json(
+      {
+        error: `Guest limit reached. You have used all ${usage.limit} complimentary messages. Please sign in to continue using RoleFlow.`,
+        guestLimitReached: true,
+        usage,
+      },
+      { status: 429 }
+    );
+  }
+  return NextResponse.json(
+    {
+      error: `Daily message limit reached. Free accounts include ${usage.limit} messages per day. Your quota resets at midnight.`,
+      limitReached: true,
+      usage,
+    },
+    { status: 429 }
+  );
+}
 
 /**
  * Sends the chat request. A client that asks for text/event-stream gets the reply as it is
@@ -70,6 +99,14 @@ export async function POST(req: NextRequest) {
 }
 
 async function handleChat(req: NextRequest, onDelta?: (text: string) => void): Promise<NextResponse> {
+  // A message reserved for this request. It is refunded unless a reply is produced.
+  let pendingCharge: UsageCharge | null = null;
+  const refundPending = async () => {
+    const charge = pendingCharge;
+    pendingCharge = null;
+    if (charge) await db.refundUsage(charge);
+  };
+
   try {
     const body = await req.json();
     const session = getSessionFromRequest(req);
@@ -84,7 +121,7 @@ async function handleChat(req: NextRequest, onDelta?: (text: string) => void): P
       if (guestId && typeof guestId === "string" && guestId.startsWith("guest_")) {
         userId = guestId.slice(0, 36);
       } else {
-        const ipHash = (req.headers.get("x-forwarded-for")?.split(",")[0]?.trim() || "127.0.0.1").replace(/[^a-zA-Z0-9]/g, "");
+        const ipHash = getClientIp(req).replace(/[^a-zA-Z0-9]/g, "");
         userId = `guest_${ipHash.slice(0, 16)}`;
       }
     }
@@ -124,10 +161,7 @@ async function handleChat(req: NextRequest, onDelta?: (text: string) => void): P
 
     // Per-minute abuse limits, separate from daily quotas. Guest IDs come from the client,
     // so guests are limited per IP. Signed-in accounts are also capped per user.
-    const rateIp =
-      req.headers.get("x-forwarded-for")?.split(",")[0]?.trim() ||
-      req.headers.get("x-real-ip") ||
-      "unknown";
+    const rateIp = getClientIp(req);
     const ipLimit = checkRateLimit(
       `ip:${rateIp}`,
       isGuest ? RATE_LIMITS.guestIpPerMinute : RATE_LIMITS.ipPerMinute
@@ -257,36 +291,15 @@ async function handleChat(req: NextRequest, onDelta?: (text: string) => void): P
     // Enforce Usage Limits using dynamic limits from system config
     const usageCheck = await db.getUsage(identifier, isGuest);
 
-    if (!usageCheck.allowed) {
-      if (isGuest) {
-        return NextResponse.json(
-          {
-            error: `Guest limit reached. You have used all ${usageCheck.limit} complimentary messages. Please sign in to continue using RoleFlow.`,
-            guestLimitReached: true,
-            usage: usageCheck,
-          },
-          { status: 429 }
-        );
-      } else {
-        return NextResponse.json(
-          {
-            error: `Daily message limit reached. Free accounts include ${usageCheck.limit} messages per day. Your quota resets at midnight.`,
-            limitReached: true,
-            usage: usageCheck,
-          },
-          { status: 429 }
-        );
-      }
+    if (usageCheck.unverified || !usageCheck.allowed) {
+      return usageLimitResponse(usageCheck, isGuest);
     }
 
-    // Extract IP Address for moderation audit records
-    const ipAddress =
-      req.headers.get("x-forwarded-for")?.split(",")[0]?.trim() ||
-      req.headers.get("x-real-ip") ||
-      "127.0.0.1";
+    // Client IP for moderation audit records
+    const ipAddress = getClientIp(req);
 
     // 1. Run Trust & Safety Hybrid Scanner across current prompt and recent user messages
-    const promptToScan = latestUserMsg ? latestUserMsg.content : "";
+    const promptToScan: string = latestUserMsg?.content || "";
     // Attachments are scanned as well: filenames and text file contents. Image pixels are checked below.
     const attachmentScanText = buildAttachmentScanText(latestUserMsg);
     let moderationVerdict = scanMessage([promptToScan, attachmentScanText].filter(Boolean).join("\n"));
@@ -369,7 +382,7 @@ async function handleChat(req: NextRequest, onDelta?: (text: string) => void): P
           projectId,
           model,
           effort,
-          messages: [...safeMessages, assistantMessage],
+          messages: [...cappedMessages, assistantMessage],
           createdAt: new Date().toISOString(),
           updatedAt: new Date().toISOString(),
         };
@@ -412,7 +425,7 @@ async function handleChat(req: NextRequest, onDelta?: (text: string) => void): P
             projectId,
             model,
             effort,
-            messages: [...safeMessages, assistantMessage],
+            messages: [...cappedMessages, assistantMessage],
             createdAt: new Date().toISOString(),
             updatedAt: new Date().toISOString(),
           };
@@ -479,7 +492,7 @@ async function handleChat(req: NextRequest, onDelta?: (text: string) => void): P
           projectId,
           model,
           effort,
-          messages: [...safeMessages, assistantMessage],
+          messages: [...cappedMessages, assistantMessage],
           createdAt: new Date().toISOString(),
           updatedAt: new Date().toISOString(),
         };
@@ -554,6 +567,15 @@ async function handleChat(req: NextRequest, onDelta?: (text: string) => void): P
       }
     }
 
+    // Reserve one message now. Every check that can refuse the request has passed, and the model has not
+    // run yet. Parallel requests cannot all pass the quota check this way. The charge is refunded unless
+    // a reply is produced.
+    const reservation = await db.reserveUsage(identifier, isGuest);
+    if (!reservation.allowed) {
+      return usageLimitResponse(reservation, isGuest);
+    }
+    pendingCharge = reservation.charge;
+
     // Generate response from RoleFlow AI Engine
     const result = await generateRoleFlowResponse({
       messages: historyForModel,
@@ -571,6 +593,7 @@ async function handleChat(req: NextRequest, onDelta?: (text: string) => void): P
     // did not catch it, so it is audited here as a Tier 2 incident (strike + warning, no auto-ban),
     // alerted to admins, and not charged against quota.
     if (result.isSafetyRefusal) {
+      await refundPending();
       const newStrikes = await db.incrementStrikes(userEmail || userId || identifier);
       const logId =
         "mod-" + Date.now() + "-" + Math.random().toString(36).substring(2, 7);
@@ -697,18 +720,21 @@ async function handleChat(req: NextRequest, onDelta?: (text: string) => void): P
 
     await db.saveChat(chatToSave, userId);
 
-    // Increment Usage only on successful, non-fallback generations
-    let updatedUsage = usageCheck;
-    if (result.content && !result.isFallback) {
-      updatedUsage = await db.incrementUsage(identifier, isGuest);
+    // Keep the reserved message only when a reply was produced. Otherwise refund it.
+    const chargeable = Boolean(result.content) && !result.isFallback;
+    if (chargeable) {
+      pendingCharge = null;
+    } else {
+      await refundPending();
+    }
+    const updatedUsage = chargeable ? reservation : await db.getUsage(identifier, isGuest);
 
-      // Warn signed-in users at 5 and 1 remaining messages.
-      if (!isGuest && !updatedUsage.isUnlimited && (updatedUsage.remaining === 5 || updatedUsage.remaining === 1)) {
-        notifyUser(
-          userEmail,
-          usageWarningNotice({ remaining: updatedUsage.remaining, limit: updatedUsage.limit, resetsAt: updatedUsage.resetsAt })
-        );
-      }
+    // Warn signed-in users at 5 and 1 remaining messages.
+    if (chargeable && !isGuest && !updatedUsage.isUnlimited && (updatedUsage.remaining === 5 || updatedUsage.remaining === 1)) {
+      notifyUser(
+        userEmail,
+        usageWarningNotice({ remaining: updatedUsage.remaining, limit: updatedUsage.limit, resetsAt: updatedUsage.resetsAt })
+      );
     }
 
     return NextResponse.json({
@@ -725,9 +751,8 @@ async function handleChat(req: NextRequest, onDelta?: (text: string) => void): P
     });
   } catch (error: any) {
     console.error("Chat API error:", error);
-    return NextResponse.json(
-      { error: error.message || "Internal server error" },
-      { status: 500 }
-    );
+    await refundPending().catch((refundError) => console.error("Usage refund failed:", refundError));
+    // Internal error details stay in the server log. The client gets a generic message.
+    return NextResponse.json({ error: "Internal server error" }, { status: 500 });
   }
 }
