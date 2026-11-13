@@ -364,3 +364,31 @@ export interface LawRequestRecord {
   createdAt: string;
   updatedAt: string;
 }
+
+export type IncidentSeverity = "minor" | "major" | "critical" | "maintenance";
+export type IncidentStatus = "investigating" | "identified" | "monitoring" | "resolved";
+
+export interface IncidentUpdateEntry {
+  id: string;
+  status: IncidentStatus;
+  message: string;
+  timestamp: string;
+}
+
+export interface SystemIncident {
+  id: string; // e.g. "RF-INC-0001"
+  incidentNumber: number; // e.g. 1
+  title: string;
+  description: string;
+  status: IncidentStatus;
+  severity: IncidentSeverity;
+  affectedServices: string[];
+  source: "betterstack" | "internal" | "manual";
+  sourceMonitorId?: string;
+  sourceReportId?: string;
+  discordMessageId?: string;
+  createdAt: string;
+  updatedAt: string;
+  resolvedAt?: string;
+  updates: IncidentUpdateEntry[];
+}

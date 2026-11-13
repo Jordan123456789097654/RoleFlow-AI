@@ -1,3 +1,9 @@
+import {
+  createSystemIncident,
+  resolveSystemIncident,
+  getActiveIncidentForReport,
+} from "@/lib/incidents";
+
 /**
  * Better Stack (Better Uptime) Maintenance & Telemetry Integration
  * Status Page: status.roleflow.site (Status Page ID: 269433)
@@ -219,6 +225,20 @@ export async function enableBetterStackMaintenance(): Promise<{
     }
 
     await setMonitorsPaused(true);
+
+    // Automatically provision RF-INC-XXXX and dispatch maintenance advisory to Discord #status
+    await createSystemIncident({
+      title: "Scheduled System Maintenance",
+      description: "Routine maintenance and neural cluster upgrades in progress",
+      status: "monitoring",
+      severity: "maintenance",
+      affectedServices: ["RoleFlow API & Inference Clusters"],
+      source: "internal",
+      sourceReportId: reportId || "maint_mode",
+      monitorName: "RoleFlow API & Infrastructure",
+      monitorCheck: "HTTP GET https://roleflow.site/api/health",
+    }).catch((e) => console.error("Discord maintenance dispatch error:", e));
+
     return { success: true, reportId };
   } catch (err: any) {
     return { success: false, error: err?.message || "Unknown error" };
@@ -248,6 +268,17 @@ export async function endBetterStackMaintenance(reportId?: string): Promise<{
     }
 
     await setMonitorsPaused(false);
+
+    // Automatically resolve maintenance incident and update Discord embed to green recovered
+    const active = await getActiveIncidentForReport(reportId || "maint_mode");
+    if (active) {
+      await resolveSystemIncident(active.id, {
+        monitorName: "RoleFlow API & Infrastructure",
+        monitorCheck: "HTTP GET https://roleflow.site/api/health",
+        resolutionMessage: "Operational — Scheduled maintenance completed. All systems fully operational.",
+      }).catch((e) => console.error("Discord maintenance resolve error:", e));
+    }
+
     return { success: true };
   } catch (err: any) {
     return { success: false, error: err?.message || "Unknown error" };

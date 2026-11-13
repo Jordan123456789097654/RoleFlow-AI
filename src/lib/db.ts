@@ -2,7 +2,7 @@ import fs from "fs";
 import path from "path";
 import os from "os";
 import { sql } from "@vercel/postgres";
-import { Chat, Project, UserProfile, ModerationLogEntry, ModerationStatus, SystemConfig, MemoryItem, ApiKey, ModelId, EffortLevel, EmailBroadcastLog, LicenseKeyRecord, ReferralRecord, LawRequestRecord, LawRequestStatus, AdminNote, Punishment } from "@/types";
+import { Chat, Project, UserProfile, ModerationLogEntry, ModerationStatus, SystemConfig, MemoryItem, ApiKey, ModelId, EffortLevel, EmailBroadcastLog, LicenseKeyRecord, ReferralRecord, LawRequestRecord, LawRequestStatus, AdminNote, Punishment, SystemIncident } from "@/types";
 import { MODEL_IDS, resolveModelList } from "@/lib/models";
 import { getKeyPoolStatus } from "@/lib/groq-keys";
 
@@ -47,6 +47,7 @@ interface LocalStore {
   licenseKeys?: Record<string, LicenseKeyRecord>;
   referrals?: Record<string, ReferralRecord>;
   lawRequests?: Record<string, LawRequestRecord>;
+  systemIncidents?: Record<string, SystemIncident>;
 }
 
 export function getTodayDateString(): string {
@@ -2430,5 +2431,45 @@ export const db = {
     key.dailyCount = key.dailyDate === today ? (key.dailyCount || 0) + 1 : 1;
     key.dailyDate = today;
     saveLocalStore(store);
+  },
+
+  /** Retrieves all system status incidents ordered newest first. */
+  async getSystemIncidents(): Promise<SystemIncident[]> {
+    const store = getLocalStore();
+    const list = Object.values(store.systemIncidents || {});
+    return list.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+  },
+
+  /** Retrieves a specific system incident by ID (e.g. RF-INC-0001). */
+  async getSystemIncidentById(id: string): Promise<SystemIncident | null> {
+    const store = getLocalStore();
+    return store.systemIncidents?.[id] || null;
+  },
+
+  /** Saves or updates a system incident. */
+  async saveSystemIncident(incident: SystemIncident): Promise<SystemIncident> {
+    const store = getLocalStore();
+    if (!store.systemIncidents) store.systemIncidents = {};
+    store.systemIncidents[incident.id] = incident;
+    saveLocalStore(store);
+    return incident;
+  },
+
+  /** Calculates the next sequential incident number (e.g. RF-INC-0001). */
+  async getNextSystemIncidentNumber(): Promise<{ id: string; incidentNumber: number }> {
+    const store = getLocalStore();
+    const list = Object.values(store.systemIncidents || {});
+    let maxNum = 0;
+    for (const inc of list) {
+      if (typeof inc.incidentNumber === "number" && inc.incidentNumber > maxNum) {
+        maxNum = inc.incidentNumber;
+      } else if (inc.id && inc.id.startsWith("RF-INC-")) {
+        const parsed = parseInt(inc.id.replace("RF-INC-", ""), 10);
+        if (!isNaN(parsed) && parsed > maxNum) maxNum = parsed;
+      }
+    }
+    const nextNum = maxNum + 1;
+    const nextId = `RF-INC-${String(nextNum).padStart(4, "0")}`;
+    return { id: nextId, incidentNumber: nextNum };
   },
 };

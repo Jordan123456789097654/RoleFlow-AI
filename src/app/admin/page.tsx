@@ -26,13 +26,14 @@ import { UserProfile, SystemConfig, ModerationLogEntry, IncidentContext, Inciden
 import AdminEmailsPanel from "@/components/AdminEmailsPanel";
 import AdminLicenseKeysPanel from "@/components/AdminLicenseKeysPanel";
 import AdminLawRequestsPanel from "@/components/AdminLawRequestsPanel";
-import { Scale, Ticket, BookOpen, Gavel } from "lucide-react";
+import { Scale, Ticket, BookOpen, Gavel, Radio } from "lucide-react";
 import AdminPunishmentsPanel from "@/components/AdminPunishmentsPanel";
 import AdminHandbookPanel from "@/components/AdminHandbookPanel";
+import AdminIncidentsPanel from "@/components/AdminIncidentsPanel";
 import ReferralModal from "@/components/ReferralModal";
 import AdminChatsPanel from "@/components/AdminChatsPanel";
 
-type AdminTab = "attention" | "config" | "users" | "chats" | "moderation" | "emails" | "licenses" | "law" | "handbook" | "punishments";
+type AdminTab = "attention" | "config" | "users" | "chats" | "moderation" | "emails" | "licenses" | "law" | "handbook" | "punishments" | "incidents";
 
 const focusRing = "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/40";
 
@@ -48,6 +49,7 @@ const cardClass = "rounded-2xl border border-line bg-card";
 
 const NAV: { id: AdminTab; label: string; icon: React.ReactNode }[] = [
   { id: "attention", label: "Needs attention", icon: <Activity className="h-4 w-4" /> },
+  { id: "incidents", label: "Incidents & Status", icon: <Radio className="h-4 w-4" /> },
   { id: "config", label: "System settings", icon: <Sliders className="h-4 w-4" /> },
   { id: "users", label: "Users", icon: <Users className="h-4 w-4" /> },
   { id: "punishments", label: "Punishments", icon: <Gavel className="h-4 w-4" /> },
@@ -1183,6 +1185,7 @@ export default function AdminPage() {
             />
           )}
           {activeTab === "handbook" && <AdminHandbookPanel />}
+          {activeTab === "incidents" && <AdminIncidentsPanel />}
 
           {/* MODERATION */}
           {referralLog && (
