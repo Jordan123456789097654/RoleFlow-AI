@@ -196,6 +196,10 @@ async function ensureDb() {
     `;
 
     await sql`
+      ALTER TABLE roleflow_chats ADD COLUMN IF NOT EXISTS compaction JSONB;
+    `;
+
+    await sql`
       CREATE TABLE IF NOT EXISTS roleflow_guest_usage (
         id VARCHAR(255) PRIMARY KEY,
         count INTEGER DEFAULT 0,
@@ -773,7 +777,7 @@ export const db = {
     if (isPostgresConfigured) {
       try {
         const { rows } = await sql`
-          SELECT id, user_id as "userId", title, project_id as "projectId", pinned, model, effort, messages, created_at as "createdAt", updated_at as "updatedAt"
+          SELECT id, user_id as "userId", title, project_id as "projectId", pinned, model, effort, messages, compaction, created_at as "createdAt", updated_at as "updatedAt"
           FROM roleflow_chats WHERE id = ${chatId};
         `;
         if (rows[0]) {
@@ -816,10 +820,10 @@ export const db = {
     if (isPostgresConfigured) {
       try {
         await sql`
-          INSERT INTO roleflow_chats (id, user_id, title, project_id, pinned, model, effort, messages, updated_at)
-          VALUES (${chat.id}, ${assignedUserId}, ${chat.title}, ${chat.projectId || null}, ${chat.pinned || false}, ${chat.model}, ${chat.effort}, ${JSON.stringify(chat.messages)}, NOW())
+          INSERT INTO roleflow_chats (id, user_id, title, project_id, pinned, model, effort, messages, compaction, updated_at)
+          VALUES (${chat.id}, ${assignedUserId}, ${chat.title}, ${chat.projectId || null}, ${chat.pinned || false}, ${chat.model}, ${chat.effort}, ${JSON.stringify(chat.messages)}, ${chat.compaction ? JSON.stringify(chat.compaction) : null}, NOW())
           ON CONFLICT (id) DO UPDATE
-          SET title = ${chat.title}, project_id = ${chat.projectId || null}, pinned = ${chat.pinned || false}, model = ${chat.model}, effort = ${chat.effort}, messages = ${JSON.stringify(chat.messages)}, updated_at = NOW()
+          SET title = ${chat.title}, project_id = ${chat.projectId || null}, pinned = ${chat.pinned || false}, model = ${chat.model}, effort = ${chat.effort}, messages = ${JSON.stringify(chat.messages)}, compaction = ${chat.compaction ? JSON.stringify(chat.compaction) : null}, updated_at = NOW()
           WHERE roleflow_chats.user_id = ${assignedUserId} OR roleflow_chats.user_id IS NULL;
         `;
         return;

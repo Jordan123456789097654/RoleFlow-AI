@@ -1,11 +1,12 @@
 "use client";
 
 import React, { useState, useRef, useEffect } from "react";
-import { Plus, ArrowUp, X, FileText, ChevronDown, FolderKanban, Check } from "lucide-react";
+import { Plus, ArrowUp, X, FileText, ChevronDown, FolderKanban, Check, Mic, MicOff, Globe, Square } from "lucide-react";
 import { Attachment, EffortLevel, ModelId, Project } from "@/types";
 import { EffortDropdown } from "./EffortDropdown";
 import { ModelSelector } from "./ModelSelector";
 import { IMAGE_UPLOADS_ENABLED, IMAGE_UPLOADS_PAUSED_MESSAGE, isImageMimeType } from "@/lib/features";
+import { toast } from "@/lib/toast";
 
 interface PromptBoxProps {
   onSend: (content: string, attachments: Attachment[]) => void;
@@ -22,19 +23,29 @@ interface PromptBoxProps {
   onRequireAccount?: () => void;
   /** Free-limit line shown under the composer, e.g. "4 of 25 messages left today". */
   usageNote?: string | null;
+  /** Shows a bar for messages used against the daily limit. Omit for unlimited accounts. */
+  usageMeter?: { used: number; limit: number } | null;
+  /** Stops a reply that is being generated. The stop button shows while isLoading is true. */
+  onStop?: () => void;
+  /** Web search toggle. Shown only when webSearchAvailable is true. */
+  webSearchAvailable?: boolean;
+  webSearchEnabled?: boolean;
+  onWebSearchToggle?: () => void;
 }
 
 const MAX_IMAGE_BYTES = 4 * 1024 * 1024;
 const MAX_TEXT_BYTES = 512 * 1024;
 const MAX_PDF_BYTES = 4 * 1024 * 1024;
+const MAX_OFFICE_BYTES = 4 * 1024 * 1024;
+const OFFICE_FILE_PATTERN = /\.(docx|xlsx)$/i;
 const TEXT_FILE_PATTERN =
   /\.(txt|md|csv|tsv|json|ya?ml|xml|html?|css|scss|js|jsx|ts|tsx|py|java|c|cpp|h|rs|go|rb|php|sh|sql|log|env|toml|ini)$/i;
 const IMAGE_FILE_PATTERN = /\.(png|jpe?g|gif|webp|bmp|svg|avif|heic|heif|tiff?|ico)$/i;
 
 /** Picker filter. Images are left out while image uploads are paused. */
 const PICKER_ACCEPT = IMAGE_UPLOADS_ENABLED
-  ? ".pdf,.txt,.json,.md,.csv,.ts,.tsx,.js,.jsx,.py,.html,.css,image/*"
-  : ".pdf,.txt,.json,.md,.csv,.ts,.tsx,.js,.jsx,.py,.html,.css";
+  ? ".pdf,.docx,.xlsx,.txt,.json,.md,.csv,.ts,.tsx,.js,.jsx,.py,.html,.css,image/*"
+  : ".pdf,.docx,.xlsx,.txt,.json,.md,.csv,.ts,.tsx,.js,.jsx,.py,.html,.css";
 
 export const PromptBox: React.FC<PromptBoxProps> = ({
   onSend,
@@ -50,8 +61,17 @@ export const PromptBox: React.FC<PromptBoxProps> = ({
   guest,
   onRequireAccount,
   usageNote,
+  usageMeter,
+  onStop,
+  webSearchAvailable,
+  webSearchEnabled,
+  onWebSearchToggle,
 }) => {
   const [content, setContent] = useState("");
+  const [listening, setListening] = useState(false);
+  const [voiceSupported, setVoiceSupported] = useState(false);
+  const recognitionRef = useRef<any>(null);
+  const baseTextRef = useRef("");
   const [attachments, setAttachments] = useState<Attachment[]>([]);
   const [isProjectMenuOpen, setIsProjectMenuOpen] = useState(false);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
@@ -84,6 +104,51 @@ export const PromptBox: React.FC<PromptBoxProps> = ({
       document.removeEventListener("keydown", handleEscape);
     };
   }, []);
+
+  useEffect(() => {
+    setVoiceSupported(Boolean((window as any).SpeechRecognition || (window as any).webkitSpeechRecognition));
+    return () => recognitionRef.current?.abort?.();
+  }, []);
+
+  /** Dictation: appends what the user says to the text already typed. Uses the browser's speech recognition. */
+  const toggleVoice = () => {
+    if (listening) {
+      recognitionRef.current?.stop?.();
+      return;
+    }
+    const Recognition = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
+    if (!Recognition) return;
+
+    const recognition = new Recognition();
+    recognition.continuous = true;
+    recognition.interimResults = true;
+    recognition.lang = navigator.language || "en-US";
+
+    let finalText = "";
+    recognition.onresult = (event: any) => {
+      let interim = "";
+      for (let i = event.resultIndex; i < event.results.length; i++) {
+        const result = event.results[i];
+        if (result.isFinal) finalText += result[0].transcript;
+        else interim += result[0].transcript;
+      }
+      const base = baseTextRef.current;
+      const spacer = base && !/\s$/.test(base) && finalText + interim ? " " : "";
+      setContent(base + spacer + finalText + interim);
+    };
+    recognition.onerror = () => {
+      toast("Voice input stopped. Check that microphone access is allowed.", "error");
+    };
+    recognition.onend = () => {
+      setListening(false);
+      recognitionRef.current = null;
+    };
+
+    baseTextRef.current = content;
+    recognitionRef.current = recognition;
+    setListening(true);
+    recognition.start();
+  };
 
   const canSend = (content.trim().length > 0 || attachments.length > 0) && !isLoading;
 
@@ -118,20 +183,25 @@ export const PromptBox: React.FC<PromptBoxProps> = ({
 
       const isImage = looksLikeImage;
       const isPdf = file.type === "application/pdf" || /\.pdf$/i.test(file.name);
+      const isOffice = OFFICE_FILE_PATTERN.test(file.name);
       const isText =
         !isImage &&
         (file.type.startsWith("text/") ||
           file.type === "application/json" ||
           TEXT_FILE_PATTERN.test(file.name));
 
-      if (!isImage && !isText && !isPdf) {
+      if (!isImage && !isText && !isPdf && !isOffice) {
         window.alert(
           `"${file.name}" can't be read yet. ${
             IMAGE_UPLOADS_ENABLED
-              ? "Attach images (PNG, JPG, WEBP, GIF), PDFs, or text and code files."
-              : "Attach PDFs or text and code files."
+              ? "Attach images (PNG, JPG, WEBP, GIF), PDFs, Word or Excel files, or text and code files."
+              : "Attach PDFs, Word or Excel files, or text and code files."
           }`
         );
+        return;
+      }
+      if (isOffice && file.size > MAX_OFFICE_BYTES) {
+        window.alert(`"${file.name}" is larger than 4 MB. Please attach a smaller file.`);
         return;
       }
       if (isPdf && file.size > MAX_PDF_BYTES) {
@@ -154,13 +224,19 @@ export const PromptBox: React.FC<PromptBoxProps> = ({
           ...prev,
           {
             name: file.name,
-            type: isPdf ? "application/pdf" : isImage ? file.type : file.type || "text/plain",
+            type: isPdf
+              ? "application/pdf"
+              : isImage
+                ? file.type
+                : isOffice
+                  ? file.type || "application/octet-stream"
+                  : file.type || "text/plain",
             size: file.size,
             content: fileContent,
           },
         ]);
       };
-      if (isImage || isPdf) {
+      if (isImage || isPdf || isOffice) {
         reader.readAsDataURL(file);
       } else {
         reader.readAsText(file);
@@ -254,6 +330,7 @@ export const PromptBox: React.FC<PromptBoxProps> = ({
         <div className="px-4 pt-3.5 pb-1">
           <textarea
             ref={textareaRef}
+            id="composer-input"
             value={content}
             onChange={(e) => setContent(e.target.value)}
             onKeyDown={handleKeyDown}
@@ -354,6 +431,35 @@ export const PromptBox: React.FC<PromptBoxProps> = ({
                 </div>
               )}
             </div>
+            {voiceSupported && (
+              <button
+                type="button"
+                onClick={toggleVoice}
+                aria-pressed={listening}
+                aria-label={listening ? "Stop dictation" : "Dictate message"}
+                title={listening ? "Stop dictation" : "Dictate message"}
+                className={`w-9 h-9 flex items-center justify-center rounded-lg transition-colors duration-150 outline-none focus-visible:ring-2 focus-visible:ring-accent/40 shrink-0 ${
+                  listening ? "text-accent bg-hover" : "text-muted hover:text-ink hover:bg-hover"
+                }`}
+              >
+                {listening ? <MicOff className="w-4 h-4" strokeWidth={1.75} /> : <Mic className="w-4 h-4" strokeWidth={1.75} />}
+              </button>
+            )}
+
+            {webSearchAvailable && onWebSearchToggle && (
+              <button
+                type="button"
+                onClick={onWebSearchToggle}
+                aria-pressed={Boolean(webSearchEnabled)}
+                title={webSearchEnabled ? "Web search is on" : "Search the web for this message"}
+                className={`flex items-center gap-1.5 min-h-[36px] px-2 rounded-lg text-sm transition-colors duration-150 outline-none focus-visible:ring-2 focus-visible:ring-accent/40 shrink-0 ${
+                  webSearchEnabled ? "text-accent bg-hover" : "text-muted hover:text-ink hover:bg-hover"
+                }`}
+              >
+                <Globe className="w-4 h-4" strokeWidth={1.75} />
+                <span className="hidden sm:inline">Web search</span>
+              </button>
+            )}
           </div>
 
           {/* Model, effort, send */}
@@ -367,6 +473,17 @@ export const PromptBox: React.FC<PromptBoxProps> = ({
             />
             <EffortDropdown effort={effort} onChange={onEffortChange} placement="up" />
 
+            {isLoading && onStop ? (
+              <button
+                type="button"
+                onClick={onStop}
+                aria-label="Stop generating"
+                title="Stop generating (Esc)"
+                className="ml-1 w-9 h-9 flex items-center justify-center rounded-full bg-ink text-app transition-colors duration-150 outline-none focus-visible:ring-2 focus-visible:ring-accent/40"
+              >
+                <Square className="w-3.5 h-3.5 fill-current" strokeWidth={2} />
+              </button>
+            ) : (
             <button
               type="button"
               onClick={handleSubmit}
@@ -380,9 +497,28 @@ export const PromptBox: React.FC<PromptBoxProps> = ({
             >
               <ArrowUp className="w-[18px] h-[18px]" strokeWidth={2} />
             </button>
+            )}
           </div>
         </div>
       </div>
+
+      {usageMeter && usageMeter.limit > 0 && (
+        <div
+          role="meter"
+          aria-label="Messages used today"
+          aria-valuemin={0}
+          aria-valuemax={usageMeter.limit}
+          aria-valuenow={Math.min(usageMeter.used, usageMeter.limit)}
+          className="mt-2 mx-auto w-40 h-1 rounded-full bg-hover overflow-hidden"
+        >
+          <div
+            className={`h-full rounded-full transition-all duration-300 ${
+              usageMeter.used >= usageMeter.limit ? "bg-red-500" : "bg-accent"
+            }`}
+            style={{ width: `${Math.min(100, (usageMeter.used / usageMeter.limit) * 100)}%` }}
+          />
+        </div>
+      )}
 
       {usageNote && (
         <p className="text-xs text-muted text-center mt-2 px-2" aria-live="polite">

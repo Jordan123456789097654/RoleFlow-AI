@@ -16,6 +16,8 @@ import {
   Trash2,
   Shield,
   MessageSquare,
+  Pencil,
+  Download,
 } from "lucide-react";
 import { Chat, Project, UserProfile } from "@/types";
 import { formatCleanName } from "@/lib/format";
@@ -41,6 +43,8 @@ interface SidebarProps {
   onOpenSettings: () => void;
   onSignOut: () => void;
   onClearConversation?: () => void;
+  onRenameChat?: (chatId: string, title: string) => void;
+  onExportChat?: (chatId: string) => void;
 }
 
 type ChatGroup = { label: string; chats: Chat[] };
@@ -92,8 +96,12 @@ export const Sidebar: React.FC<SidebarProps> = ({
   onOpenSettings,
   onSignOut,
   onClearConversation,
+  onRenameChat,
+  onExportChat,
 }) => {
   const [searchQuery, setSearchQuery] = useState("");
+  const [editingId, setEditingId] = useState<string | null>(null);
+  const [editTitle, setEditTitle] = useState("");
 
   const filteredChats = useMemo(
     () => chats.filter((c) => c.title.toLowerCase().includes(searchQuery.toLowerCase())),
@@ -116,15 +124,74 @@ export const Sidebar: React.FC<SidebarProps> = ({
   const iconBtn =
     "p-1.5 rounded-md text-muted hover:text-ink hover:bg-app transition-colors duration-150 outline-none focus-visible:ring-2 focus-visible:ring-accent/40";
 
+  const startRename = (chat: Chat) => {
+    setEditingId(chat.id);
+    setEditTitle(chat.title);
+  };
+
+  const commitRename = (chat: Chat) => {
+    const next = editTitle.trim();
+    setEditingId(null);
+    if (next && next !== chat.title && onRenameChat) onRenameChat(chat.id, next.slice(0, 120));
+  };
+
   const renderChat = (chat: Chat) => (
     <div
       key={chat.id}
       className={rowClass(activeChatId === chat.id)}
-      onClick={() => onSelectChat(chat.id)}
+      onClick={() => {
+        if (editingId !== chat.id) onSelectChat(chat.id);
+      }}
       aria-current={activeChatId === chat.id ? "true" : undefined}
     >
-      <span className="truncate flex-1 min-w-0">{chat.title}</span>
+      {editingId === chat.id ? (
+        <input
+          autoFocus
+          value={editTitle}
+          onChange={(e) => setEditTitle(e.target.value)}
+          onClick={(e) => e.stopPropagation()}
+          onKeyDown={(e) => {
+            e.stopPropagation();
+            if (e.key === "Enter") commitRename(chat);
+            if (e.key === "Escape") setEditingId(null);
+          }}
+          onBlur={() => commitRename(chat)}
+          maxLength={120}
+          aria-label="Chat title"
+          className="flex-1 min-w-0 min-h-[28px] bg-transparent text-sm text-ink outline-none border-b border-accent/50"
+        />
+      ) : (
+        <span className="truncate flex-1 min-w-0">{chat.title}</span>
+      )}
       <div className="flex items-center gap-0.5 shrink-0 md:opacity-0 md:group-hover:opacity-100 focus-within:opacity-100 transition-opacity duration-150">
+        {onRenameChat && editingId !== chat.id && (
+          <button
+            type="button"
+            onClick={(e) => {
+              e.stopPropagation();
+              startRename(chat);
+            }}
+            className={iconBtn}
+            title="Rename chat"
+            aria-label="Rename chat"
+          >
+            <Pencil className="w-3.5 h-3.5" strokeWidth={1.75} />
+          </button>
+        )}
+        {onExportChat && (
+          <button
+            type="button"
+            onClick={(e) => {
+              e.stopPropagation();
+              onExportChat(chat.id);
+            }}
+            className={iconBtn}
+            title="Export as Markdown"
+            aria-label="Export chat as Markdown"
+          >
+            <Download className="w-3.5 h-3.5" strokeWidth={1.75} />
+          </button>
+        )}
         <button
           type="button"
           onClick={(e) => {
@@ -213,6 +280,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
           <div className="relative">
             <Search className="w-4 h-4 text-muted absolute left-2.5 top-1/2 -translate-y-1/2 pointer-events-none" strokeWidth={1.75} />
             <input
+              id="chat-search"
               type="search"
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}

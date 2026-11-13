@@ -13,6 +13,8 @@ import { DEFAULT_MODEL, GUEST_MODEL, isGuestAllowedModel, resolveModelId } from 
 import { CreateProjectModal } from "@/components/CreateProjectModal";
 import { ShareModal } from "@/components/ShareModal";
 import { Logo } from "@/components/Logo";
+import { Toaster } from "@/components/Toaster";
+import { toast } from "@/lib/toast";
 import {
   Artifact,
   Attachment,
@@ -29,6 +31,27 @@ import { Code, Bug, Compass } from "lucide-react";
 /** Messages a signed-out visitor can send before being asked to sign in. */
 const GUEST_MESSAGE_LIMIT = 5;
 
+/** Web search is offered only when the server has a search key. The client must opt in with this flag. */
+const WEB_SEARCH_AVAILABLE = process.env.NEXT_PUBLIC_WEB_SEARCH_ENABLED === "true";
+
+/** A chat as Markdown, for exporting. Sources are listed under the reply they support. */
+function chatToMarkdown(chat: Chat): string {
+  const lines: string[] = [`# ${chat.title}`, "", `Exported from RoleFlow on ${new Date().toLocaleString()}`, ""];
+  for (const m of chat.messages) {
+    lines.push(`## ${m.role === "user" ? "You" : "RoleFlow"}`, "");
+    if (m.attachments && m.attachments.length > 0) {
+      lines.push(`_Attached: ${m.attachments.map((a) => a.name).join(", ")}_`, "");
+    }
+    lines.push((m.content || "").trim(), "");
+    if (m.sources && m.sources.length > 0) {
+      lines.push("**Sources**", "");
+      m.sources.forEach((src, i) => lines.push(`${i + 1}. [${src.title}](${src.url})`));
+      lines.push("");
+    }
+  }
+  return lines.join("\n");
+}
+
 /** One reply from /api/chat: the final payload when it succeeds, or the error details when it fails. */
 interface ChatReplyResult {
   ok: boolean;
@@ -43,7 +66,8 @@ interface ChatReplyResult {
 async function postChatStream(
   body: unknown,
   headers: Record<string, string>,
-  onDelta: (text: string) => void
+  onDelta: (text: string) => void,
+  signal?: AbortSignal
 ): Promise<ChatReplyResult> {
   const outcome: { value: ChatReplyResult | null } = { value: null };
 
@@ -81,6 +105,7 @@ async function postChatStream(
       method: "POST",
       headers: { "Content-Type": "application/json", Accept: "text/event-stream", ...headers },
       body: JSON.stringify(body),
+      signal,
     });
 
     // Not a stream (for example, an unexpected proxy response): read it as plain JSON.
@@ -104,7 +129,8 @@ async function postChatStream(
       }
     }
     if (buffer.trim()) handleEvent(buffer);
-  } catch (err) {
+  } catch (err: any) {
+    if (err?.name === "AbortError") return { ok: false, status: 0, data: { aborted: true } };
     console.error("Chat stream failed:", err);
     if (!outcome.value) {
       return { ok: false, status: 0, data: { error: "The connection was interrupted. Please try again." } };
@@ -157,6 +183,8 @@ export default function ChatPage() {
   const [thinkingSeconds, setThinkingSeconds] = useState(0);
   const [isLiveTyping, setIsLiveTyping] = useState(false);
   const thinkingTimerRef = useRef<NodeJS.Timeout | null>(null);
+  const abortRef = useRef<AbortController | null>(null);
+  const [webSearchOn, setWebSearchOn] = useState(false);
 
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
@@ -341,8 +369,12 @@ export default function ChatPage() {
     const activeProject = projects.find((p) => p.id === selectedProjectId);
     const placeholderId = "stream-" + Date.now();
     let streaming = false;
+    let streamedText = "";
+    const controller = new AbortController();
+    abortRef.current = controller;
 
     const onDelta = (text: string) => {
+      streamedText += text;
       if (!streaming) {
         // The first text replaces the "Thinking" indicator with the reply itself.
         streaming = true;
@@ -376,14 +408,39 @@ export default function ChatPage() {
           effort,
           projectId: selectedProjectId,
           customInstructions: user?.customInstructions || activeProject?.customInstructions,
+          webSearch: webSearchOn,
         },
         {
           "x-user-id": effectiveUserId,
           "x-user-email": user?.email || "",
         },
-        onDelta
+        onDelta,
+        controller.signal
       );
       stopThinking();
+
+      if (reply.data?.aborted) {
+        // The user pressed Stop. Keep what was written so far, marked as stopped.
+        const partial = streamedText.trim();
+        if (partial) {
+          const stoppedMessage: Message = {
+            id: placeholderId,
+            role: "assistant",
+            content: partial,
+            stopped: true,
+            createdAt: new Date().toISOString(),
+          };
+          if (streaming) {
+            setMessages((prev) => prev.map((m) => (m.id === placeholderId ? stoppedMessage : m)));
+          } else {
+            setMessages((prev) => [...prev, stoppedMessage]);
+          }
+        } else {
+          removePlaceholder();
+          toast("Stopped", "info");
+        }
+        return;
+      }
 
       const data = reply.data;
       if (!reply.ok) {
@@ -452,6 +509,7 @@ export default function ChatPage() {
       stopThinking();
       removePlaceholder();
       console.error("Chat error:", err);
+      toast("The reply failed. You can try again.", "error");
       const errorMessage: Message = {
         id: "msg-" + Date.now(),
         role: "assistant",
@@ -460,6 +518,7 @@ export default function ChatPage() {
       };
       setMessages((prev) => [...prev, errorMessage]);
     } finally {
+      abortRef.current = null;
       setIsLiveTyping(false);
       setIsLoading(false);
     }
@@ -513,6 +572,93 @@ export default function ChatPage() {
     void requestAssistantReply(trimmed);
   };
 
+  const handleStop = () => {
+    abortRef.current?.abort();
+  };
+
+  /** Starts a new chat from an assistant reply. The current chat is left as it was. */
+  const handleBranch = (messageId: string) => {
+    if (isLoading) return;
+    const index = messages.findIndex((m) => m.id === messageId);
+    if (index === -1) return;
+    setCurrentChatId(undefined);
+    setMessages(messages.slice(0, index + 1));
+    setActiveArtifact(null);
+    toast("Branched into a new chat. Your original chat is unchanged.", "success");
+  };
+
+  const handleRenameChat = async (chatId: string, title: string) => {
+    const effectiveUserId = getEffectiveUserId();
+    const previousTitle = chats.find((c) => c.id === chatId)?.title;
+    setChats((prev) => prev.map((c) => (c.id === chatId ? { ...c, title } : c)));
+    try {
+      const res = await fetch(`/api/chats/${chatId}?userId=${encodeURIComponent(effectiveUserId)}`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json", "x-user-id": effectiveUserId },
+        body: JSON.stringify({ title }),
+      });
+      const data = await res.json();
+      if (!res.ok || !data.chat) throw new Error(data.error || "Rename failed");
+      setChats((prev) => prev.map((c) => (c.id === chatId ? data.chat : c)));
+      toast("Chat renamed", "success");
+    } catch (err) {
+      console.error("Rename chat error:", err);
+      setChats((prev) => prev.map((c) => (c.id === chatId && previousTitle ? { ...c, title: previousTitle } : c)));
+      toast("Could not rename the chat. Please try again.", "error");
+    }
+  };
+
+  const handleExportChat = (chatId: string) => {
+    const chat = chats.find((c) => c.id === chatId);
+    if (!chat) return;
+    try {
+      const blob = new Blob([chatToMarkdown(chat)], { type: "text/markdown;charset=utf-8" });
+      const url = URL.createObjectURL(blob);
+      const slug = chat.title.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "") || "chat";
+      const link = document.createElement("a");
+      link.href = url;
+      link.download = `${slug}.md`;
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      window.setTimeout(() => URL.revokeObjectURL(url), 1000);
+      toast("Chat exported as Markdown", "success");
+    } catch (err) {
+      console.error("Export chat error:", err);
+      toast("Could not export the chat.", "error");
+    }
+  };
+
+  // Keyboard shortcuts: Ctrl/Cmd+Shift+O new chat, Ctrl/Cmd+K search chats, Ctrl/Cmd+/ focus the composer, Esc stops a reply.
+  const anyModalOpen = authModalOpen || settingsModalOpen || createProjectModalOpen || shareModalOpen;
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      const mod = e.metaKey || e.ctrlKey;
+      const key = e.key.toLowerCase();
+      if (mod && e.shiftKey && key === "o") {
+        e.preventDefault();
+        if (!isLoading) handleNewChat();
+        return;
+      }
+      if (mod && !e.shiftKey && key === "k") {
+        e.preventDefault();
+        setSidebarOpen(true);
+        window.setTimeout(() => document.getElementById("chat-search")?.focus(), 60);
+        return;
+      }
+      if (mod && !e.shiftKey && e.key === "/") {
+        e.preventDefault();
+        document.getElementById("composer-input")?.focus();
+        return;
+      }
+      if (e.key === "Escape" && isLoading && !anyModalOpen) {
+        handleStop();
+      }
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  });
+
   const handleAuthSuccess = (authenticatedUser: UserProfile) => {
     setUser(authenticatedUser);
     localStorage.setItem("roleflow_user", JSON.stringify(authenticatedUser));
@@ -565,6 +711,11 @@ export default function ChatPage() {
       onProjectChange={setSelectedProjectId}
       onCreateProject={() => setCreateProjectModalOpen(true)}
       usageNote={usageNote}
+      usageMeter={!user || !usageStats || usageStats.isUnlimited ? null : { used: usageStats.used, limit: usageStats.limit }}
+      onStop={handleStop}
+      webSearchAvailable={WEB_SEARCH_AVAILABLE}
+      webSearchEnabled={webSearchOn}
+      onWebSearchToggle={() => setWebSearchOn((on) => !on)}
     />
   );
 
@@ -583,6 +734,8 @@ export default function ChatPage() {
         onNewChat={handleNewChat}
         onDeleteChat={handleDeleteChat}
         onTogglePinChat={handleTogglePinChat}
+        onRenameChat={handleRenameChat}
+        onExportChat={handleExportChat}
         projects={projects}
         activeProjectId={selectedProjectId}
         onSelectProject={setSelectedProjectId}
@@ -670,6 +823,7 @@ export default function ChatPage() {
                     onEdit={handleEditMessage}
                     onRegenerate={handleRegenerate}
                     onOpenArtifact={(art) => setActiveArtifact(art)}
+                    onBranch={handleBranch}
                     isStreaming={isLiveTyping && index === messages.length - 1}
                   />
                 ))}
@@ -738,6 +892,8 @@ export default function ChatPage() {
           setSelectedProjectId(newProj.id);
         }}
       />
+
+      <Toaster />
 
       {currentChatId && (
         <ShareModal

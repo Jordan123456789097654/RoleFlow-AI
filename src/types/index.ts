@@ -52,6 +52,27 @@ export interface Artifact {
   createdAt: string;
 }
 
+/** Per-reply generation stats, shown under assistant replies. */
+export interface MessageMeta {
+  model: string;
+  promptTokens?: number;
+  completionTokens?: number;
+  totalTokens?: number;
+  /** Wall-clock time from request start to the final token. */
+  latencyMs: number;
+  /** Completion tokens per second, when token counts are known. */
+  tokensPerSecond?: number;
+  /** True when the reply came from the fallback model instead of the tier's primary model. */
+  usedFallback?: boolean;
+}
+
+/** A web result used to ground a reply. Cited in the text as [1], [2], and so on. */
+export interface WebSource {
+  title: string;
+  url: string;
+  snippet?: string;
+}
+
 export interface Message {
   id: string;
   role: "user" | "assistant" | "system";
@@ -68,10 +89,25 @@ export interface Message {
   moderationLogId?: string;
   canAppeal?: boolean;
   appealStatus?: "NONE" | "APPEALED" | "RESOLVED";
+  meta?: MessageMeta;
+  sources?: WebSource[];
+  /** True when the user stopped the reply before it finished. */
+  stopped?: boolean;
+}
+
+/**
+ * Summary of the oldest turns of a long chat. The model sees it in place of those turns.
+ * coveredCount is how many messages from the start of the chat the summary replaces.
+ */
+export interface CompactionState {
+  summary: string;
+  coveredCount: number;
+  updatedAt: string;
 }
 
 export interface Chat {
   id: string;
+  compaction?: CompactionState;
   userId?: string;
   title: string;
   projectId?: string;

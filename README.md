@@ -26,6 +26,13 @@ An independent, fully custom AI assistant platform engineered with a clean, inte
 - **Database & Storage**:
   - Vercel Postgres / Neon integration ready.
   - Automatic zero-config local storage fallback for offline development.
+- **Chat Tools**:
+  - Stop a reply mid-stream (button or Esc), rename chats, export a chat as Markdown, and branch a new chat from any assistant reply.
+  - Dictation (browser speech recognition), read-aloud for replies, and toast notifications.
+  - Word (.docx) and Excel (.xlsx) attachments, plus previews of text attachments.
+  - Generation stats under each reply (tokens, latency, tokens per second).
+  - Chat compacting: long chats keep a running summary of older turns, so the model keeps context without resending the whole history.
+  - Keyboard shortcuts: Ctrl/Cmd+Shift+O new chat, Ctrl/Cmd+K search chats, Ctrl/Cmd+/ focus the composer.
 - **Public Chat Sharing**:
   - Instant read-only shareable links (`/share/[id]`).
 
@@ -49,6 +56,14 @@ GROQ_API_KEYS=key1,key2,key3,key4,key5
 # Optional. Enables reading uploaded images. Check Groq's current model list first.
 # GROQ_VISION_MODEL=qwen/qwen3.8-27b   # PREVIEW tier: Groq may discontinue it at short notice.
 #   When it's gone, images fail closed (held for review) until you set a new model.
+
+# Optional. Second Groq model, used only when every key fails on the tier's primary model.
+# GROQ_FALLBACK_MODEL=openai/gpt-oss-20b
+
+# Optional. Web search for replies. Get a key from the Brave Search API. Without it, search stays off.
+# BRAVE_SEARCH_API_KEY=
+# Set to "true" to show the Web search toggle in the composer (needs BRAVE_SEARCH_API_KEY on the server).
+# NEXT_PUBLIC_WEB_SEARCH_ENABLED=true
 
 # When deployed to Vercel, link Vercel Postgres to automatically populate:
 # POSTGRES_URL=

@@ -1,4 +1,4 @@
-import { Artifact, Attachment, EffortLevel, GeneratedFile, Message, ModelId } from "@/types";
+import { Artifact, Attachment, EffortLevel, GeneratedFile, Message, MessageMeta, ModelId } from "@/types";
 import { extractFileBlocks, renderGeneratedFile } from "@/lib/files";
 import { DEFAULT_MODEL, getModelSpec, resolveModelId } from "@/lib/models";
 import { buildSystemPrompt } from "@/lib/prompts";
@@ -13,6 +13,38 @@ interface GenerateParams {
   memories?: string[];
   /** When set, the reply is streamed from Groq and each new visible piece of text is passed here. */
   onDelta?: (text: string) => void;
+  /** Summary of earlier turns of a long chat, added to the system prompt. */
+  conversationSummary?: string;
+}
+
+interface GroqUsage {
+  prompt_tokens?: number;
+  completion_tokens?: number;
+  total_tokens?: number;
+}
+
+/**
+ * Optional second Groq model. Used only when every key fails on the primary model and the
+ * request has no images (the vision model has no text fallback).
+ */
+export function getFallbackBackend(primary: string): string | null {
+  const fallback = process.env.GROQ_FALLBACK_MODEL?.trim();
+  return fallback && fallback !== primary ? fallback : null;
+}
+
+function buildMeta(model: string, usage: GroqUsage | null, elapsedMs: number, usedFallback: boolean): MessageMeta {
+  const completionTokens = usage?.completion_tokens;
+  const seconds = elapsedMs / 1000;
+  return {
+    model,
+    promptTokens: usage?.prompt_tokens,
+    completionTokens,
+    totalTokens: usage?.total_tokens,
+    latencyMs: Math.round(elapsedMs),
+    tokensPerSecond:
+      typeof completionTokens === "number" && seconds > 0 ? Math.round((completionTokens / seconds) * 10) / 10 : undefined,
+    usedFallback: usedFallback || undefined,
+  };
 }
 
 export interface GenerateResult {
@@ -26,6 +58,7 @@ export interface GenerateResult {
   /** Set when the upstream provider blocked the request or the generation for safety reasons. */
   isSafetyRefusal?: boolean;
   safetyReason?: string;
+  meta?: MessageMeta;
 }
 
 /**
@@ -70,13 +103,14 @@ export function visibleStreamText(raw: string): string {
 async function readGroqStream(
   body: ReadableStream<Uint8Array>,
   onDelta: (text: string) => void
-): Promise<{ text: string; finishReason: string | null }> {
+): Promise<{ text: string; finishReason: string | null; usage: GroqUsage | null }> {
   const reader = body.getReader();
   const decoder = new TextDecoder();
   let buffer = "";
   let text = "";
   let emitted = "";
   let finishReason: string | null = null;
+  let usage: GroqUsage | null = null;
 
   while (true) {
     const { done, value } = await reader.read();
@@ -105,13 +139,15 @@ async function readGroqStream(
           }
         }
         if (choice?.finish_reason) finishReason = choice.finish_reason;
+        const reported = json.usage ?? json.x_groq?.usage;
+        if (reported) usage = reported;
       } catch {
         // Ignore a malformed event and keep reading.
       }
     }
   }
 
-  return { text, finishReason };
+  return { text, finishReason, usage };
 }
 
 export async function generateRoleFlowResponse({
@@ -122,6 +158,7 @@ export async function generateRoleFlowResponse({
   projectInstructions,
   memories,
   onDelta,
+  conversationSummary,
 }: GenerateParams): Promise<GenerateResult> {
   const startTime = Date.now();
   const latestMessage = messages[messages.length - 1];
@@ -157,11 +194,21 @@ export async function generateRoleFlowResponse({
       memories,
     });
 
+    const systemWithSummary = conversationSummary
+      ? `${systemPrompt}\n\n<earlier_conversation_summary>\nThe earlier part of this conversation was condensed to save context. Treat this summary as what was said before, and do not repeat it back unless asked.\n\n${conversationSummary}\n</earlier_conversation_summary>`
+      : systemPrompt;
+
     const formattedMessages = [
-      { role: "system", content: systemPrompt },
+      { role: "system", content: systemWithSummary },
       ...modelMessages,
     ];
 
+    // The primary model is tried with every key first. The fallback model, if configured, is tried next.
+    const fallbackBackend = hasImages ? null : getFallbackBackend(backendModel);
+    const backendsToTry = fallbackBackend ? [backendModel, fallbackBackend] : [backendModel];
+
+    for (let modelIndex = 0; modelIndex < backendsToTry.length; modelIndex++) {
+    const modelName = backendsToTry[modelIndex];
     // Try keys sequentially if one hits a rate limit
     for (let attempt = 0; attempt < keyPool.length; attempt++) {
       const activeKey = keyPool[(keyIndex + attempt) % keyPool.length];
@@ -174,7 +221,7 @@ export async function generateRoleFlowResponse({
             Authorization: `Bearer ${activeKey}`,
           },
           body: JSON.stringify({
-            model: backendModel,
+            model: modelName,
             messages: formattedMessages,
             temperature: sampling.temperature[effort],
             ...(sampling.topP !== undefined ? { top_p: sampling.topP } : {}),
@@ -182,14 +229,14 @@ export async function generateRoleFlowResponse({
             ...(!hasImages && sampling.reasoningEffort
               ? { reasoning_effort: sampling.reasoningEffort }
               : {}),
-            ...(onDelta ? { stream: true } : {}),
+            ...(onDelta ? { stream: true, stream_options: { include_usage: true } } : {}),
           }),
         });
 
         if (!res.ok) {
           const body = await res.text().catch(() => "");
           console.error(
-            `Groq request failed: model=${backendModel} key#${(keyIndex + attempt) % keyPool.length} status=${res.status} body=${body.slice(0, 500)}`
+            `Groq request failed: model=${modelName} key#${(keyIndex + attempt) % keyPool.length} status=${res.status} body=${body.slice(0, 500)}`
           );
           // A safety rejection applies to the content, not the key, so stop retrying other keys.
           if (isUpstreamSafetyBlock(res.status, body)) {
@@ -208,15 +255,18 @@ export async function generateRoleFlowResponse({
 
           let serverText = "";
           let finishReason: string | null = null;
+          let usage: GroqUsage | null = null;
           if (onDelta && res.body) {
             const streamed = await readGroqStream(res.body, onDelta);
             serverText = streamed.text;
             finishReason = streamed.finishReason;
+            usage = streamed.usage;
           } else {
             const data = await res.json();
             const choice = data.choices?.[0];
             serverText = choice?.message?.content || "";
             finishReason = choice?.finish_reason ?? null;
+            usage = data.usage ?? null;
           }
           const thinkingTime = Math.max(
             0.8,
@@ -298,6 +348,7 @@ export async function generateRoleFlowResponse({
             return {
               content: cleanedText,
               thinkingTime,
+              meta: buildMeta(modelName, usage, Date.now() - startTime, modelIndex > 0),
               artifact: generatedArtifact,
               memoriesAdded: memoriesAdded.length > 0 ? memoriesAdded : undefined,
               memoriesRemoved: memoriesRemoved.length > 0 ? memoriesRemoved : undefined,
@@ -308,6 +359,7 @@ export async function generateRoleFlowResponse({
       } catch (err) {
         console.warn(`Groq attempt ${attempt + 1} network error:`, err);
       }
+    }
     }
   }
 

@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { generateRoleFlowResponse } from "@/lib/ai-engine";
 import { db, ADMIN_EMAIL } from "@/lib/db";
-import { Attachment, Chat, Message, ModerationLogEntry, ModelId, EffortLevel } from "@/types";
+import { Attachment, Chat, Message, ModerationLogEntry, ModelId, EffortLevel, WebSource } from "@/types";
 import { scanMessage } from "@/lib/moderation";
 import { sendSecurityAlertEmail } from "@/lib/email";
 import { getMemories, addMemory, removeMemory } from "@/lib/memory";
@@ -9,6 +9,9 @@ import { getSessionFromRequest } from "@/lib/auth";
 import { checkRateLimit, RATE_LIMITS } from "@/lib/rate-limit";
 import { isImageAttachment } from "@/lib/ai-engine";
 import { convertPdfAttachments } from "@/lib/pdf";
+import { convertOfficeAttachments } from "@/lib/office";
+import { compactHistory } from "@/lib/compaction";
+import { formatSourcesForPrompt, isWebSearchConfigured, searchWeb } from "@/lib/web-search";
 import { buildAttachmentScanText, buildIncidentContext, classifyImagesForSafety } from "@/lib/attachments";
 import { imageHeldNotice, moderationRefusalNotice, notifyUser, suspensionNotice, usageWarningNotice } from "@/lib/notify";
 import { DEFAULT_MODEL, GUEST_MODEL, MODEL_IDS, isGuestAllowedModel, resolveModelId } from "@/lib/models";
@@ -93,6 +96,7 @@ async function handleChat(req: NextRequest, onDelta?: (text: string) => void): P
       effort = "medium",
       projectId,
       customInstructions,
+      webSearch = false,
     } = body;
     // Retired IDs (e.g. roleflow-flash-1) resolve to their successor before any other check.
     let model: ModelId = resolveModelId(rawModel) ?? DEFAULT_MODEL;
@@ -201,6 +205,12 @@ async function handleChat(req: NextRequest, onDelta?: (text: string) => void): P
     const pdfError = await convertPdfAttachments(safeMessages);
     if (pdfError) {
       return NextResponse.json({ error: pdfError }, { status: 400 });
+    }
+
+    // Word and Excel files become extracted text in the same way.
+    const officeError = await convertOfficeAttachments(safeMessages);
+    if (officeError) {
+      return NextResponse.json({ error: officeError }, { status: 400 });
     }
 
     // Cap conversation history to 30 messages to prevent token budget abuse
@@ -502,14 +512,34 @@ async function handleChat(req: NextRequest, onDelta?: (text: string) => void): P
     const titlePromise: Promise<string> | null =
       !existingChat && titleSource ? generateChatTitle(titleSource.content || "") : null;
 
+    // Chat compacting: older turns are condensed into a stored summary, and the newest turns go in full.
+    const compacted = await compactHistory(safeMessages, existingChat?.compaction);
+    const historyForModel = compacted.history.slice(-30);
+
+    // Web search: when the user turns it on and the server has a key, the latest question is
+    // answered with numbered results. The results go to the model only, not into the saved message.
+    let webSources: WebSource[] = [];
+    const latestUserIndex = historyForModel.map((m: Message) => m.role).lastIndexOf("user");
+    if (webSearch === true && isWebSearchConfigured() && latestUserIndex !== -1) {
+      const latest = historyForModel[latestUserIndex];
+      webSources = await searchWeb(latest.content || "");
+      if (webSources.length > 0) {
+        historyForModel[latestUserIndex] = {
+          ...latest,
+          content: `${latest.content}\n\n[Web search results for this question. Cite the results you use as [1], [2], and so on.]\n\n${formatSourcesForPrompt(webSources)}`,
+        };
+      }
+    }
+
     // Generate response from RoleFlow AI Engine
     const result = await generateRoleFlowResponse({
-      messages: cappedMessages,
+      messages: historyForModel,
       model: safeModel,
       effort: safeEffort,
       customInstructions: effectiveInstructions,
       memories: persistentMemories,
       onDelta,
+      conversationSummary: compacted.summaryForModel,
     });
 
     // Upstream safety block: Groq refused the request or filtered the generation. Our scanner
@@ -616,6 +646,8 @@ async function handleChat(req: NextRequest, onDelta?: (text: string) => void): P
       thinkingTime: result.thinkingTime || 1.2,
       artifact: result.artifact,
       generatedFiles: result.generatedFiles,
+      meta: result.meta,
+      sources: webSources.length > 0 ? webSources : undefined,
       createdAt: new Date().toISOString(),
     };
 
@@ -633,6 +665,7 @@ async function handleChat(req: NextRequest, onDelta?: (text: string) => void): P
       model,
       effort,
       messages: updatedMessages,
+      compaction: compacted.compaction,
       createdAt: new Date().toISOString(),
       updatedAt: new Date().toISOString(),
     };

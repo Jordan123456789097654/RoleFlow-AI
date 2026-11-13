@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState } from "react";
+import React, { useEffect, useRef, useState } from "react";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import {
@@ -15,15 +15,31 @@ import {
   ChevronRight,
   ShieldAlert,
   Download,
+  GitBranch,
+  Volume2,
+  Square,
 } from "lucide-react";
 import { Message, Artifact } from "@/types";
+import { toast } from "@/lib/toast";
 
 interface MessageItemProps {
   message: Message;
   onEdit?: (messageId: string, newContent: string) => void;
   onRegenerate?: () => void;
   onOpenArtifact?: (artifact: Artifact) => void;
+  /** Starts a new chat with the conversation up to and including this message. */
+  onBranch?: (messageId: string) => void;
   isStreaming?: boolean;
+}
+
+/** Plain text for speech: drops code blocks, link targets and Markdown symbols. */
+function speakableText(markdown: string): string {
+  return markdown
+    .replace(/```[\s\S]*?```/g, " Code block omitted. ")
+    .replace(/\[([^\]]+)\]\([^)]*\)/g, "$1")
+    .replace(/[`*_#>|~]/g, "")
+    .replace(/\s+/g, " ")
+    .trim();
 }
 
 const iconButton =
@@ -64,12 +80,16 @@ export const MessageItem: React.FC<MessageItemProps> = ({
   onEdit,
   onRegenerate,
   onOpenArtifact,
+  onBranch,
   isStreaming = false,
 }) => {
   const isUser = message.role === "user";
   const isBlocked = Boolean(message.moderationBlocked);
 
   const [copied, setCopied] = useState(false);
+  const [canSpeak, setCanSpeak] = useState(false);
+  const [speaking, setSpeaking] = useState(false);
+  const speakingRef = useRef(false);
   const [feedback, setFeedback] = useState<"up" | "down" | null>(null);
   const [isEditing, setIsEditing] = useState(false);
   const [editContent, setEditContent] = useState(message.content);
@@ -81,11 +101,58 @@ export const MessageItem: React.FC<MessageItemProps> = ({
   const [isSubmittingAppeal, setIsSubmittingAppeal] = useState(false);
   const [appealError, setAppealError] = useState<string | null>(null);
 
+  useEffect(() => {
+    setCanSpeak(typeof window !== "undefined" && "speechSynthesis" in window);
+    // Stop reading if this reply leaves the screen while it is being read.
+    return () => {
+      if (speakingRef.current && typeof window !== "undefined" && "speechSynthesis" in window) {
+        window.speechSynthesis.cancel();
+      }
+    };
+  }, []);
+
   const handleCopy = () => {
-    navigator.clipboard.writeText(message.content);
+    navigator.clipboard.writeText(message.content).then(
+      () => toast("Copied to clipboard", "success"),
+      () => toast("Copy failed. Select the text and copy it instead.", "error")
+    );
     setCopied(true);
     setTimeout(() => setCopied(false), 2000);
   };
+
+  const handleSpeak = () => {
+    if (!canSpeak) return;
+    const synth = window.speechSynthesis;
+    if (speaking) {
+      synth.cancel();
+      speakingRef.current = false;
+      setSpeaking(false);
+      return;
+    }
+    const utterance = new SpeechSynthesisUtterance(speakableText(message.content));
+    const finish = () => {
+      speakingRef.current = false;
+      setSpeaking(false);
+    };
+    utterance.onend = finish;
+    utterance.onerror = finish;
+    synth.cancel();
+    synth.speak(utterance);
+    speakingRef.current = true;
+    setSpeaking(true);
+  };
+
+  /** Generation stats for power users. Token counts and speed are shown; the backend model is not. */
+  const statsLine = (() => {
+    const meta = message.meta;
+    if (!meta) return null;
+    const parts: string[] = [`${(meta.latencyMs / 1000).toFixed(1)}s`];
+    if (typeof meta.totalTokens === "number") {
+      parts.push(`${meta.promptTokens ?? "?"} in · ${meta.completionTokens ?? "?"} out tokens`);
+    }
+    if (typeof meta.tokensPerSecond === "number") parts.push(`${meta.tokensPerSecond} tok/s`);
+    return parts.join(" · ");
+  })();
 
   const handleSaveEdit = () => {
     if (onEdit && editContent.trim() && editContent !== message.content) {
@@ -231,15 +298,29 @@ export const MessageItem: React.FC<MessageItemProps> = ({
         <div className="flex flex-col items-end">
           {message.attachments && message.attachments.length > 0 && (
             <div className="flex flex-wrap gap-2 mb-2 justify-end max-w-[85%]">
-              {message.attachments.map((att, i) => (
-                <div
-                  key={i}
-                  className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg bg-card border border-line text-xs text-ink"
-                >
-                  <FileText className="w-3.5 h-3.5 text-accent shrink-0" strokeWidth={1.75} />
-                  <span className="truncate max-w-[150px] font-mono">{att.name}</span>
-                </div>
-              ))}
+              {message.attachments.map((att, i) => {
+                // Text attachments (including extracted PDF, Word and Excel text) get a preview.
+                // Image and original binary data do not.
+                const previewable = !att.content.startsWith("data:");
+                return (
+                  <details
+                    key={i}
+                    className="max-w-full rounded-lg bg-card border border-line text-xs text-ink"
+                  >
+                    <summary className="flex items-center gap-1.5 px-2.5 py-1.5 cursor-pointer list-none select-none">
+                      <FileText className="w-3.5 h-3.5 text-accent shrink-0" strokeWidth={1.75} />
+                      <span className="truncate max-w-[150px] font-mono">{att.name}</span>
+                      {previewable && <span className="text-muted">Preview</span>}
+                    </summary>
+                    {previewable && (
+                      <pre className="px-3 pb-3 pt-2 mx-0 max-h-48 max-w-[min(28rem,80vw)] overflow-auto whitespace-pre-wrap break-words font-mono text-[11px] leading-relaxed text-muted border-t border-line">
+                        {att.content.slice(0, 1500)}
+                        {att.content.length > 1500 ? "\n…" : ""}
+                      </pre>
+                    )}
+                  </details>
+                );
+              })}
             </div>
           )}
 
@@ -368,6 +449,38 @@ export const MessageItem: React.FC<MessageItemProps> = ({
         )}
       </div>
 
+      {message.stopped && (
+        <div className="mt-2 text-xs text-muted select-none">Stopped before it finished.</div>
+      )}
+
+      {message.sources && message.sources.length > 0 && (
+        <div className="mt-4 max-w-xl">
+          <div className="text-xs font-medium text-muted mb-1.5">Sources</div>
+          <ol className="space-y-1.5">
+            {message.sources.map((source, i) => (
+              <li key={source.url} className="flex gap-2 text-sm min-w-0">
+                <span className="text-xs text-muted w-4 shrink-0 pt-0.5">{i + 1}.</span>
+                <a
+                  href={source.url}
+                  target="_blank"
+                  rel="noopener noreferrer nofollow"
+                  className="text-accent hover:underline truncate min-w-0"
+                  title={source.url}
+                >
+                  {source.title}
+                </a>
+              </li>
+            ))}
+          </ol>
+        </div>
+      )}
+
+      {statsLine && !isStreaming && (
+        <div className="mt-2 text-[11px] text-muted font-mono select-none" title="Generation stats">
+          {statsLine}
+        </div>
+      )}
+
       {message.generatedFiles && message.generatedFiles.length > 0 && (
         <div className="flex flex-wrap gap-2 mt-4">
           {message.generatedFiles.map((f, i) => (
@@ -410,6 +523,31 @@ export const MessageItem: React.FC<MessageItemProps> = ({
         <button type="button" onClick={handleCopy} className={iconButton} title="Copy response" aria-label="Copy response">
           {copied ? <Check className="w-4 h-4 text-accent" strokeWidth={2} /> : <Copy className="w-4 h-4" strokeWidth={1.75} />}
         </button>
+
+        {canSpeak && (
+          <button
+            type="button"
+            onClick={handleSpeak}
+            className={`${iconButton} ${speaking ? "text-accent" : ""}`}
+            title={speaking ? "Stop reading" : "Read aloud"}
+            aria-label={speaking ? "Stop reading" : "Read aloud"}
+            aria-pressed={speaking}
+          >
+            {speaking ? <Square className="w-3.5 h-3.5 fill-current" strokeWidth={2} /> : <Volume2 className="w-4 h-4" strokeWidth={1.75} />}
+          </button>
+        )}
+
+        {onBranch && (
+          <button
+            type="button"
+            onClick={() => onBranch(message.id)}
+            className={iconButton}
+            title="Branch from here"
+            aria-label="Branch from here"
+          >
+            <GitBranch className="w-4 h-4" strokeWidth={1.75} />
+          </button>
+        )}
 
         <button
           type="button"
