@@ -31,6 +31,7 @@ const nextConfig = {
               "img-src 'self' data: https: blob:;",
               "font-src 'self' https://fonts.gstatic.com data:;",
               "connect-src 'self' https: wss:;",
+              "frame-src 'self' https://status.roleflow.site;",
               "frame-ancestors 'none';",
               "object-src 'none';",
               "base-uri 'self';",
