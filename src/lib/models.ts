@@ -69,7 +69,7 @@ const SPECS: Record<ModelId, ModelSpec> = {
     backend: "openai/gpt-oss-120b",
     temperature: { low: 0.3, medium: 0.4, high: 0.4, extra: 0.5, max: 0.5 },
     topP: 0.9,
-    maxTokens: { low: 16384, medium: 32768, high: 32768, extra: 65536, max: 65536 },
+    maxTokens: { low: 1024, medium: 2048, high: 2560, extra: 3072, max: 3584 },
     reasoningEffort: "high",
   },
   "roleflow-omni-1": {
@@ -84,7 +84,7 @@ const SPECS: Record<ModelId, ModelSpec> = {
     backend: "openai/gpt-oss-120b",
     temperature: { low: 0.3, medium: 0.4, high: 0.5, extra: 0.5, max: 0.6 },
     topP: 0.9,
-    maxTokens: { low: 8192, medium: 16384, high: 16384, extra: 32768, max: 32768 },
+    maxTokens: { low: 1024, medium: 2048, high: 2560, extra: 3072, max: 3584 },
     reasoningEffort: "high",
   },
   "roleflow-genesis-1": {
@@ -98,7 +98,7 @@ const SPECS: Record<ModelId, ModelSpec> = {
       "You are the balanced flagship of the RoleFlow lineup, version 1.5, built for general intelligence, system architecture, and creative writing.",
     backend: "openai/gpt-oss-120b",
     temperature: { low: 0.3, medium: 0.6, high: 0.6, extra: 0.6, max: 0.85 },
-    maxTokens: { low: 4096, medium: 4096, high: 4096, extra: 8192, max: 8192 },
+    maxTokens: { low: 1024, medium: 1536, high: 2048, extra: 2560, max: 3072 },
     reasoningEffort: "medium",
   },
   "roleflow-flash-2": {
@@ -113,7 +113,7 @@ const SPECS: Record<ModelId, ModelSpec> = {
     backend: "openai/gpt-oss-20b",
     temperature: { low: 0.2, medium: 0.5, high: 0.6, extra: 0.6, max: 0.7 },
     topP: 0.95,
-    maxTokens: { low: 4096, medium: 4096, high: 8192, extra: 8192, max: 8192 },
+    maxTokens: { low: 1024, medium: 1536, high: 2048, extra: 2560, max: 3072 },
     // Flash answers quickly: the least reasoning of any tier.
     reasoningEffort: "low",
   },

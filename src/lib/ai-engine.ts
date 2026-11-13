@@ -152,6 +152,59 @@ async function readGroqStream(
   return { text, finishReason, usage };
 }
 
+function estimateTokens(content: string | ContentPart[] | undefined): number {
+  if (!content) return 0;
+  if (typeof content === "string") return Math.ceil(content.length / 3.2);
+  if (Array.isArray(content)) {
+    return content.reduce((sum, part) => {
+      if (part.type === "text") return sum + Math.ceil((part.text || "").length / 3.2);
+      if (part.type === "image_url") return sum + 1000;
+      return sum;
+    }, 0);
+  }
+  return 0;
+}
+
+/**
+ * Ensures total messages stay well within Groq's 8,000 TPM limit
+ * by trimming older turns and clipping oversized previous assistant outputs (e.g. game files).
+ */
+function pruneMessagesForTokenLimit(
+  messages: ModelMessage[],
+  maxPromptTokens = 4200
+): ModelMessage[] {
+  if (messages.length <= 2) return messages;
+
+  const systemMsg = messages[0];
+  const turns = messages.slice(1);
+
+  // 1. Clip any older message that is excessively large (> 2000 chars) to prevent giant single-turn token bloat
+  const clipped: ModelMessage[] = turns.map((m, idx) => {
+    // Keep the very latest user message intact
+    if (idx === turns.length - 1) return m;
+    if (typeof m.content === "string" && m.content.length > 2000) {
+      return {
+        ...m,
+        content: m.content.slice(0, 1800) + "\n\n[...earlier long output omitted to fit model context...]",
+      };
+    }
+    return m;
+  });
+
+  // 2. If still over token limit, drop the oldest user/assistant turns
+  let currentTotal = estimateTokens(systemMsg.content) + clipped.reduce((s, m) => s + estimateTokens(m.content), 0);
+  const result = [...clipped];
+
+  while (currentTotal > maxPromptTokens && result.length > 1) {
+    const dropped = result.shift();
+    if (dropped) {
+      currentTotal -= estimateTokens(dropped.content);
+    }
+  }
+
+  return [systemMsg, ...result];
+}
+
 export async function generateRoleFlowResponse({
   messages,
   model,
@@ -210,10 +263,17 @@ export async function generateRoleFlowResponse({
       ? `${systemPrompt}\n\n<earlier_conversation_summary>\nThe earlier part of this conversation was condensed to save context. Treat this summary as what was said before, and do not repeat it back unless asked.\n\n${conversationSummary}\n</earlier_conversation_summary>`
       : systemPrompt;
 
-    const formattedMessages = [
+    const formattedMessages: ModelMessage[] = [
       { role: "system", content: systemWithSummary },
       ...modelMessages,
     ];
+
+    // Safe dynamic token budgeting to strictly honor Groq's 8,000 TPM limit
+    const safeMessages = pruneMessagesForTokenLimit(formattedMessages, 4200);
+    const promptTokens = safeMessages.reduce((sum, m) => sum + estimateTokens(m.content), 0);
+    const GROQ_SAFE_LIMIT = 7500;
+    const requestedMax = sampling.maxTokens[effort] ?? 2048;
+    const safeMaxTokens = Math.max(512, Math.min(requestedMax, GROQ_SAFE_LIMIT - promptTokens));
 
     // The primary model is tried with every key first. The fallback model, if configured, is tried next.
     const fallbackBackend = hasImages ? null : getFallbackBackend(backendModel);
@@ -234,10 +294,10 @@ export async function generateRoleFlowResponse({
           },
           body: JSON.stringify({
             model: modelName,
-            messages: formattedMessages,
+            messages: safeMessages,
             temperature: sampling.temperature[effort],
             ...(sampling.topP !== undefined ? { top_p: sampling.topP } : {}),
-            max_tokens: sampling.maxTokens[effort],
+            max_tokens: safeMaxTokens,
             ...(!hasImages && sampling.reasoningEffort
               ? { reasoning_effort: sampling.reasoningEffort }
               : {}),
