@@ -267,3 +267,31 @@ export interface EmailBroadcastLog {
   status: "completed" | "partial" | "failed";
   createdAt: string;
 }
+
+/** Extra-usage license key. Only the SHA-256 hash of the key is stored. */
+export type LicenseKeyState = "unused" | "redeemed";
+
+/** Display status derived from a record and the current time. */
+export type LicenseKeyStatus = "unused" | "active" | "used_up" | "expired";
+
+export interface LicenseKeyRecord {
+  id: string;
+  keyHash: string;
+  keyPrefix: string;
+  /** Messages granted when the key is redeemed. */
+  amount: number;
+  /** Days the balance lasts after redemption, or null for no expiry. */
+  durationDays: number | null;
+  status: LicenseKeyState;
+  /** Messages still unspent on this key. */
+  remaining: number;
+  note?: string;
+  recipientEmail?: string;
+  createdBy: string;
+  createdAt: string;
+  sentAt?: string;
+  redeemedAt?: string;
+  redeemedByEmail?: string;
+  /** Set when the key is redeemed. Null means no expiry. */
+  expiresAt?: string | null;
+}

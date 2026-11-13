@@ -32,6 +32,7 @@ import {
   Key,
 } from "lucide-react";
 import { ApiKeysPanel } from "@/components/ApiKeysPanel";
+import { LicenseKeyRedeem } from "@/components/LicenseKeyRedeem";
 import { UserProfile, ModerationLogEntry, UsageStats, MemoryItem } from "@/types";
 
 
@@ -685,6 +686,8 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                   title="Account & quota"
                   description="Track your daily message usage, plan status, and account identifier."
                 />
+
+                <LicenseKeyRedeem />
 
                 {/* Plan */}
                 <div className={`${cardClass} space-y-5 p-5`}>

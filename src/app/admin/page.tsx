@@ -29,9 +29,11 @@ import {
 } from "lucide-react";
 import { UserProfile, SystemConfig, ModerationLogEntry, IncidentContext, IncidentTurn } from "@/types";
 import AdminEmailsPanel from "@/components/AdminEmailsPanel";
+import AdminLicenseKeysPanel from "@/components/AdminLicenseKeysPanel";
+import { Ticket } from "lucide-react";
 import AdminChatsPanel from "@/components/AdminChatsPanel";
 
-type AdminTab = "telemetry" | "config" | "users" | "chats" | "moderation" | "emails";
+type AdminTab = "telemetry" | "config" | "users" | "chats" | "moderation" | "emails" | "licenses";
 
 const focusRing = "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/40";
 
@@ -52,6 +54,7 @@ const NAV: { id: AdminTab; label: string; icon: React.ReactNode }[] = [
   { id: "chats", label: "User Chats (Support)", icon: <MessageSquare className="h-4 w-4" /> },
   { id: "moderation", label: "Moderation", icon: <AlertTriangle className="h-4 w-4" /> },
   { id: "emails", label: "Emails", icon: <Mail className="h-4 w-4" /> },
+  { id: "licenses", label: "License keys", icon: <Ticket className="h-4 w-4" /> },
 ];
 
 /** Small status pill. Palette colors are reserved for status like this. */
@@ -1127,6 +1130,7 @@ export default function AdminPage() {
 
           {/* EMAILS */}
           {activeTab === "emails" && <AdminEmailsPanel />}
+          {activeTab === "licenses" && <AdminLicenseKeysPanel />}
 
           {/* MODERATION */}
           {activeTab === "moderation" && (

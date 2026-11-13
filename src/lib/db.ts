@@ -2,7 +2,7 @@ import fs from "fs";
 import path from "path";
 import os from "os";
 import { sql } from "@vercel/postgres";
-import { Chat, Project, UserProfile, ModerationLogEntry, ModerationStatus, SystemConfig, MemoryItem, ApiKey, ModelId, EffortLevel, EmailBroadcastLog } from "@/types";
+import { Chat, Project, UserProfile, ModerationLogEntry, ModerationStatus, SystemConfig, MemoryItem, ApiKey, ModelId, EffortLevel, EmailBroadcastLog, LicenseKeyRecord } from "@/types";
 import { MODEL_IDS, resolveModelList } from "@/lib/models";
 
 const DATA_DIR = process.env.VERCEL ? path.join(os.tmpdir(), "roleflow-data") : path.join(process.cwd(), ".data");
@@ -40,6 +40,7 @@ interface LocalStore {
   systemConfig?: SystemConfig;
   apiKeys?: Record<string, ApiKey>;
   emailBroadcasts?: EmailBroadcastLog[];
+  licenseKeys?: Record<string, LicenseKeyRecord>;
 }
 
 export function getTodayDateString(): string {
@@ -76,6 +77,43 @@ function rowToApiKey(r: any): ApiKey {
     dailyDate: r.daily_date || undefined,
     allowedModels,
   };
+}
+
+/** Maps a roleflow_license_keys row (snake_case) to LicenseKeyRecord. */
+function rowToLicenseKey(r: any): LicenseKeyRecord {
+  const iso = (v: any) => (v ? new Date(v).toISOString() : undefined);
+  return {
+    id: r.id,
+    keyHash: r.key_hash,
+    keyPrefix: r.key_prefix,
+    amount: Number(r.amount) || 0,
+    durationDays: r.duration_days === null || r.duration_days === undefined ? null : Number(r.duration_days),
+    status: r.status === "redeemed" ? "redeemed" : "unused",
+    remaining: Number(r.remaining) || 0,
+    note: r.note || undefined,
+    recipientEmail: r.recipient_email || undefined,
+    createdBy: r.created_by,
+    createdAt: iso(r.created_at) as string,
+    sentAt: iso(r.sent_at),
+    redeemedAt: iso(r.redeemed_at),
+    redeemedByEmail: r.redeemed_by_email || undefined,
+    expiresAt: r.expires_at ? iso(r.expires_at) : null,
+  };
+}
+
+/** The one redeemed key with balance left that is still unexpired, for a user. Local store version. */
+function activeLocalLicenseKey(store: LocalStore, email: string): LicenseKeyRecord | null {
+  const now = Date.now();
+  const found = Object.values(store.licenseKeys || {})
+    .filter(
+      (k) =>
+        k.status === "redeemed" &&
+        k.redeemedByEmail === email &&
+        k.remaining > 0 &&
+        (!k.expiresAt || Date.parse(k.expiresAt) > now)
+    )
+    .sort((a, b) => (a.redeemedAt || "").localeCompare(b.redeemedAt || ""));
+  return found[0] ?? null;
 }
 
 export function patchUserProfile(user: UserProfile): UserProfile {
@@ -300,6 +338,26 @@ async function ensureDb() {
         failed_count INTEGER NOT NULL DEFAULT 0,
         status VARCHAR(20) NOT NULL,
         created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+      );
+    `;
+
+    await sql`
+      CREATE TABLE IF NOT EXISTS roleflow_license_keys (
+        id VARCHAR(255) PRIMARY KEY,
+        key_hash VARCHAR(128) UNIQUE NOT NULL,
+        key_prefix VARCHAR(32) NOT NULL,
+        amount INTEGER NOT NULL,
+        duration_days INTEGER,
+        status VARCHAR(20) NOT NULL DEFAULT 'unused',
+        remaining INTEGER NOT NULL DEFAULT 0,
+        note TEXT,
+        recipient_email VARCHAR(255),
+        created_by VARCHAR(255) NOT NULL,
+        created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+        sent_at TIMESTAMP WITH TIME ZONE,
+        redeemed_at TIMESTAMP WITH TIME ZONE,
+        redeemed_by_email VARCHAR(255),
+        expires_at TIMESTAMP WITH TIME ZONE
       );
     `;
 
@@ -535,6 +593,134 @@ export const db = {
     return patched;
   },
 
+  // ───────────────────────────────────────────────────────────────────────────
+  // License keys (extra usage). Only the SHA-256 hash of a key is stored.
+  // ───────────────────────────────────────────────────────────────────────────
+  async createLicenseKey(record: LicenseKeyRecord): Promise<LicenseKeyRecord> {
+    await ensureDb();
+    if (isPostgresConfigured) {
+      await sql`
+        INSERT INTO roleflow_license_keys
+          (id, key_hash, key_prefix, amount, duration_days, status, remaining,
+           note, recipient_email, created_by, created_at)
+        VALUES
+          (${record.id}, ${record.keyHash}, ${record.keyPrefix}, ${record.amount}, ${record.durationDays},
+           ${record.status}, ${record.remaining}, ${record.note ?? null}, ${record.recipientEmail ?? null},
+           ${record.createdBy}, ${record.createdAt});
+      `;
+      return record;
+    }
+    const store = getLocalStore();
+    store.licenseKeys = store.licenseKeys || {};
+    store.licenseKeys[record.id] = record;
+    saveLocalStore(store);
+    return record;
+  },
+
+  async listLicenseKeys(): Promise<LicenseKeyRecord[]> {
+    await ensureDb();
+    if (isPostgresConfigured) {
+      const { rows } = await sql`SELECT * FROM roleflow_license_keys ORDER BY created_at DESC;`;
+      return rows.map(rowToLicenseKey);
+    }
+    const store = getLocalStore();
+    return Object.values(store.licenseKeys || {}).sort((a, b) => b.createdAt.localeCompare(a.createdAt));
+  },
+
+  async getLicenseKeyByHash(keyHash: string): Promise<LicenseKeyRecord | null> {
+    await ensureDb();
+    if (isPostgresConfigured) {
+      const { rows } = await sql`SELECT * FROM roleflow_license_keys WHERE key_hash = ${keyHash} LIMIT 1;`;
+      return rows[0] ? rowToLicenseKey(rows[0]) : null;
+    }
+    const store = getLocalStore();
+    return Object.values(store.licenseKeys || {}).find((k) => k.keyHash === keyHash) ?? null;
+  },
+
+  async markLicenseKeySent(id: string, sentAt: string): Promise<void> {
+    await ensureDb();
+    if (isPostgresConfigured) {
+      await sql`UPDATE roleflow_license_keys SET sent_at = ${sentAt} WHERE id = ${id};`;
+      return;
+    }
+    const store = getLocalStore();
+    if (store.licenseKeys?.[id]) {
+      store.licenseKeys[id].sentAt = sentAt;
+      saveLocalStore(store);
+    }
+  },
+
+  /** Marks an unused key as redeemed by this user. Returns false if it was already used. */
+  async claimLicenseKey(id: string, email: string, redeemedAt: string, expiresAt: string | null): Promise<boolean> {
+    await ensureDb();
+    const cleanEmail = email.toLowerCase().trim();
+    if (isPostgresConfigured) {
+      const { rows } = await sql`
+        UPDATE roleflow_license_keys
+        SET status = 'redeemed', redeemed_at = ${redeemedAt}, redeemed_by_email = ${cleanEmail},
+            expires_at = ${expiresAt}
+        WHERE id = ${id} AND status = 'unused'
+        RETURNING id;
+      `;
+      return rows.length > 0;
+    }
+    const store = getLocalStore();
+    const rec = store.licenseKeys?.[id];
+    if (!rec || rec.status !== "unused") return false;
+    rec.status = "redeemed";
+    rec.redeemedAt = redeemedAt;
+    rec.redeemedByEmail = cleanEmail;
+    rec.expiresAt = expiresAt;
+    saveLocalStore(store);
+    return true;
+  },
+
+  /** The user's active extra balance, or null. expiresAt null means no expiry. */
+  async getActiveLicenseBalance(email: string): Promise<{ remaining: number; expiresAt: string | null } | null> {
+    await ensureDb();
+    const cleanEmail = email.toLowerCase().trim();
+    if (isPostgresConfigured) {
+      const { rows } = await sql`
+        SELECT remaining, expires_at FROM roleflow_license_keys
+        WHERE status = 'redeemed' AND redeemed_by_email = ${cleanEmail} AND remaining > 0
+          AND (expires_at IS NULL OR expires_at > NOW())
+        ORDER BY redeemed_at ASC LIMIT 1;
+      `;
+      if (!rows[0]) return null;
+      return {
+        remaining: Number(rows[0].remaining),
+        expiresAt: rows[0].expires_at ? new Date(rows[0].expires_at).toISOString() : null,
+      };
+    }
+    const k = activeLocalLicenseKey(getLocalStore(), cleanEmail);
+    return k ? { remaining: k.remaining, expiresAt: k.expiresAt ?? null } : null;
+  },
+
+  /** Spends one message from the user's active key. Returns false when there is no balance. */
+  async spendLicenseMessage(email: string): Promise<boolean> {
+    await ensureDb();
+    const cleanEmail = email.toLowerCase().trim();
+    if (isPostgresConfigured) {
+      const { rows } = await sql`
+        UPDATE roleflow_license_keys SET remaining = remaining - 1
+        WHERE id = (
+          SELECT id FROM roleflow_license_keys
+          WHERE status = 'redeemed' AND redeemed_by_email = ${cleanEmail} AND remaining > 0
+            AND (expires_at IS NULL OR expires_at > NOW())
+          ORDER BY redeemed_at ASC LIMIT 1
+        )
+        RETURNING id;
+      `;
+      return rows.length > 0;
+    }
+    const store = getLocalStore();
+    const k = activeLocalLicenseKey(store, cleanEmail);
+    if (!k) return false;
+    k.remaining -= 1;
+    saveLocalStore(store);
+    return true;
+  },
+
   // Usage Limits & Tracking
   async getUsage(identifier?: string, isGuest: boolean = false): Promise<{
     allowed: boolean;
@@ -543,6 +729,8 @@ export const db = {
     remaining: number;
     isUnlimited: boolean;
     resetsAt: string;
+    extraRemaining?: number;
+    extraExpiresAt?: string | null;
   }> {
     const today = getTodayDateString();
     const config = await this.getSystemConfig();
@@ -610,13 +798,16 @@ export const db = {
     }
 
     const limit = dynamicDailyLimit;
+    const extra = await this.getActiveLicenseBalance(user.email);
     return {
-      allowed: used < limit,
+      allowed: used < limit || Boolean(extra),
       used,
       limit,
       remaining: Math.max(0, limit - used),
       isUnlimited: false,
       resetsAt: "midnight",
+      extraRemaining: extra?.remaining ?? 0,
+      extraExpiresAt: extra?.expiresAt ?? null,
     };
   },
 
@@ -627,6 +818,8 @@ export const db = {
     remaining: number;
     isUnlimited: boolean;
     resetsAt: string;
+    extraRemaining?: number;
+    extraExpiresAt?: string | null;
   }> {
     const today = getTodayDateString();
     const config = await this.getSystemConfig();
@@ -696,6 +889,21 @@ export const db = {
       user.lastResetDate = today;
     }
 
+    // Daily quota used up: spend one message from the user's license key instead.
+    if (count >= dynamicDailyLimit && (await this.spendLicenseMessage(user.email))) {
+      const spent = await this.getActiveLicenseBalance(user.email);
+      return {
+        allowed: true,
+        used: count,
+        limit: dynamicDailyLimit,
+        remaining: 0,
+        isUnlimited: false,
+        resetsAt: "midnight",
+        extraRemaining: spent?.remaining ?? 0,
+        extraExpiresAt: spent?.expiresAt ?? null,
+      };
+    }
+
     count += 1;
     user.messageCount = count;
     await this.upsertUser(user);
@@ -708,6 +916,7 @@ export const db = {
       remaining: Math.max(0, limit - count),
       isUnlimited: false,
       resetsAt: "midnight",
+      extraRemaining: (await this.getActiveLicenseBalance(user.email))?.remaining ?? 0,
     };
   },
 
