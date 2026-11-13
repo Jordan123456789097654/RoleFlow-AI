@@ -61,7 +61,7 @@ function parseEmailJson(text: string): { subject: string; body: string; emoji?: 
 
 /**
  * Admin only. "Prompt for AI to Make": turns a short brief into a subject, body and emoji
- * using the Groq key pool. The admin reviews the result in the composer before sending.
+ * using the inference key pool. The admin reviews the result in the composer before sending.
  *
  * Body: { prompt: string, tone?: one of EMAIL_TONES }
  */
@@ -101,7 +101,7 @@ export async function POST(req: NextRequest) {
 
   if (!reply) {
     return NextResponse.json(
-      { error: "AI drafting is unavailable right now. Check the Groq key pool and try again." },
+      { error: "AI drafting is unavailable right now. Check the inference key pool and try again." },
       { status: 503 }
     );
   }

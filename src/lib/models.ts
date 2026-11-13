@@ -45,12 +45,12 @@ export interface ModelSpec {
   identity: string;
   /** Role sentence placed in the system prompt. */
   promptRole: string;
-  /** Groq model that serves this tier. */
+  /** Backend model that serves this tier. */
   backend: string;
   /** Sampling by effort level. */
   temperature: Record<EffortLevel, number>;
   topP?: number;
-  /** Groq max_tokens by effort level. Reasoning models count reasoning tokens against this. */
+  /** Max tokens by effort level. Reasoning models count reasoning tokens against this. */
   maxTokens: Record<EffortLevel, number>;
   /** gpt-oss reasoning depth. Omitted where the backend default is intended. */
   reasoningEffort?: "low" | "medium" | "high";

@@ -2,7 +2,7 @@ import fs from "fs";
 import path from "path";
 import os from "os";
 import { sql } from "@vercel/postgres";
-import { Chat, Project, UserProfile, ModerationLogEntry, ModerationStatus, SystemConfig, MemoryItem, ApiKey, ModelId, EffortLevel, EmailBroadcastLog, LicenseKeyRecord, ReferralRecord, LawRequestRecord, LawRequestStatus } from "@/types";
+import { Chat, Project, UserProfile, ModerationLogEntry, ModerationStatus, SystemConfig, MemoryItem, ApiKey, ModelId, EffortLevel, EmailBroadcastLog, LicenseKeyRecord, ReferralRecord, LawRequestRecord, LawRequestStatus, AdminNote } from "@/types";
 import { MODEL_IDS, resolveModelList } from "@/lib/models";
 import { getKeyPoolStatus } from "@/lib/groq-keys";
 
@@ -161,6 +161,18 @@ function rowToLawRequest(r: any): LawRequestRecord {
   };
 }
 
+/** Maps a moderation row with its JSON-encoded admin_notes column to ModerationLogEntry. */
+function withNotes(row: any): ModerationLogEntry {
+  let adminNotes: AdminNote[] = [];
+  try {
+    adminNotes = row.adminNotesRaw ? JSON.parse(row.adminNotesRaw) : [];
+  } catch {
+    adminNotes = [];
+  }
+  const { adminNotesRaw, ...rest } = row;
+  return { ...rest, adminNotes } as ModerationLogEntry;
+}
+
 export function patchUserProfile(user: UserProfile): UserProfile {
   const isJordanAdmin = Boolean(ADMIN_EMAIL && user.email?.toLowerCase() === ADMIN_EMAIL);
   const isAdmin = isJordanAdmin || Boolean(user.isAdmin);
@@ -259,6 +271,7 @@ async function ensureDb() {
       "last_reset_date VARCHAR(20)",
       "is_banned BOOLEAN DEFAULT FALSE",
       "strikes INTEGER DEFAULT 0",
+      "suspended_until TIMESTAMP WITH TIME ZONE",
     ];
     for (const col of userColumns) {
       try {
@@ -283,6 +296,10 @@ async function ensureDb() {
 
     await sql`
       ALTER TABLE roleflow_moderation_logs ADD COLUMN IF NOT EXISTS context TEXT;
+    `;
+
+    await sql`
+      ALTER TABLE roleflow_moderation_logs ADD COLUMN IF NOT EXISTS admin_notes TEXT;
     `;
 
     await sql`
@@ -705,7 +722,7 @@ export const db = {
     if (isPostgresConfigured) {
       try {
         const { rows } = await sql`
-          SELECT id, email, name, custom_instructions as "customInstructions", response_instructions as "responseInstructions", is_admin as "isAdmin", plan, message_count as "messageCount", last_reset_date as "lastResetDate", is_banned as "isBanned", strikes, created_at as "createdAt"
+          SELECT id, email, name, custom_instructions as "customInstructions", response_instructions as "responseInstructions", is_admin as "isAdmin", plan, message_count as "messageCount", last_reset_date as "lastResetDate", is_banned as "isBanned", strikes, suspended_until as "suspendedUntil", created_at as "createdAt"
           FROM roleflow_users WHERE email = ${cleanEmail};
         `;
         if (rows[0]) return patchUserProfile(rows[0] as unknown as UserProfile);
@@ -723,7 +740,7 @@ export const db = {
     if (isPostgresConfigured) {
       try {
         const { rows } = await sql`
-          SELECT id, email, name, custom_instructions as "customInstructions", response_instructions as "responseInstructions", is_admin as "isAdmin", plan, message_count as "messageCount", last_reset_date as "lastResetDate", is_banned as "isBanned", strikes, created_at as "createdAt"
+          SELECT id, email, name, custom_instructions as "customInstructions", response_instructions as "responseInstructions", is_admin as "isAdmin", plan, message_count as "messageCount", last_reset_date as "lastResetDate", is_banned as "isBanned", strikes, suspended_until as "suspendedUntil", created_at as "createdAt"
           FROM roleflow_users WHERE id = ${id};
         `;
         if (rows[0]) return patchUserProfile(rows[0] as unknown as UserProfile);
@@ -744,8 +761,8 @@ export const db = {
     if (isPostgresConfigured) {
       try {
         await sql`
-          INSERT INTO roleflow_users (id, email, name, custom_instructions, response_instructions, is_admin, plan, message_count, last_reset_date, is_banned, strikes)
-          VALUES (${patched.id}, ${cleanEmail}, ${patched.name}, ${patched.customInstructions || ""}, ${patched.responseInstructions || ""}, ${patched.isAdmin || false}, ${patched.plan || "FREE"}, ${patched.messageCount || 0}, ${patched.lastResetDate || ""}, ${patched.isBanned || false}, ${patched.strikes || 0})
+          INSERT INTO roleflow_users (id, email, name, custom_instructions, response_instructions, is_admin, plan, message_count, last_reset_date, is_banned, strikes, suspended_until)
+          VALUES (${patched.id}, ${cleanEmail}, ${patched.name}, ${patched.customInstructions || ""}, ${patched.responseInstructions || ""}, ${patched.isAdmin || false}, ${patched.plan || "FREE"}, ${patched.messageCount || 0}, ${patched.lastResetDate || ""}, ${patched.isBanned || false}, ${patched.strikes || 0}, ${patched.suspendedUntil || null})
           ON CONFLICT (email) DO UPDATE
           SET name = ${patched.name}, 
               custom_instructions = ${patched.customInstructions || ""}, 
@@ -755,7 +772,8 @@ export const db = {
               message_count = ${patched.messageCount || 0}, 
               last_reset_date = ${patched.lastResetDate || ""},
               is_banned = ${patched.isBanned || false},
-              strikes = ${patched.strikes || 0};
+              strikes = ${patched.strikes || 0},
+              suspended_until = ${patched.suspendedUntil || null};
         `;
         return patched;
       } catch (e) {
@@ -1724,11 +1742,11 @@ export const db = {
     if (isPostgresConfigured) {
       try {
         const { rows } = await sql`
-          SELECT id, user_id as "userId", user_email as "userEmail", prompt, tier, category, status, appeal_note as "appealNote", ip_address as "ipAddress", context, created_at as "createdAt"
+          SELECT id, user_id as "userId", user_email as "userEmail", prompt, tier, category, status, appeal_note as "appealNote", ip_address as "ipAddress", context, admin_notes as "adminNotesRaw", created_at as "createdAt"
           FROM roleflow_moderation_logs
           ORDER BY created_at DESC;
         `;
-        let list = rows as unknown as ModerationLogEntry[];
+        let list = (rows as any[]).map(withNotes);
         if (filter?.status) list = list.filter((l) => l.status === filter.status);
         if (filter?.tier) list = list.filter((l) => l.tier === filter.tier);
         return list;
@@ -1750,11 +1768,11 @@ export const db = {
     if (isPostgresConfigured) {
       try {
         const { rows } = await sql`
-          SELECT id, user_id as "userId", user_email as "userEmail", prompt, tier, category, status, appeal_note as "appealNote", ip_address as "ipAddress", context, created_at as "createdAt"
+          SELECT id, user_id as "userId", user_email as "userEmail", prompt, tier, category, status, appeal_note as "appealNote", ip_address as "ipAddress", context, admin_notes as "adminNotesRaw", created_at as "createdAt"
           FROM roleflow_moderation_logs
           WHERE id = ${id};
         `;
-        if (rows[0]) return rows[0] as unknown as ModerationLogEntry;
+        if (rows[0]) return withNotes(rows[0]);
       } catch (e) {
         console.error("Postgres get moderation log by id error:", e);
       }
@@ -1801,6 +1819,44 @@ export const db = {
     return null;
   },
 
+  async addModerationNote(logId: string, note: AdminNote): Promise<ModerationLogEntry | null> {
+    await ensureDb();
+    const current = await this.getModerationLogById(logId);
+    if (!current) return null;
+    const notes = [...(current.adminNotes || []), note];
+    if (isPostgresConfigured) {
+      try {
+        await sql`
+          UPDATE roleflow_moderation_logs
+          SET admin_notes = ${JSON.stringify(notes)}
+          WHERE id = ${logId};
+        `;
+        return await this.getModerationLogById(logId);
+      } catch (e) {
+        console.error("Postgres add moderation note error:", e);
+      }
+    }
+    const store = getLocalStore();
+    if (store.moderationLogs && store.moderationLogs[logId]) {
+      store.moderationLogs[logId].adminNotes = notes;
+      saveLocalStore(store);
+      return store.moderationLogs[logId];
+    }
+    return null;
+  },
+
+  /** Suspends an account until a given ISO time. Access returns automatically after that. */
+  async suspendUserUntil(userIdOrEmail: string, until: string): Promise<UserProfile | null> {
+    await ensureDb();
+    const user = userIdOrEmail.includes("@")
+      ? await this.getUserByEmail(userIdOrEmail)
+      : await this.getUserById(userIdOrEmail);
+    if (!user) return null;
+    user.isBanned = true;
+    user.suspendedUntil = until;
+    return this.upsertUser(user);
+  },
+
   async banUser(userIdOrEmail: string): Promise<void> {
     await ensureDb();
     if (!userIdOrEmail) return;
@@ -1811,12 +1867,14 @@ export const db = {
 
     if (user) {
       user.isBanned = true;
+      user.suspendedUntil = undefined;
       await this.upsertUser(user);
     } else {
       const store = getLocalStore();
       for (const [key, u] of Object.entries(store.users)) {
         if (u.id === userIdOrEmail || u.email.toLowerCase() === clean) {
           u.isBanned = true;
+          u.suspendedUntil = undefined;
           store.users[key] = u;
         }
       }
@@ -1846,12 +1904,14 @@ export const db = {
 
     if (user) {
       user.isBanned = false;
+      user.suspendedUntil = undefined;
       await this.upsertUser(user);
     } else {
       const store = getLocalStore();
       for (const [key, u] of Object.entries(store.users)) {
         if (u.id === userIdOrEmail || u.email.toLowerCase() === clean) {
           u.isBanned = false;
+          u.suspendedUntil = undefined;
           store.users[key] = u;
         }
       }
@@ -1920,8 +1980,9 @@ export const db = {
       : await this.getUserById(userIdOrEmail);
 
     if (user) {
+      const expired = Boolean(user.suspendedUntil && Date.parse(user.suspendedUntil) <= Date.now());
       return {
-        isBanned: Boolean(user.isBanned),
+        isBanned: Boolean(user.isBanned) && !expired,
         strikes: typeof user.strikes === "number" ? user.strikes : 0,
       };
     }
@@ -2065,7 +2126,7 @@ export const db = {
     if (isPostgresConfigured) {
       try {
         const { rows } = await sql`
-          SELECT id, email, name, custom_instructions as "customInstructions", response_instructions as "responseInstructions", is_admin as "isAdmin", plan, message_count as "messageCount", last_reset_date as "lastResetDate", is_banned as "isBanned", strikes, created_at as "createdAt"
+          SELECT id, email, name, custom_instructions as "customInstructions", response_instructions as "responseInstructions", is_admin as "isAdmin", plan, message_count as "messageCount", last_reset_date as "lastResetDate", is_banned as "isBanned", strikes, suspended_until as "suspendedUntil", created_at as "createdAt"
           FROM roleflow_users ORDER BY created_at DESC;
         `;
         for (const row of rows) {

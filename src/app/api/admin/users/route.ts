@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { db, ADMIN_EMAIL } from "@/lib/db";
 import { getSessionFromRequest } from "@/lib/auth";
+import { notifyUser, temporarySuspensionNotice, warningNotice } from "@/lib/notify";
 
 export const dynamic = "force-dynamic";
 
@@ -116,6 +117,46 @@ export async function POST(req: NextRequest) {
           success: true,
           message: `Daily message counter reset to 0 for ${updated.email}.`,
           user: updated,
+        });
+      }
+
+      case "warnUser": {
+        const strikes = await db.incrementStrikes(target);
+        const warned = targetClean.includes("@")
+          ? await db.getUserByEmail(targetClean)
+          : await db.getUserById(target);
+        if (warned) notifyUser(warned.email, warningNotice({ strikes }));
+        return NextResponse.json({
+          success: true,
+          message: `Warning sent to ${target}. Strike ${strikes}.`,
+          user: warned,
+        });
+      }
+
+      case "suspendUser": {
+        if (targetClean === ADMIN_EMAIL.toLowerCase()) {
+          return NextResponse.json(
+            { error: "Primary system administrator cannot be suspended." },
+            { status: 400 }
+          );
+        }
+        const n = Number(body.days);
+        if (!Number.isInteger(n) || n < 1 || n > 365) {
+          return NextResponse.json(
+            { error: "Suspension length must be a whole number of days from 1 to 365." },
+            { status: 400 }
+          );
+        }
+        const until = new Date(Date.now() + n * 24 * 60 * 60 * 1000).toISOString();
+        const suspended = await db.suspendUserUntil(target, until);
+        if (!suspended) {
+          return NextResponse.json({ error: "User not found" }, { status: 404 });
+        }
+        notifyUser(suspended.email, temporarySuspensionNotice({ until }));
+        return NextResponse.json({
+          success: true,
+          message: `User ${suspended.email} suspended for ${n} day${n === 1 ? "" : "s"}.`,
+          user: suspended,
         });
       }
 

@@ -5,7 +5,7 @@ import type { ModelId } from "@/types";
 /**
  * Per-model health for status monitoring. Each model gets a tiny one-token request through the same
  * key pool the chat uses. Results are cached, so monitors polling the endpoint cannot use up the
- * Groq quota that real users need. The cache lives in each server instance.
+ * model quota that real users need. The cache lives in each server instance.
  */
 
 const GROQ_URL = "https://api.groq.com/openai/v1/chat/completions";
@@ -36,7 +36,7 @@ async function probe(id: ModelId): Promise<ModelHealth> {
   const keys = getKeyOrder().slice(0, MAX_KEYS_PER_PROBE);
 
   if (keys.length === 0) {
-    return { ...base, status: "down", latencyMs: null, detail: "No Groq API keys are configured." };
+    return { ...base, status: "down", latencyMs: null, detail: "Inference API keys are not configured." };
   }
 
   const failures = new Set<string>();

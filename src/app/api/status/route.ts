@@ -7,7 +7,7 @@ export const dynamic = "force-dynamic";
  * Public status for the home page and admin dashboard. Unauthenticated, so it returns only what
  * visitors may see: each model's status, latency and a generic note. It always answers 200, so the
  * page can render "degraded" or "down" itself. Probes are cached for five minutes, so repeated
- * visits do not spend Groq quota.
+ * visits do not spend model inference quota.
  */
 export async function GET() {
   const models = await getModelHealth();

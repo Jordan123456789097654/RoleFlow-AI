@@ -218,6 +218,32 @@ export function appealDecisionNotice(opts: { logId: string; outcome: "RESOLVED" 
   };
 }
 
+export function warningNotice(opts: { logId?: string; strikes: number }): Notice {
+  return {
+    subject: "A warning about your RoleFlow account",
+    heading: "Warning on your account",
+    paragraphs: [
+      `After review, activity on your account was found to breach our Acceptable Use Policy. This is strike ${opts.strikes} on your account.`,
+      (opts.logId ? `Reference: ${opts.logId}. ` : "") + "Further violations can lead to a temporary or permanent suspension.",
+      "If you think this was a mistake, you can appeal using the reference above.",
+    ],
+    cta: { label: "Read the Moderation and Appeals Policy", href: `${SITE}/moderation` },
+  };
+}
+
+export function temporarySuspensionNotice(opts: { logId?: string; until: string }): Notice {
+  const when = new Date(opts.until).toUTCString();
+  return {
+    subject: "Your RoleFlow account is temporarily suspended",
+    heading: "Temporary suspension",
+    paragraphs: [
+      `Your RoleFlow account is suspended until ${when} following a review of your activity. Access to the app and API keys is paused until then.`,
+      (opts.logId ? `Reference: ${opts.logId}. ` : "") + "Your access returns automatically after this time. You can appeal at any time.",
+    ],
+    cta: { label: "Appeal this decision", href: `${SITE}/moderation` },
+  };
+}
+
 // ---------------------------------------------------------------------------
 // Required notices about policy changes
 // ---------------------------------------------------------------------------

@@ -1,13 +1,10 @@
 "use client";
 
 import React, { useState, useEffect } from "react";
-import { useSystemStatus } from "@/lib/use-system-status";
-import { STATUS_LABEL, type HealthStatus } from "@/lib/status";
 import Link from "next/link";
 import {
   Shield,
   Activity,
-  Server,
   Users,
   Sliders,
   AlertTriangle,
@@ -19,10 +16,6 @@ import {
   RotateCcw,
   Search,
   Check,
-  Brain,
-  Crown,
-  Cpu,
-  Zap,
   Lock,
   Clock,
   Sparkles,
@@ -37,7 +30,7 @@ import { Scale, Ticket } from "lucide-react";
 import ReferralModal from "@/components/ReferralModal";
 import AdminChatsPanel from "@/components/AdminChatsPanel";
 
-type AdminTab = "telemetry" | "config" | "users" | "chats" | "moderation" | "emails" | "licenses" | "law";
+type AdminTab = "attention" | "config" | "users" | "chats" | "moderation" | "emails" | "licenses" | "law";
 
 const focusRing = "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/40";
 
@@ -52,7 +45,7 @@ const dangerButtonClass = `inline-flex items-center gap-1.5 rounded-xl border bo
 const cardClass = "rounded-2xl border border-line bg-card";
 
 const NAV: { id: AdminTab; label: string; icon: React.ReactNode }[] = [
-  { id: "telemetry", label: "Overview", icon: <Activity className="h-4 w-4" /> },
+  { id: "attention", label: "Needs attention", icon: <Activity className="h-4 w-4" /> },
   { id: "config", label: "System settings", icon: <Sliders className="h-4 w-4" /> },
   { id: "users", label: "Users", icon: <Users className="h-4 w-4" /> },
   { id: "chats", label: "User Chats (Support)", icon: <MessageSquare className="h-4 w-4" /> },
@@ -139,48 +132,6 @@ function StatCard({
   );
 }
 
-/** Model status card on the overview. */
-function StatusBadge({ status }: { status?: HealthStatus }) {
-  if (!status) return <Badge tone="neutral">Checking</Badge>;
-  const tone = status === "operational" ? "success" : status === "degraded" ? "warning" : "danger";
-  return <Badge tone={tone}>{STATUS_LABEL[status]}</Badge>;
-}
-
-function ModelCard({
-  icon,
-  name,
-  description,
-  status,
-  stats,
-}: {
-  icon: React.ReactNode;
-  name: string;
-  description: string;
-  status: React.ReactNode;
-  stats: { label: string; value: string }[];
-}) {
-  return (
-    <div className={`${cardClass} flex flex-col p-5`}>
-      <div className="mb-3 flex items-center justify-between gap-2">
-        <div className="flex items-center gap-2 text-sm font-medium text-ink">
-          <span className="text-accent">{icon}</span>
-          <span>{name}</span>
-        </div>
-        {status}
-      </div>
-      <p className="mb-4 text-sm leading-relaxed text-muted">{description}</p>
-      <div className="mt-auto grid grid-cols-2 gap-3 border-t border-line pt-3">
-        {stats.map((s) => (
-          <div key={s.label}>
-            <div className="text-xs text-muted">{s.label}</div>
-            <div className="mt-0.5 text-sm font-medium tabular-nums text-ink">{s.value}</div>
-          </div>
-        ))}
-      </div>
-    </div>
-  );
-}
-
 /** Shows the conversation captured when an incident was flagged, including attachments and images. */
 function ConversationContext({ raw }: { raw?: string }) {
   if (!raw) {
@@ -236,7 +187,7 @@ function ConversationContext({ raw }: { raw?: string }) {
 }
 
 export default function AdminPage() {
-  const [activeTab, setActiveTab] = useState<AdminTab>("telemetry");
+  const [activeTab, setActiveTab] = useState<AdminTab>("attention");
   const [user, setUser] = useState<UserProfile | null>(null);
   const [isAdminAuthorized, setIsAdminAuthorized] = useState<boolean | null>(null);
   const [loading, setLoading] = useState(true);
@@ -250,14 +201,6 @@ export default function AdminPage() {
   } | null>(null);
   const [moderationLogs, setModerationLogs] = useState<ModerationLogEntry[]>([]);
   const [totalMemories, setTotalMemories] = useState<number>(0);
-  // Live per-model health from the public status endpoint, refreshed every minute.
-  const { data: liveStatus } = useSystemStatus(60_000);
-  const liveFor = (id: string) => liveStatus?.models.find((m) => m.id === id);
-  const latencyLabel = (id: string) => {
-    const ms = liveFor(id)?.latencyMs;
-    return ms == null ? "Not measured yet" : `${ms} ms`;
-  };
-
   // System Configurations
   const [config, setConfig] = useState<SystemConfig>({
     guestLimit: 5,
@@ -286,6 +229,12 @@ export default function AdminPage() {
   const [modStatusFilter, setModStatusFilter] = useState<string>("all");
   const [modTierFilter, setModTierFilter] = useState<string>("all");
   const [modActionLoading, setModActionLoading] = useState<string | null>(null);
+  const [modSearch, setModSearch] = useState("");
+  const [modCategoryFilter, setModCategoryFilter] = useState<string>("all");
+  const [modUserFilter, setModUserFilter] = useState<string>("");
+  const [selectedLogIds, setSelectedLogIds] = useState<Set<string>>(new Set());
+  const [noteDrafts, setNoteDrafts] = useState<Record<string, string>>({});
+  const [bulkBusy, setBulkBusy] = useState(false);
 
   // Notification Toast
   const [toastMessage, setToastMessage] = useState<string | null>(null);
@@ -439,13 +388,17 @@ export default function AdminPage() {
   };
 
   // User Actions
-  const handleUserAction = async (action: "toggleAdmin" | "banUser" | "unbanUser" | "resetQuota", targetUser: UserProfile) => {
+  const handleUserAction = async (
+    action: "toggleAdmin" | "banUser" | "unbanUser" | "resetQuota" | "warnUser" | "suspendUser",
+    targetUser: UserProfile,
+    extra: Record<string, unknown> = {}
+  ) => {
     setUserActionLoading(`${action}-${targetUser.id}`);
     try {
       const res = await fetch("/api/admin/users", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ action, userId: targetUser.id, email: targetUser.email }),
+        body: JSON.stringify({ action, userId: targetUser.id, email: targetUser.email, ...extra }),
       });
       const data = await res.json();
       if (res.ok) {
@@ -461,29 +414,71 @@ export default function AdminPage() {
     }
   };
 
-  // Moderation Actions
-  const handleModerationAction = async (logId: string, action: "UNBAN_DISMISS" | "CONFIRM_BAN") => {
+  // Moderation actions. The server records each one on the incident with the admin's email.
+  type ModAction = "UNBAN_DISMISS" | "CONFIRM_BAN" | "WARN" | "SUSPEND" | "ESCALATE" | "REOPEN" | "NOTE";
+
+  const runModerationAction = async (logId: string, action: ModAction, extra: Record<string, unknown> = {}) => {
+    const res = await fetch("/api/moderation/logs", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ logId, action, ...extra }),
+    });
+    const data = await res.json().catch(() => ({}));
+    return { ok: res.ok, message: data.message || data.error || "Done." };
+  };
+
+  const handleModerationAction = async (logId: string, action: ModAction, extra: Record<string, unknown> = {}) => {
     setModActionLoading(`${action}-${logId}`);
     try {
-      const res = await fetch("/api/moderation/logs", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ logId, action }),
-      });
-      const data = await res.json();
-      if (res.ok) {
-        showToast(data.message || "Incident status updated.");
+      const result = await runModerationAction(logId, action, extra);
+      showToast(result.message);
+      if (result.ok) {
         await fetchModerationLogs();
         await fetchUsers();
-      } else {
-        showToast(data.error || "Failed to update moderation log.");
       }
+      return result.ok;
     } catch (e) {
       showToast("Network error updating moderation log.");
+      return false;
     } finally {
       setModActionLoading(null);
     }
   };
+
+  const handleBulkAction = async (action: ModAction, extra: Record<string, unknown> = {}) => {
+    const ids: string[] = Array.from(selectedLogIds);
+    if (ids.length === 0) return;
+    setBulkBusy(true);
+    let done = 0;
+    for (const id of ids) {
+      try {
+        const result = await runModerationAction(id, action, extra);
+        if (result.ok) done++;
+      } catch (_) {
+        // Counted as not updated.
+      }
+    }
+    showToast(`${done} of ${ids.length} incidents updated.`);
+    setSelectedLogIds(new Set());
+    await fetchModerationLogs();
+    await fetchUsers();
+    setBulkBusy(false);
+  };
+
+  const handleSaveNote = async (logId: string) => {
+    const text = (noteDrafts[logId] || "").trim();
+    if (!text) return;
+    const ok = await handleModerationAction(logId, "NOTE", { note: text });
+    if (ok) setNoteDrafts((d) => ({ ...d, [logId]: "" }));
+  };
+
+  const toggleSelected = (id: string, checked: boolean) =>
+    setSelectedLogIds((prev) => {
+      const next = new Set(prev);
+      if (checked) next.add(id);
+      else next.delete(id);
+      return next;
+    });
 
   // Emergency Global Reset
   const handleEmergencyReset = async () => {
@@ -521,11 +516,16 @@ export default function AdminPage() {
   });
 
   // Filtered Moderation Logs
+  const q = modSearch.trim().toLowerCase();
   const filteredLogs = moderationLogs.filter((log) => {
     if (modStatusFilter !== "all" && log.status !== modStatusFilter) return false;
     if (modTierFilter !== "all" && String(log.tier) !== modTierFilter) return false;
+    if (modCategoryFilter !== "all" && log.category !== modCategoryFilter) return false;
+    if (modUserFilter && log.userEmail !== modUserFilter) return false;
+    if (q && !(log.userEmail.toLowerCase().includes(q) || log.prompt.toLowerCase().includes(q) || log.id.toLowerCase().includes(q))) return false;
     return true;
   });
+  const categories = Array.from(new Set(moderationLogs.map((l) => l.category))).sort();
 
   // Access Denied Screen
   if (isAdminAuthorized === false) {
@@ -548,7 +548,17 @@ export default function AdminPage() {
     );
   }
 
-  const pendingCount = moderationLogs.filter((l) => l.status === "FLAGGED" || l.status === "APPEALED").length;
+  const pendingCount = moderationLogs.filter((l) => l.status === "FLAGGED" || l.status === "APPEALED" || l.status === "ESCALATED").length;
+  const pendingItems = moderationLogs
+    .filter((l) => l.status === "FLAGGED" || l.status === "APPEALED" || l.status === "ESCALATED")
+    .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
+    .slice(0, 5);
+  const weekAgo = Date.now() - 7 * 24 * 60 * 60 * 1000;
+  const newUsersThisWeek = usersList.filter((u) => new Date(u.createdAt).getTime() >= weekAgo).length;
+  const bannedCount = usersList.filter((u) => u.isBanned).length;
+  const recentUsers = [...usersList]
+    .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
+    .slice(0, 5);
 
   return (
     <div className="flex min-h-screen flex-col bg-app text-ink">
@@ -651,104 +661,89 @@ export default function AdminPage() {
         </nav>
 
         <main className="min-w-0 flex-1 px-4 py-6 sm:px-6 md:py-8">
-          {/* OVERVIEW */}
-          {activeTab === "telemetry" && (
+          {/* NEEDS ATTENTION */}
+          {activeTab === "attention" && (
             <div className="space-y-8">
               <div>
-                <h1 className="font-display text-3xl text-ink">Overview</h1>
-                <p className="mt-1.5 text-sm text-muted">Model health, usage, and safety at a glance.</p>
-              </div>
-
-              <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-4">
-                <ModelCard
-                  icon={<Crown className="h-4 w-4" />}
-                  name="RoleFlow Apex 1.0"
-                  description="Highest-intelligence frontier model for proofs, systems architecture, and exhaustive reviews."
-                  status={<StatusBadge status={liveFor("roleflow-apex-1")?.status} />}
-                  stats={[
-                    { label: "Avg latency", value: latencyLabel("roleflow-apex-1") },
-                    { label: "Backend", value: "gpt-oss-120b, max reasoning" },
-                  ]}
-                />
-                <ModelCard
-                  icon={<Brain className="h-4 w-4" />}
-                  name="RoleFlow Omni 1.0"
-                  description="Frontier reasoning model for multi-step logic, advanced math, and enterprise engineering."
-                  status={<StatusBadge status={liveFor("roleflow-omni-1")?.status} />}
-                  stats={[
-                    { label: "Avg latency", value: latencyLabel("roleflow-omni-1") },
-                    { label: "Backend", value: "gpt-oss-120b, deep reasoning" },
-                  ]}
-                />
-                <ModelCard
-                  icon={<Cpu className="h-4 w-4" />}
-                  name="RoleFlow Genesis 1.5"
-                  description="Balanced flagship for general intelligence, system architecture, and creative writing."
-                  status={<StatusBadge status={liveFor("roleflow-genesis-1")?.status} />}
-                  stats={[
-                    { label: "Avg latency", value: latencyLabel("roleflow-genesis-1") },
-                    { label: "Context window", value: "128k tokens" },
-                  ]}
-                />
-                <ModelCard
-                  icon={<Zap className="h-4 w-4" />}
-                  name="RoleFlow Flash 2.0"
-                  description="Ultra-fast model for quick questions, rapid coding, and higher reasoning throughput."
-                  status={<StatusBadge status={liveFor("roleflow-flash-2")?.status} />}
-                  stats={[
-                    { label: "Avg latency", value: latencyLabel("roleflow-flash-2") },
-                    { label: "Context window", value: "128k tokens" },
-                  ]}
-                />
-                <ModelCard
-                  icon={<Server className="h-4 w-4" />}
-                  name="Inference pool"
-                  description="Multi-key load balancing with automatic failover when a key is rate limited."
-                  status={<Badge tone="neutral" mono>{stats?.modelKeys?.active || 0} keys active</Badge>}
-                  stats={[
-                    { label: "Pool health", value: liveStatus ? STATUS_LABEL[liveStatus.overall] : "Checking" },
-                    { label: "Failover", value: "Round-robin" },
-                  ]}
-                />
+                <h1 className="font-display text-3xl text-ink">Needs attention</h1>
+                <p className="mt-1.5 text-sm text-muted">Open reviews, new sign-ups, and accounts that need a look.</p>
               </div>
 
               <div className="grid grid-cols-2 gap-4 md:grid-cols-4">
                 <StatCard
-                  label="Registered users"
-                  value={usersList.length || stats?.totalUsers || 0}
-                  hint={<span className="text-emerald-700 dark:text-emerald-400">Signed in with email</span>}
+                  label="Awaiting review"
+                  value={pendingCount}
+                  valueClassName={pendingCount > 0 ? "text-danger" : ""}
+                  hint={pendingCount > 0 ? "Flagged or appealed" : "Queue is clear"}
                 />
-                <StatCard label="Chats" value={stats?.totalChats || 0} hint="Across all accounts" />
                 <StatCard
-                  label="Incidents"
-                  value={moderationLogs.length}
-                  valueClassName={moderationLogs.length > 0 ? "text-danger" : ""}
-                  hint={`${moderationLogs.filter((l) => l.tier === 1).length} tier 1 blocks`}
+                  label="Total users"
+                  value={usersList.length || stats?.totalUsers || 0}
+                  hint={`${newUsersThisWeek} joined in the last 7 days`}
                 />
-                <StatCard label="Memory" value="Active" hint="Personalized recall" />
+                <StatCard label="Banned accounts" value={bannedCount} hint="Blocked from chatting" />
+                <StatCard label="Chats" value={stats?.totalChats || 0} hint="Across all accounts" />
               </div>
 
-              {stats?.modelKeys?.keysMasked && stats.modelKeys.keysMasked.length > 0 && (
-                <div className={`${cardClass} p-5`}>
-                  <h2 className="mb-3 text-sm font-medium text-ink">
-                    Configured inference keys ({stats.modelKeys?.keysMasked?.length ?? 0})
-                  </h2>
-                  <ul className="grid grid-cols-1 gap-2 md:grid-cols-2">
-                    {(stats.modelKeys?.keysMasked ?? []).map((keyMask, idx) => (
-                      <li
-                        key={idx}
-                        className="flex items-center justify-between rounded-xl border border-line bg-app px-3.5 py-2.5 text-xs"
-                      >
-                        <span className="flex items-center gap-2 text-muted">
-                          <span className="h-1.5 w-1.5 rounded-full bg-emerald-500" />
-                          Key {idx + 1}
-                        </span>
-                        <span className="font-mono text-ink">{keyMask}</span>
-                      </li>
-                    ))}
-                  </ul>
-                </div>
-              )}
+              <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
+                <section className={`${cardClass} p-5`}>
+                  <div className="mb-3 flex items-center justify-between gap-2">
+                    <h2 className="text-sm font-medium text-ink">Waiting for review</h2>
+                    <button type="button" onClick={() => setActiveTab("moderation")} className={secondaryButtonClass}>
+                      Open moderation
+                    </button>
+                  </div>
+                  {pendingItems.length === 0 ? (
+                    <p className="py-6 text-center text-sm text-muted">Nothing is waiting for review.</p>
+                  ) : (
+                    <ul className="divide-y divide-line">
+                      {pendingItems.map((item) => (
+                        <li key={item.id} className="flex items-center justify-between gap-3 py-3 text-sm">
+                          <div className="min-w-0">
+                            <div className="truncate text-ink">{item.userEmail}</div>
+                            <div className="mt-0.5 truncate text-xs text-muted">
+                              {item.category} · {new Date(item.createdAt).toLocaleString()}
+                            </div>
+                          </div>
+                          <Badge tone={item.status === "APPEALED" ? "info" : "warning"}>
+                            {item.status === "APPEALED" ? "Appealed" : "Flagged"}
+                          </Badge>
+                        </li>
+                      ))}
+                    </ul>
+                  )}
+                </section>
+
+                <section className={`${cardClass} p-5`}>
+                  <div className="mb-3 flex items-center justify-between gap-2">
+                    <h2 className="text-sm font-medium text-ink">Recent sign-ups</h2>
+                    <button type="button" onClick={() => setActiveTab("users")} className={secondaryButtonClass}>
+                      View users
+                    </button>
+                  </div>
+                  {recentUsers.length === 0 ? (
+                    <p className="py-6 text-center text-sm text-muted">No accounts yet.</p>
+                  ) : (
+                    <ul className="divide-y divide-line">
+                      {recentUsers.map((u) => (
+                        <li key={u.id} className="flex items-center justify-between gap-3 py-3 text-sm">
+                          <div className="min-w-0">
+                            <div className="truncate text-ink">{u.name || u.email}</div>
+                            <div className="mt-0.5 truncate text-xs text-muted">
+                              {u.email} · joined {new Date(u.createdAt).toLocaleDateString()}
+                            </div>
+                          </div>
+                          {u.isBanned ? (
+                            <Badge tone="danger">Banned</Badge>
+                          ) : u.isAdmin ? (
+                            <Badge tone="info">Admin</Badge>
+                          ) : null}
+                        </li>
+                      ))}
+                    </ul>
+                  )}
+                </section>
+              </div>
             </div>
           )}
 
@@ -877,7 +872,7 @@ export default function AdminPage() {
                     </span>
                   </div>
                   <p className="text-xs text-muted leading-relaxed">
-                    Lock the entire system to a single model or effort level during upstream Groq outages or TPM spikes.
+                    Lock the entire system to a single model or effort level during upstream provider outages or capacity spikes.
                     When a model is forced, any attempts to use other models will display:
                     <span className="font-mono text-ink block mt-1 p-2 rounded bg-app border border-line">
                       &quot;We are experiencing issues reaching this model. Please switch to [allowed model name].&quot;
@@ -1191,9 +1186,30 @@ export default function AdminPage() {
                     <option value="FLAGGED">Flagged (pending)</option>
                     <option value="BANNED">Banned</option>
                     <option value="APPEALED">Appealed</option>
+                    <option value="ESCALATED">Escalated</option>
                     <option value="RESOLVED">Resolved</option>
                   </select>
 
+                  <input
+                    type="search"
+                    value={modSearch}
+                    onChange={(e) => setModSearch(e.target.value)}
+                    placeholder="Search email, prompt, or ID"
+                    aria-label="Search incidents"
+                    className={`min-w-[220px] rounded-xl border border-line bg-card px-3 py-2 text-sm text-ink placeholder:text-muted/70 ${focusRing}`}
+                  />
+                  <label htmlFor="mod-category" className="sr-only">Category</label>
+                  <select
+                    id="mod-category"
+                    value={modCategoryFilter}
+                    onChange={(e) => setModCategoryFilter(e.target.value)}
+                    className={`rounded-xl border border-line bg-card px-3 py-2 text-sm text-ink ${focusRing}`}
+                  >
+                    <option value="all">All categories</option>
+                    {categories.map((c) => (
+                      <option key={c} value={c}>{c}</option>
+                    ))}
+                  </select>
                   <label htmlFor="mod-tier" className="sr-only">Tier</label>
                   <select
                     id="mod-tier"
@@ -1207,6 +1223,106 @@ export default function AdminPage() {
                   </select>
                 </div>
               </div>
+
+              {modUserFilter && (() => {
+                const account = usersList.find((x) => x.email === modUserFilter);
+                const accountIncidents = moderationLogs.filter((l) => l.userEmail === modUserFilter);
+                const suspendedNow = Boolean(account?.isBanned && account?.suspendedUntil && Date.parse(account.suspendedUntil) > Date.now());
+                const loadingFor = (a: string) => userActionLoading === `${a}-${account?.id}`;
+                return (
+                  <section className={`${cardClass} space-y-4 p-5`}>
+                    <div className="flex flex-wrap items-start justify-between gap-3">
+                      <div className="min-w-0">
+                        <h2 className="text-sm font-medium text-ink">Account history</h2>
+                        <p className="mt-0.5 truncate font-mono text-xs text-muted">{modUserFilter}</p>
+                      </div>
+                      <button type="button" onClick={() => setModUserFilter("")} className={secondaryButtonClass}>
+                        Close
+                      </button>
+                    </div>
+
+                    <div className="flex flex-wrap items-center gap-2 text-xs">
+                      {!account ? (
+                        <Badge tone="neutral">Account not found</Badge>
+                      ) : account.isBanned ? (
+                        suspendedNow ? (
+                          <Badge tone="warning">Suspended until {new Date(account.suspendedUntil as string).toLocaleString()}</Badge>
+                        ) : (
+                          <Badge tone="danger">Banned</Badge>
+                        )
+                      ) : (
+                        <Badge tone="success">Active</Badge>
+                      )}
+                      <Badge tone="neutral">{account?.strikes ?? 0} strikes</Badge>
+                      <Badge tone="neutral">{accountIncidents.length} incidents</Badge>
+                    </div>
+
+                    <div className="flex flex-wrap gap-2">
+                      <button type="button" disabled={!account || loadingFor("warnUser")} onClick={() => account && handleUserAction("warnUser", account)} className={secondaryButtonClass}>
+                        <AlertTriangle className="h-3.5 w-3.5" />
+                        <span>Warn</span>
+                      </button>
+                      <button type="button" disabled={!account || loadingFor("suspendUser")} onClick={() => account && confirm(`Suspend ${account.email} for 7 days?`) && handleUserAction("suspendUser", account, { days: 7 })} className={secondaryButtonClass}>
+                        <Clock className="h-3.5 w-3.5" />
+                        <span>Suspend 7 days</span>
+                      </button>
+                      <button type="button" disabled={!account || loadingFor("suspendUser")} onClick={() => account && confirm(`Suspend ${account.email} for 30 days?`) && handleUserAction("suspendUser", account, { days: 30 })} className={secondaryButtonClass}>
+                        <Clock className="h-3.5 w-3.5" />
+                        <span>Suspend 30 days</span>
+                      </button>
+                      {account?.isBanned ? (
+                        <button type="button" disabled={loadingFor("unbanUser")} onClick={() => account && handleUserAction("unbanUser", account)} className={secondaryButtonClass}>
+                          <CheckCircle className="h-3.5 w-3.5" />
+                          <span>Lift ban or suspension</span>
+                        </button>
+                      ) : (
+                        <button type="button" disabled={!account || loadingFor("banUser")} onClick={() => account && confirm(`Permanently ban ${account.email}?`) && handleUserAction("banUser", account)} className={dangerButtonClass}>
+                          <Ban className="h-3.5 w-3.5" />
+                          <span>Ban</span>
+                        </button>
+                      )}
+                    </div>
+
+                    {accountIncidents.length > 0 && (
+                      <ul className="divide-y divide-line rounded-xl border border-line">
+                        {accountIncidents.map((l) => (
+                          <li key={l.id} className="flex flex-wrap items-center justify-between gap-2 px-3.5 py-2.5 text-xs">
+                            <span className="font-mono text-ink">{l.category}</span>
+                            <span className="tabular-nums text-muted">{new Date(l.createdAt).toLocaleString()}</span>
+                            <span className="font-mono text-muted">{l.status}</span>
+                          </li>
+                        ))}
+                      </ul>
+                    )}
+                  </section>
+                );
+              })()}
+
+              {selectedLogIds.size > 0 && (
+                <div className="sticky top-3 z-20 flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-line bg-card p-3 shadow-menu">
+                  <span className="text-sm font-medium text-ink">{selectedLogIds.size} selected</span>
+                  <div className="flex flex-wrap gap-2">
+                    <button type="button" disabled={bulkBusy} onClick={() => handleBulkAction("UNBAN_DISMISS")} className={secondaryButtonClass}>
+                      Dismiss and lift ban
+                    </button>
+                    <button type="button" disabled={bulkBusy} onClick={() => handleBulkAction("WARN")} className={secondaryButtonClass}>
+                      Warn
+                    </button>
+                    <button type="button" disabled={bulkBusy} onClick={() => handleBulkAction("ESCALATE")} className={secondaryButtonClass}>
+                      Escalate
+                    </button>
+                    <button type="button" disabled={bulkBusy} onClick={() => handleBulkAction("REOPEN")} className={secondaryButtonClass}>
+                      Reopen
+                    </button>
+                    <button type="button" disabled={bulkBusy} onClick={() => confirm(`Suspend ${selectedLogIds.size} accounts for 7 days?`) && handleBulkAction("SUSPEND", { days: 7 })} className={dangerButtonClass}>
+                      Suspend 7 days
+                    </button>
+                    <button type="button" disabled={bulkBusy} onClick={() => setSelectedLogIds(new Set())} className={secondaryButtonClass}>
+                      Clear
+                    </button>
+                  </div>
+                </div>
+              )}
 
               {filteredLogs.length === 0 ? (
                 <div className={`${cardClass} flex flex-col items-center gap-2 px-6 py-14 text-center`}>
@@ -1223,6 +1339,13 @@ export default function AdminPage() {
                         {/* Incident meta */}
                         <div className="flex flex-col gap-2 border-b border-line pb-4 sm:flex-row sm:items-center sm:justify-between">
                           <div className="flex flex-wrap items-center gap-2">
+                            <input
+                              type="checkbox"
+                              checked={selectedLogIds.has(log.id)}
+                              onChange={(e) => toggleSelected(log.id, e.target.checked)}
+                              className="h-4 w-4 accent-accent"
+                              aria-label={`Select incident ${log.id}`}
+                            />
                             <Badge tone={isTier1 ? "danger" : "warning"}>
                               Tier {log.tier}
                             </Badge>
@@ -1273,6 +1396,37 @@ export default function AdminPage() {
                           )}
                         </div>
 
+                        {/* Staff notes and audit trail */}
+                        {(log.adminNotes?.length ?? 0) > 0 && (
+                          <ul className="space-y-1.5 rounded-xl border border-line bg-app p-3.5 text-xs">
+                            {(log.adminNotes ?? []).map((n) => (
+                              <li key={n.id} className="flex flex-wrap gap-x-2 gap-y-0.5">
+                                <span className="tabular-nums text-muted">{new Date(n.createdAt).toLocaleString()}</span>
+                                <span className="font-mono text-muted">{n.authorEmail}</span>
+                                <span className={n.kind === "action" ? "italic text-muted" : "text-ink"}>{n.text}</span>
+                              </li>
+                            ))}
+                          </ul>
+                        )}
+                        <div className="flex gap-2">
+                          <input
+                            value={noteDrafts[log.id] || ""}
+                            onChange={(e) => setNoteDrafts((d) => ({ ...d, [log.id]: e.target.value }))}
+                            placeholder="Add an internal note (staff only)"
+                            maxLength={2000}
+                            aria-label="Internal note"
+                            className={inputClass}
+                          />
+                          <button
+                            type="button"
+                            onClick={() => handleSaveNote(log.id)}
+                            disabled={!(noteDrafts[log.id] || "").trim() || modActionLoading === `NOTE-${log.id}`}
+                            className={secondaryButtonClass}
+                          >
+                            Add note
+                          </button>
+                        </div>
+
                         {/* Actions */}
                         <div className="flex flex-wrap items-center justify-between gap-3 pt-1">
                           {log.matchedKeywords && log.matchedKeywords.length > 0 ? (
@@ -1301,6 +1455,59 @@ export default function AdminPage() {
                               <Download className="h-3.5 w-3.5" />
                               <span>Download dossier</span>
                             </a>
+
+                            <button
+                              type="button"
+                              onClick={() => setModUserFilter(log.userEmail)}
+                              className={secondaryButtonClass}
+                              title="Show every incident and the account status for this user"
+                            >
+                              <Users className="h-3.5 w-3.5" />
+                              <span>Account history</span>
+                            </button>
+
+                            <button
+                              type="button"
+                              onClick={() => handleModerationAction(log.id, "WARN")}
+                              disabled={modActionLoading === `WARN-${log.id}`}
+                              className={secondaryButtonClass}
+                            >
+                              <AlertTriangle className="h-3.5 w-3.5" />
+                              <span>Warn</span>
+                            </button>
+
+                            {log.status !== "BANNED" && (
+                              <button
+                                type="button"
+                                onClick={() => confirm(`Suspend ${log.userEmail} for 7 days?`) && handleModerationAction(log.id, "SUSPEND", { days: 7 })}
+                                disabled={modActionLoading === `SUSPEND-${log.id}`}
+                                className={secondaryButtonClass}
+                              >
+                                <Clock className="h-3.5 w-3.5" />
+                                <span>Suspend 7 days</span>
+                              </button>
+                            )}
+
+                            {log.status === "ESCALATED" ? (
+                              <button
+                                type="button"
+                                onClick={() => handleModerationAction(log.id, "REOPEN")}
+                                disabled={modActionLoading === `REOPEN-${log.id}`}
+                                className={secondaryButtonClass}
+                              >
+                                <span>Reopen</span>
+                              </button>
+                            ) : (
+                              <button
+                                type="button"
+                                onClick={() => handleModerationAction(log.id, "ESCALATE")}
+                                disabled={modActionLoading === `ESCALATE-${log.id}`}
+                                className={secondaryButtonClass}
+                              >
+                                <Shield className="h-3.5 w-3.5" />
+                                <span>Escalate</span>
+                              </button>
+                            )}
 
                             {log.status !== "BANNED" && (
                               <button

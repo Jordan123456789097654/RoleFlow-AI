@@ -589,7 +589,7 @@ async function handleChat(req: NextRequest, onDelta?: (text: string) => void): P
       conversationSummary: compacted.summaryForModel,
     });
 
-    // Upstream safety block: Groq refused the request or filtered the generation. Our scanner
+    // Upstream safety block: upstream provider refused the request or filtered the generation. Our scanner
     // did not catch it, so it is audited here as a Tier 2 incident (strike + warning, no auto-ban),
     // alerted to admins, and not charged against quota.
     if (result.isSafetyRefusal) {

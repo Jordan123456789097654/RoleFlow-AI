@@ -12,7 +12,7 @@ export interface PromptContext {
 }
 
 /**
- * System prompt for the Groq request. Every tier uses the same layered structure:
+ * System prompt for the inference request. Every tier uses the same layered structure:
  * identity and self-knowledge, a tier operating mode, effort guidance, quality standards,
  * output rules, attachment rules, user context, memory rules, and confidentiality.
  * Tiers differ in the identity line and the operating mode only, so changes stay in one place.

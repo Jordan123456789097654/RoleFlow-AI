@@ -142,6 +142,8 @@ export interface UserProfile {
   lastResetDate?: string;
   isBanned?: boolean;
   strikes?: number;
+  /** When a temporary suspension ends. Empty for permanent bans. */
+  suspendedUntil?: string;
   createdAt: string;
 }
 
@@ -194,7 +196,16 @@ export type ModerationCategory =
   | "SELF_HARM"
   | "IMAGE_REVIEW";
 
-export type ModerationStatus = "FLAGGED" | "BANNED" | "APPEALED" | "RESOLVED";
+export type ModerationStatus = "FLAGGED" | "BANNED" | "APPEALED" | "RESOLVED" | "ESCALATED";
+
+/** A staff note or an audit entry written by an admin on an incident. */
+export interface AdminNote {
+  id: string;
+  text: string;
+  authorEmail: string;
+  createdAt: string;
+  kind: "note" | "action";
+}
 
 export interface ModerationLogEntry {
   id: string;
@@ -211,6 +222,8 @@ export interface ModerationLogEntry {
   matchedKeywords?: string[];
   /** JSON-encoded IncidentContext: the conversation as it stood when the incident was flagged. */
   context?: string;
+  /** Staff notes and audit entries, oldest first. */
+  adminNotes?: AdminNote[];
 }
 
 export interface ModerationVerdict {
