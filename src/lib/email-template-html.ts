@@ -142,62 +142,79 @@ export function wrapEmailInBrandedTemplate({ title, emoji, body, ctaText, ctaUrl
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>${safeTitle}</title>
 </head>
-<body style="margin: 0; padding: 40px 20px; background-color: #ffffff; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; color: #111827;">
-  <table align="center" border="0" cellpadding="0" cellspacing="0" width="100%" style="max-width: 520px; margin: 0 auto; text-align: center;">
+<body style="margin: 0; padding: 40px 16px; background-color: #f3f4f6; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; color: #111827;">
+  <table align="center" border="0" cellpadding="0" cellspacing="0" width="100%" style="max-width: 560px; margin: 0 auto; background-color: #ffffff; border: 1px solid #e5e7eb; border-radius: 16px; overflow: hidden; box-shadow: 0 4px 16px rgba(0,0,0,0.04);">
+    <!-- Brand Header -->
     <tr>
-      <td style="padding-bottom: 36px;">
+      <td style="padding: 32px 36px 24px 36px; text-align: center; border-bottom: 1px solid #f3f4f6;">
         <table align="center" border="0" cellpadding="0" cellspacing="0">
           <tr>
-            <td style="vertical-align: middle; padding-right: 8px;">
-              <svg width="24" height="24" viewBox="0 0 32 32" fill="none" xmlns="http://www.w3.org/2000/svg">
-                <path d="M4 16C8 8 12 8 16 16C20 24 24 24 28 16" stroke="#d97706" stroke-width="4" stroke-linecap="round" stroke-linejoin="round"/>
-                <path d="M4 22C8 14 12 14 16 22C20 30 24 30 28 22" stroke="#d97706" stroke-width="3" stroke-linecap="round" stroke-opacity="0.5"/>
-              </svg>
+            <td style="vertical-align: middle; padding-right: 12px;">
+              <img src="https://roleflow.site/icon.png" width="36" height="36" alt="RoleFlow" style="display: block; width: 36px; height: 36px; border-radius: 8px; border: 0;" />
             </td>
-            <td style="vertical-align: middle; font-size: 22px; font-weight: 600; color: #111827; letter-spacing: -0.5px;">
-              RoleFlow
+            <td style="vertical-align: middle; text-align: left;">
+              <span style="font-size: 22px; font-weight: 700; color: #111827; letter-spacing: -0.5px; display: block; line-height: 1.1;">RoleFlow</span>
             </td>
           </tr>
         </table>
       </td>
     </tr>
+
+    <!-- Body Container -->
+    <tr>
+      <td style="padding: 32px 36px 24px 36px; text-align: center;">
+        <table width="100%" border="0" cellpadding="0" cellspacing="0">
 ${emojiBlock}
-    <tr>
-      <td style="padding-bottom: 16px;">
-        <h1 style="margin: 0; font-size: 26px; font-weight: 700; color: #111827; letter-spacing: -0.5px;">
-          ${safeTitle}
-        </h1>
-      </td>
-    </tr>
-    <tr>
-      <td style="padding-bottom: 8px; text-align: left;">
-        ${bodyToHtml(body)}
-      </td>
-    </tr>
+          <tr>
+            <td style="padding-bottom: 16px; text-align: center;">
+              <h1 style="margin: 0; font-size: 24px; font-weight: 700; color: #111827; letter-spacing: -0.5px; line-height: 1.3;">
+                ${safeTitle}
+              </h1>
+            </td>
+          </tr>
+          <tr>
+            <td style="padding-bottom: 24px; text-align: left;">
+              ${bodyToHtml(body)}
+            </td>
+          </tr>
 ${ctaBlock}
-    <tr>
-      <td style="padding-bottom: 32px; border-bottom: 1px solid #e5e7eb;">
-        <p style="margin: 0 0 8px 0; font-size: 13px; line-height: 20px; color: #6b7280;">
-          ${escapeHtml(
-            footnote || "You are receiving this message because you have a RoleFlow account or were addressed directly by the RoleFlow team."
-          )}
-        </p>
-        <p style="margin: 0; font-size: 13px; line-height: 20px; color: #6b7280;">
-          Need a hand? Contact <a href="mailto:support@roleflow.site" style="color: #4b5563; text-decoration: underline;">RoleFlow Support</a>.
-        </p>
+        </table>
       </td>
     </tr>
+
+    <!-- Footnote & Support -->
     <tr>
-      <td style="padding-top: 24px; font-size: 12px; line-height: 18px; color: #9ca3af; text-align: left;">
+      <td style="padding: 0 36px 28px 36px;">
+        <table width="100%" border="0" cellpadding="0" cellspacing="0" style="border-top: 1px solid #f3f4f6; padding-top: 20px;">
+          <tr>
+            <td style="font-size: 13px; line-height: 20px; color: #6b7280; text-align: center;">
+              <p style="margin: 0 0 8px 0;">
+                ${escapeHtml(
+                  footnote || "You are receiving this message because you have a RoleFlow account or were addressed directly by the RoleFlow team."
+                )}
+              </p>
+              <p style="margin: 0;">
+                Need assistance? Visit our <a href="https://status.roleflow.site" style="color: #d97706; text-decoration: underline; font-weight: 500;">Live Status Page</a> or contact <a href="mailto:support@roleflow.site" style="color: #4b5563; text-decoration: underline;">RoleFlow Support</a>.
+              </p>
+            </td>
+          </tr>
+        </table>
+      </td>
+    </tr>
+
+    <!-- Footer Links -->
+    <tr>
+      <td style="padding: 20px 36px; background-color: #f9fafb; border-top: 1px solid #e5e7eb; font-size: 12px; line-height: 18px; color: #9ca3af; text-align: center;">
         <table width="100%" border="0" cellpadding="0" cellspacing="0">
           <tr>
-            <td style="color: #6b7280; font-size: 12px;">
-              RoleFlow, Inc.<br>
+            <td style="color: #6b7280; font-size: 12px; text-align: center;">
+              <span style="font-weight: 600; color: #374151;">RoleFlow</span> • Founded & Built by Jordan Daniels<br>
               <a href="https://roleflow.site" style="color: #6b7280; text-decoration: underline;">roleflow.site</a>
-              <div style="margin-top: 8px;">
-                <a href="https://roleflow.site/help" style="color: #6b7280; text-decoration: underline; margin-right: 12px;">Help</a>
-                <a href="https://roleflow.site/privacy" style="color: #6b7280; text-decoration: underline; margin-right: 12px;">Privacy</a>
-                <a href="https://roleflow.site/unsubscribe" style="color: #6b7280; text-decoration: underline;">Unsubscribe</a>
+              <div style="margin-top: 10px;">
+                <a href="https://roleflow.site" style="color: #6b7280; text-decoration: underline; margin: 0 8px;">Home</a>
+                <a href="https://status.roleflow.site" style="color: #6b7280; text-decoration: underline; margin: 0 8px;">System Status</a>
+                <a href="https://roleflow.site/privacy" style="color: #6b7280; text-decoration: underline; margin: 0 8px;">Privacy</a>
+                <a href="https://roleflow.site/terms" style="color: #6b7280; text-decoration: underline; margin: 0 8px;">Terms</a>
               </div>
             </td>
           </tr>

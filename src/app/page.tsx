@@ -232,6 +232,28 @@ export default function MarketingLandingPage() {
         </section>
 
         {/* Features */}
+        <section id="status" className="border-t border-line/70 px-4 py-20 sm:px-6 lg:py-28">
+          <div className="mx-auto max-w-5xl">
+            <h2 className="mb-4 text-center font-display text-3xl font-normal tracking-tight text-ink sm:text-4xl">
+              System status
+            </h2>
+            <p className="mx-auto mb-10 max-w-xl text-center text-base leading-relaxed text-muted">
+              Live uptime and incident updates for RoleFlow.
+            </p>
+            <div className="overflow-hidden rounded-2xl border border-line bg-card">
+              <iframe
+                src="https://status.roleflow.site"
+                title="RoleFlow status"
+                loading="lazy"
+                className="block h-[600px] w-full border-0 sm:h-[700px]"
+              />
+            </div>
+            <p className="mt-4 text-center text-sm text-muted">
+              Having trouble? <a href="https://status.roleflow.site" target="_blank" rel="noopener noreferrer" className="text-accent hover:underline">Open the status page</a>.
+            </p>
+          </div>
+        </section>
+
         <section id="features" className="border-t border-line/70 px-4 py-20 sm:px-6 lg:py-28">
           <div className="mx-auto max-w-6xl">
             <div className="mx-auto mb-14 max-w-2xl text-center">
