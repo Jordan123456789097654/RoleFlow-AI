@@ -26,6 +26,100 @@ import {
 } from "@/types";
 import { Code, Bug, Compass } from "lucide-react";
 
+/** Messages a signed-out visitor can send before being asked to sign in. */
+const GUEST_MESSAGE_LIMIT = 5;
+
+/** One reply from /api/chat: the final payload when it succeeds, or the error details when it fails. */
+interface ChatReplyResult {
+  ok: boolean;
+  status: number;
+  data: any;
+}
+
+/**
+ * Sends a chat request and reads its server-sent events. Text arrives through onDelta while the
+ * reply is being written. Resolves with the final payload, or with the error the server reported.
+ */
+async function postChatStream(
+  body: unknown,
+  headers: Record<string, string>,
+  onDelta: (text: string) => void
+): Promise<ChatReplyResult> {
+  const outcome: { value: ChatReplyResult | null } = { value: null };
+
+  const handleEvent = (raw: string) => {
+    let event = "message";
+    const dataLines: string[] = [];
+    for (const line of raw.split("\n")) {
+      if (line.startsWith("event:")) event = line.slice(6).trim();
+      else if (line.startsWith("data:")) dataLines.push(line.slice(5).trimStart());
+    }
+    if (dataLines.length === 0) return;
+
+    let payload: any;
+    try {
+      payload = JSON.parse(dataLines.join("\n"));
+    } catch {
+      return;
+    }
+
+    if (event === "delta") {
+      if (typeof payload.text === "string" && payload.text) onDelta(payload.text);
+    } else if (event === "done") {
+      outcome.value = { ok: true, status: 200, data: payload };
+    } else if (event === "error") {
+      outcome.value = {
+        ok: false,
+        status: typeof payload.status === "number" ? payload.status : 500,
+        data: payload,
+      };
+    }
+  };
+
+  try {
+    const res = await fetch("/api/chat", {
+      method: "POST",
+      headers: { "Content-Type": "application/json", Accept: "text/event-stream", ...headers },
+      body: JSON.stringify(body),
+    });
+
+    // Not a stream (for example, an unexpected proxy response): read it as plain JSON.
+    if (!(res.headers.get("content-type") || "").includes("text/event-stream") || !res.body) {
+      const data = await res.json().catch(() => ({}));
+      return { ok: res.ok, status: res.status, data };
+    }
+
+    const reader = res.body.getReader();
+    const decoder = new TextDecoder();
+    let buffer = "";
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      buffer += decoder.decode(value, { stream: true });
+      let boundary = buffer.indexOf("\n\n");
+      while (boundary !== -1) {
+        handleEvent(buffer.slice(0, boundary));
+        buffer = buffer.slice(boundary + 2);
+        boundary = buffer.indexOf("\n\n");
+      }
+    }
+    if (buffer.trim()) handleEvent(buffer);
+  } catch (err) {
+    console.error("Chat stream failed:", err);
+    if (!outcome.value) {
+      return { ok: false, status: 0, data: { error: "The connection was interrupted. Please try again." } };
+    }
+  }
+
+  return (
+    outcome.value ?? {
+      ok: false,
+      status: 500,
+      data: { error: "The reply ended before it was complete. Please try again." },
+    }
+  );
+}
+
 export default function ChatPage() {
   // Open by default on desktop. On phones the sidebar starts closed and opens as a drawer.
   const [sidebarOpen, setSidebarOpen] = useState(false);
@@ -71,51 +165,6 @@ export default function ChatPage() {
       if (thinkingTimerRef.current) clearInterval(thinkingTimerRef.current);
     };
   }, []);
-
-  const streamAssistantMessage = (fullMessage: Message) => {
-    const fullContent = fullMessage.content || "";
-    if (!fullContent) {
-      setMessages((prev) => [...prev, fullMessage]);
-      setIsLoading(false);
-      return;
-    }
-
-    const streamingMsg: Message = {
-      ...fullMessage,
-      content: "",
-    };
-
-    setMessages((prev) => [...prev, streamingMsg]);
-    setIsLoading(false);
-    setIsLiveTyping(true);
-
-    let currentIndex = 0;
-    const totalLength = fullContent.length;
-    const step = Math.max(3, Math.ceil(totalLength / 50));
-
-    const intervalId = setInterval(() => {
-      currentIndex = Math.min(totalLength, currentIndex + step);
-      const slice = fullContent.slice(0, currentIndex);
-
-      setMessages((prev) => {
-        if (prev.length === 0) return prev;
-        const updated = [...prev];
-        const last = updated[updated.length - 1];
-        if (last && last.id === fullMessage.id) {
-          updated[updated.length - 1] = { ...last, content: slice };
-        }
-        return updated;
-      });
-
-      if (currentIndex >= totalLength) {
-        clearInterval(intervalId);
-        setIsLiveTyping(false);
-        if (fullMessage.artifact) {
-          setActiveArtifact(fullMessage.artifact);
-        }
-      }
-    }, 18);
-  };
 
   // Restore or initialize user/guest identity
   useEffect(() => {
@@ -268,74 +317,77 @@ export default function ChatPage() {
     }
   };
 
-  const handleSendMessage = async (
-    content: string,
-    attachments: Attachment[],
-    overrideBaseMessages?: Message[]
-  ) => {
-    if (!user && guestMessagesCount >= 5) {
-      setGuestLimitReached(true);
-      setAuthModalOpen(true);
-      return;
-    }
-
-    const userMessage: Message = {
-      id: "msg-" + Date.now(),
-      role: "user",
-      content,
-      attachments: attachments.length > 0 ? attachments : undefined,
-      createdAt: new Date().toISOString(),
-    };
-
-    const base = overrideBaseMessages || messages;
-    const newMessages = [...base, userMessage];
-    setMessages(newMessages);
-    setIsLoading(true);
-    setThinkingSeconds(0);
-    const startThinkingTime = Date.now();
-    if (thinkingTimerRef.current) clearInterval(thinkingTimerRef.current);
-    thinkingTimerRef.current = setInterval(() => {
-      setThinkingSeconds((Date.now() - startThinkingTime) / 1000);
-    }, 100);
-
-    if (!user) {
-      const updatedCount = guestMessagesCount + 1;
-      setGuestMessagesCount(updatedCount);
-      localStorage.setItem("roleflow_guest_count", updatedCount.toString());
-    }
-
-    const effectiveUserId = getEffectiveUserId();
-
-    try {
-      const activeProject = projects.find((p) => p.id === selectedProjectId);
-
-      const res = await fetch("/api/chat", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          "x-user-id": effectiveUserId,
-          "x-user-email": user?.email || "",
-        },
-        body: JSON.stringify({
-          userId: effectiveUserId,
-          userEmail: user?.email,
-          chatId: currentChatId,
-          messages: newMessages,
-          model: activeModel,
-          effort,
-          projectId: selectedProjectId,
-          customInstructions:
-            user?.customInstructions || activeProject?.customInstructions,
-        }),
-      });
-
-      const data = await res.json();
+  /**
+   * Sends the conversation and streams the reply into the chat. Used for new messages, edits,
+   * and regenerations. Text appears as the server produces it.
+   */
+  const requestAssistantReply = async (history: Message[]) => {
+    const startedAt = Date.now();
+    const stopThinking = () => {
       if (thinkingTimerRef.current) {
         clearInterval(thinkingTimerRef.current);
         thinkingTimerRef.current = null;
       }
+    };
 
-      if (!res.ok) {
+    setIsLoading(true);
+    setThinkingSeconds(0);
+    stopThinking();
+    thinkingTimerRef.current = setInterval(() => {
+      setThinkingSeconds((Date.now() - startedAt) / 1000);
+    }, 100);
+
+    const effectiveUserId = getEffectiveUserId();
+    const activeProject = projects.find((p) => p.id === selectedProjectId);
+    const placeholderId = "stream-" + Date.now();
+    let streaming = false;
+
+    const onDelta = (text: string) => {
+      if (!streaming) {
+        // The first text replaces the "Thinking" indicator with the reply itself.
+        streaming = true;
+        stopThinking();
+        setIsLoading(false);
+        setIsLiveTyping(true);
+        setMessages((prev) => [
+          ...prev,
+          { id: placeholderId, role: "assistant", content: text, createdAt: new Date().toISOString() },
+        ]);
+        return;
+      }
+      setMessages((prev) =>
+        prev.map((m) => (m.id === placeholderId ? { ...m, content: m.content + text } : m))
+      );
+    };
+
+    const removePlaceholder = () => {
+      if (streaming) setMessages((prev) => prev.filter((m) => m.id !== placeholderId));
+      streaming = false;
+    };
+
+    try {
+      const reply = await postChatStream(
+        {
+          userId: effectiveUserId,
+          userEmail: user?.email,
+          chatId: currentChatId,
+          messages: history,
+          model: activeModel,
+          effort,
+          projectId: selectedProjectId,
+          customInstructions: user?.customInstructions || activeProject?.customInstructions,
+        },
+        {
+          "x-user-id": effectiveUserId,
+          "x-user-email": user?.email || "",
+        },
+        onDelta
+      );
+      stopThinking();
+
+      const data = reply.data;
+      if (!reply.ok) {
+        removePlaceholder();
         if (data.isBanned) {
           const banMessage: Message = {
             id: "msg-" + Date.now(),
@@ -351,7 +403,7 @@ export default function ChatPage() {
           setMessages((prev) => [...prev, banMessage]);
           return;
         }
-        if (res.status === 429) {
+        if (reply.status === 429) {
           if (!user || data.guestLimitReached) {
             setGuestLimitReached(true);
             setAuthModalOpen(true);
@@ -374,10 +426,21 @@ export default function ChatPage() {
         }
       }
 
-      const finalElapsed = Number(((Date.now() - startThinkingTime) / 1000).toFixed(1));
+      const finalElapsed = Number(((Date.now() - startedAt) / 1000).toFixed(1));
       if (data.message) {
-        data.message.thinkingTime = data.message.thinkingTime || finalElapsed;
-        streamAssistantMessage(data.message);
+        const finalMessage: Message = {
+          ...data.message,
+          thinkingTime: data.message.thinkingTime || finalElapsed,
+        };
+        // The final message replaces the streamed text. It carries the cleaned content, artifact and files.
+        if (streaming) {
+          setMessages((prev) => prev.map((m) => (m.id === placeholderId ? finalMessage : m)));
+        } else {
+          setMessages((prev) => [...prev, finalMessage]);
+        }
+        if (finalMessage.artifact) {
+          setActiveArtifact(finalMessage.artifact);
+        }
       }
 
       if (!currentChatId && data.chatId) {
@@ -386,10 +449,8 @@ export default function ChatPage() {
 
       fetchUserChats(effectiveUserId);
     } catch (err: any) {
-      if (thinkingTimerRef.current) {
-        clearInterval(thinkingTimerRef.current);
-        thinkingTimerRef.current = null;
-      }
+      stopThinking();
+      removePlaceholder();
       console.error("Chat error:", err);
       const errorMessage: Message = {
         id: "msg-" + Date.now(),
@@ -399,8 +460,41 @@ export default function ChatPage() {
       };
       setMessages((prev) => [...prev, errorMessage]);
     } finally {
+      setIsLiveTyping(false);
       setIsLoading(false);
     }
+  };
+
+  const handleSendMessage = async (
+    content: string,
+    attachments: Attachment[],
+    overrideBaseMessages?: Message[]
+  ) => {
+    if (!user && guestMessagesCount >= GUEST_MESSAGE_LIMIT) {
+      setGuestLimitReached(true);
+      setAuthModalOpen(true);
+      return;
+    }
+
+    const userMessage: Message = {
+      id: "msg-" + Date.now(),
+      role: "user",
+      content,
+      attachments: attachments.length > 0 ? attachments : undefined,
+      createdAt: new Date().toISOString(),
+    };
+
+    const base = overrideBaseMessages || messages;
+    const newMessages = [...base, userMessage];
+    setMessages(newMessages);
+
+    if (!user) {
+      const updatedCount = guestMessagesCount + 1;
+      setGuestMessagesCount(updatedCount);
+      localStorage.setItem("roleflow_guest_count", updatedCount.toString());
+    }
+
+    await requestAssistantReply(newMessages);
   };
 
   const handleEditMessage = (messageId: string, newContent: string) => {
@@ -416,58 +510,7 @@ export default function ChatPage() {
     if (messages.length < 2) return;
     const trimmed = messages.slice(0, -1);
     setMessages(trimmed);
-
-    setIsLoading(true);
-    setThinkingSeconds(0);
-    const startThinkingTime = Date.now();
-    if (thinkingTimerRef.current) clearInterval(thinkingTimerRef.current);
-    thinkingTimerRef.current = setInterval(() => {
-      setThinkingSeconds((Date.now() - startThinkingTime) / 1000);
-    }, 100);
-
-    const effectiveUserId = getEffectiveUserId();
-
-    fetch("/api/chat", {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        "x-user-id": effectiveUserId,
-        "x-user-email": user?.email || "",
-      },
-      body: JSON.stringify({
-        userId: effectiveUserId,
-        userEmail: user?.email,
-        chatId: currentChatId,
-        messages: trimmed,
-        model: activeModel,
-        effort,
-        projectId: selectedProjectId,
-        customInstructions: user?.customInstructions,
-      }),
-    })
-      .then((r) => r.json())
-      .then((data) => {
-        if (thinkingTimerRef.current) {
-          clearInterval(thinkingTimerRef.current);
-          thinkingTimerRef.current = null;
-        }
-        if (data.usage) {
-          setUsageStats(data.usage);
-        }
-        if (data.message) {
-          const finalElapsed = Number(((Date.now() - startThinkingTime) / 1000).toFixed(1));
-          data.message.thinkingTime = data.message.thinkingTime || finalElapsed;
-          streamAssistantMessage(data.message);
-        }
-      })
-      .catch((err) => {
-        if (thinkingTimerRef.current) {
-          clearInterval(thinkingTimerRef.current);
-          thinkingTimerRef.current = null;
-        }
-        console.error(err);
-      })
-      .finally(() => setIsLoading(false));
+    void requestAssistantReply(trimmed);
   };
 
   const handleAuthSuccess = (authenticatedUser: UserProfile) => {
@@ -479,6 +522,7 @@ export default function ChatPage() {
 
   const handleSignOut = () => {
     setUser(null);
+    setUsageStats(null);
     localStorage.removeItem("roleflow_user");
     document.cookie = "roleflow_user=; Max-Age=0; path=/;";
     // Re-init guest chats
@@ -496,6 +540,16 @@ export default function ChatPage() {
 
   const activeProject = projects.find((p) => p.id === selectedProjectId);
 
+  // Free-limit line under the composer. Hidden for unlimited accounts.
+  let usageNote: string | null = null;
+  if (!user) {
+    const limit = usageStats?.limit ?? GUEST_MESSAGE_LIMIT;
+    const remaining = usageStats ? usageStats.remaining : Math.max(0, GUEST_MESSAGE_LIMIT - guestMessagesCount);
+    usageNote = `${remaining} of ${limit} free messages left · Sign in for more on every model`;
+  } else if (usageStats && !usageStats.isUnlimited) {
+    usageNote = `${usageStats.remaining} of ${usageStats.limit} messages left today`;
+  }
+
   const composer = (
     <PromptBox
       onSend={handleSendMessage}
@@ -510,6 +564,7 @@ export default function ChatPage() {
       selectedProjectId={selectedProjectId}
       onProjectChange={setSelectedProjectId}
       onCreateProject={() => setCreateProjectModalOpen(true)}
+      usageNote={usageNote}
     />
   );
 
@@ -533,7 +588,7 @@ export default function ChatPage() {
         onSelectProject={setSelectedProjectId}
         onCreateProject={() => setCreateProjectModalOpen(true)}
         user={user}
-        guestMessagesRemaining={Math.max(0, 5 - guestMessagesCount)}
+        guestMessagesRemaining={Math.max(0, GUEST_MESSAGE_LIMIT - guestMessagesCount)}
         onOpenAuth={() => {
           setGuestLimitReached(false);
           setAuthModalOpen(true);

@@ -11,6 +11,8 @@ interface GenerateParams {
   customInstructions?: string;
   projectInstructions?: string;
   memories?: string[];
+  /** When set, the reply is streamed from Groq and each new visible piece of text is passed here. */
+  onDelta?: (text: string) => void;
 }
 
 export interface GenerateResult {
@@ -50,6 +52,68 @@ function getGroqKeyPool(): string[] {
 
 let keyIndex = 0;
 
+/**
+ * Removes memory tags from streamed text so users never see them, including a tag that is
+ * still arriving. The final reply is cleaned again after the stream ends.
+ */
+export function visibleStreamText(raw: string): string {
+  return raw
+    .replace(/<memory[\s\S]*?<\/memory>/gi, "")
+    .replace(/<memory[\s\S]*$/i, "")
+    .replace(/<(m|me|mem|memo|memor|memory)?$/i, "");
+}
+
+/**
+ * Reads a Groq server-sent event stream. Emits only new visible text through onDelta and
+ * returns the full raw text plus the final finish_reason.
+ */
+async function readGroqStream(
+  body: ReadableStream<Uint8Array>,
+  onDelta: (text: string) => void
+): Promise<{ text: string; finishReason: string | null }> {
+  const reader = body.getReader();
+  const decoder = new TextDecoder();
+  let buffer = "";
+  let text = "";
+  let emitted = "";
+  let finishReason: string | null = null;
+
+  while (true) {
+    const { done, value } = await reader.read();
+    if (done) break;
+    buffer += decoder.decode(value, { stream: true });
+
+    let newline = buffer.indexOf("\n");
+    while (newline !== -1) {
+      const line = buffer.slice(0, newline).trim();
+      buffer = buffer.slice(newline + 1);
+      newline = buffer.indexOf("\n");
+      if (!line.startsWith("data:")) continue;
+      const payload = line.slice(5).trim();
+      if (!payload || payload === "[DONE]") continue;
+      try {
+        const json = JSON.parse(payload);
+        const choice = json.choices?.[0];
+        const piece = choice?.delta?.content;
+        if (typeof piece === "string" && piece) {
+          text += piece;
+          const visible = visibleStreamText(text);
+          if (visible.length > emitted.length && visible.startsWith(emitted)) {
+            const fresh = visible.slice(emitted.length);
+            emitted = visible;
+            onDelta(fresh);
+          }
+        }
+        if (choice?.finish_reason) finishReason = choice.finish_reason;
+      } catch {
+        // Ignore a malformed event and keep reading.
+      }
+    }
+  }
+
+  return { text, finishReason };
+}
+
 export async function generateRoleFlowResponse({
   messages,
   model,
@@ -57,6 +121,7 @@ export async function generateRoleFlowResponse({
   customInstructions,
   projectInstructions,
   memories,
+  onDelta,
 }: GenerateParams): Promise<GenerateResult> {
   const startTime = Date.now();
   const latestMessage = messages[messages.length - 1];
@@ -117,6 +182,7 @@ export async function generateRoleFlowResponse({
             ...(!hasImages && sampling.reasoningEffort
               ? { reasoning_effort: sampling.reasoningEffort }
               : {}),
+            ...(onDelta ? { stream: true } : {}),
           }),
         });
 
@@ -140,16 +206,25 @@ export async function generateRoleFlowResponse({
         if (res.ok) {
           keyIndex = (keyIndex + attempt + 1) % keyPool.length;
 
-          const data = await res.json();
-          const choice = data.choices?.[0];
-          const serverText = choice?.message?.content || "";
+          let serverText = "";
+          let finishReason: string | null = null;
+          if (onDelta && res.body) {
+            const streamed = await readGroqStream(res.body, onDelta);
+            serverText = streamed.text;
+            finishReason = streamed.finishReason;
+          } else {
+            const data = await res.json();
+            const choice = data.choices?.[0];
+            serverText = choice?.message?.content || "";
+            finishReason = choice?.finish_reason ?? null;
+          }
           const thinkingTime = Math.max(
             0.8,
             Number(((Date.now() - startTime) / 1000).toFixed(1))
           );
 
           // Groq reports a filtered generation as finish_reason "content_filter" on a 200 response.
-          if (choice?.finish_reason === "content_filter") {
+          if (finishReason === "content_filter") {
             return {
               content: "",
               thinkingTime,
@@ -344,6 +419,7 @@ export async function groqChatCompletion(opts: {
   messages: ModelMessage[];
   temperature?: number;
   maxTokens?: number;
+  reasoningEffort?: "low" | "medium" | "high";
 }): Promise<string | null> {
   const keyPool = getGroqKeyPool();
   for (let attempt = 0; attempt < keyPool.length; attempt++) {
@@ -357,6 +433,7 @@ export async function groqChatCompletion(opts: {
           messages: opts.messages,
           temperature: opts.temperature ?? 0,
           max_tokens: opts.maxTokens ?? 512,
+          ...(opts.reasoningEffort ? { reasoning_effort: opts.reasoningEffort } : {}),
         }),
       });
       if (res.ok) {

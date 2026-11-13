@@ -20,6 +20,8 @@ interface PromptBoxProps {
   onCreateProject?: () => void;
   guest?: boolean;
   onRequireAccount?: () => void;
+  /** Free-limit line shown under the composer, e.g. "4 of 25 messages left today". */
+  usageNote?: string | null;
 }
 
 const MAX_IMAGE_BYTES = 4 * 1024 * 1024;
@@ -47,6 +49,7 @@ export const PromptBox: React.FC<PromptBoxProps> = ({
   onCreateProject,
   guest,
   onRequireAccount,
+  usageNote,
 }) => {
   const [content, setContent] = useState("");
   const [attachments, setAttachments] = useState<Attachment[]>([]);
@@ -380,6 +383,12 @@ export const PromptBox: React.FC<PromptBoxProps> = ({
           </div>
         </div>
       </div>
+
+      {usageNote && (
+        <p className="text-xs text-muted text-center mt-2 px-2" aria-live="polite">
+          {usageNote}
+        </p>
+      )}
     </div>
   );
 };

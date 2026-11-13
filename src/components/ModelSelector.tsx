@@ -195,6 +195,11 @@ export const ModelSelector: React.FC<ModelSelectorProps> = ({
                 </button>
               );
             })}
+            <p className="px-2.5 pt-2 pb-1 mt-1 border-t border-line text-[11px] text-muted leading-relaxed">
+              {guest
+                ? "Guests get 5 free messages on Flash. Sign in for 25 messages a day on every model."
+                : "Free accounts get 25 messages a day across all four models."}
+            </p>
           </div>,
           document.body
         )}

@@ -96,6 +96,7 @@ Content-Type: application/json
 | `messages` | yes | Non-empty array of objects with `role` (`user` or `assistant`) and `content` (non-empty string, up to 16,000 characters per message). The last message must have role `user`. |
 | `model` | no | `roleflow-apex-1` (highest-intelligence frontier), `roleflow-omni-1` (frontier reasoning), `roleflow-genesis-1` (balanced flagship, Genesis 1.5), or `roleflow-flash-2` (ultra-fast, default). `roleflow-flash-1` is still accepted and is served by `roleflow-flash-2`. |
 | `effort` | no | `low`, `medium` (default), `high`, `extra`, or `max`. |
+| `stream` | no | `true` returns the reply as it is written, as server-sent events. `false` (default) returns one JSON response. See section 6.4. |
 
 Notes on the request:
 
@@ -103,7 +104,7 @@ Notes on the request:
 - **Text only.** Attachments are not accepted. A message with attachments returns an `unsupported_attachment` error.
 - **Conversation history.** The API is stateless. To continue a conversation, send the earlier messages again in `messages`. Only the most recent 30 messages are used.
 - **Effort levels.** `extra` and `max` may be lowered to `high` when those levels are not enabled for your account. The response does not indicate the adjustment.
-- **Streaming is not supported.** Each request returns one complete JSON response.
+- **Streaming is optional.** By default each request returns one complete JSON response. Set `stream` to `true` to receive the reply as it is generated (section 6.4).
 - **Memory is not used.** API requests do not read or write user memory, and they are not saved to chat history.
 
 ### 6.2 Response
@@ -164,6 +165,75 @@ console.log(data.choices[0].message.content);
 
 Store the key in an environment variable or a secrets manager, never in source code.
 
+### 6.4 Streaming
+
+Set `"stream": true` to receive the reply while it is being written. The response uses the OpenAI streaming format (`chat.completion.chunk` events), so the OpenAI SDKs can read it with no changes except `base_url`.
+
+```bash
+curl -N https://roleflow.site/api/v1/chat/completions \
+  -H "Authorization: Bearer $ROLEFLOW_API_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "model": "roleflow-flash-2",
+    "stream": true,
+    "messages": [{ "role": "user", "content": "Count from one to five." }]
+  }'
+```
+
+Each event is a line beginning with `data:`, followed by a JSON chunk. The first chunk carries `"role": "assistant"`. Text arrives in `delta.content`:
+
+```
+data: {"id":"chatcmpl-1763000000000","object":"chat.completion.chunk","created":1763000000,"model":"roleflow-flash-2","choices":[{"index":0,"delta":{"role":"assistant","content":"One, two"},"finish_reason":null}]}
+
+data: {"id":"chatcmpl-1763000000000","object":"chat.completion.chunk","created":1763000000,"model":"roleflow-flash-2","choices":[{"index":0,"delta":{},"finish_reason":"stop"}],"usage":{"used":13,"limit":100,"remaining":87}}
+
+data: [DONE]
+```
+
+- The last chunk before `[DONE]` has `finish_reason` set to `stop` and carries the same `usage` object as the non-streaming response.
+- Validation, authentication, and rate-limit errors are returned before streaming starts, as ordinary JSON errors with the status codes in section 8.
+- If something fails after streaming has started, the stream sends a chunk of the form `{"error": {"message", "type", "code"}}`, then `[DONE]`. Stop reading and treat the reply as incomplete. A stream that fails partway is not charged to your quota.
+- Streamed text is the reply as written. Surrounding whitespace may differ slightly from the final non-streaming content.
+
+**Python (OpenAI SDK):**
+
+```python
+import os
+from openai import OpenAI
+
+client = OpenAI(api_key=os.environ["ROLEFLOW_API_KEY"], base_url="https://roleflow.site/api/v1")
+
+stream = client.chat.completions.create(
+    model="roleflow-flash-2",
+    messages=[{"role": "user", "content": "Count from one to five."}],
+    stream=True,
+)
+for chunk in stream:
+    text = chunk.choices[0].delta.content
+    if text:
+        print(text, end="", flush=True)
+```
+
+**JavaScript (OpenAI SDK):**
+
+```javascript
+import OpenAI from "openai";
+
+const client = new OpenAI({
+  apiKey: process.env.ROLEFLOW_API_KEY,
+  baseURL: "https://roleflow.site/api/v1",
+});
+
+const stream = await client.chat.completions.create({
+  model: "roleflow-flash-2",
+  messages: [{ role: "user", content: "Count from one to five." }],
+  stream: true,
+});
+for await (const chunk of stream) {
+  process.stdout.write(chunk.choices[0]?.delta?.content ?? "");
+}
+```
+
 ## 7. Limits
 
 Each key is limited in two ways:
@@ -197,6 +267,7 @@ Use `code` for programmatic handling. The `message` text may change.
 | 400 | `invalid_messages` | `messages` is missing, empty, malformed, has no string content, is too long, or does not end with a `user` message. |
 | 400 | `invalid_model` | `model` is not one of the supported values. |
 | 400 | `invalid_effort` | `effort` is not one of the supported values. |
+| 400 | `invalid_stream` | `stream` must be `true` or `false`. |
 | 400 | `unsupported_attachment` | Remove attachments. The API accepts text only. |
 | 401 | `invalid_api_key` | The header is missing or malformed, or the key does not exist. Check the `Authorization: Bearer` header. |
 | 403 | `key_revoked` | The key was revoked. Create a new key. |

@@ -13,11 +13,60 @@ import { buildAttachmentScanText, buildIncidentContext, classifyImagesForSafety 
 import { imageHeldNotice, moderationRefusalNotice, notifyUser, suspensionNotice, usageWarningNotice } from "@/lib/notify";
 import { DEFAULT_MODEL, GUEST_MODEL, MODEL_IDS, isGuestAllowedModel, resolveModelId } from "@/lib/models";
 import { IMAGE_UPLOADS_ENABLED, IMAGE_UPLOADS_PAUSED_MESSAGE, isImageMimeType } from "@/lib/features";
+import { generateChatTitle } from "@/lib/titles";
 
 const ALLOWED_MODELS: ModelId[] = [...MODEL_IDS];
 const ALLOWED_EFFORTS: EffortLevel[] = ["low", "medium", "high", "extra", "max"];
 
+/**
+ * Sends the chat request. A client that asks for text/event-stream gets the reply as it is
+ * generated: "delta" events carry new text, then one "done" event carries the same JSON the
+ * non-streaming response returns, or an "error" event carries the status and error body.
+ */
 export async function POST(req: NextRequest) {
+  const wantsStream = (req.headers.get("accept") || "").includes("text/event-stream");
+  if (!wantsStream) {
+    return handleChat(req);
+  }
+
+  const encoder = new TextEncoder();
+  const stream = new ReadableStream<Uint8Array>({
+    async start(controller) {
+      const send = (event: string, data: unknown) => {
+        try {
+          controller.enqueue(encoder.encode(`event: ${event}\ndata: ${JSON.stringify(data)}\n\n`));
+        } catch {
+          // The client has gone away. Generation still finishes so the chat is saved.
+        }
+      };
+      try {
+        const res = await handleChat(req, (text) => send("delta", { text }));
+        const payload = await res.json().catch(() => ({ error: "Unexpected response." }));
+        if (res.ok) {
+          send("done", payload);
+        } else {
+          const retryAfter = res.headers.get("Retry-After");
+          send("error", { status: res.status, retryAfter: retryAfter ? Number(retryAfter) : undefined, ...payload });
+        }
+      } catch (error) {
+        console.error("Chat stream error:", error);
+        send("error", { status: 500, error: "Internal server error" });
+      } finally {
+        controller.close();
+      }
+    },
+  });
+
+  return new Response(stream, {
+    headers: {
+      "Content-Type": "text/event-stream; charset=utf-8",
+      "Cache-Control": "no-cache, no-transform",
+      "X-Accel-Buffering": "no",
+    },
+  });
+}
+
+async function handleChat(req: NextRequest, onDelta?: (text: string) => void): Promise<NextResponse> {
   try {
     const body = await req.json();
     const session = getSessionFromRequest(req);
@@ -111,8 +160,9 @@ export async function POST(req: NextRequest) {
     }
 
     // Defense-in-depth: Verify chat ownership if existing chatId supplied
+    let existingChat: Chat | null | undefined = null;
     if (chatId) {
-      const existingChat = await db.getChat(chatId, undefined, true);
+      existingChat = await db.getChat(chatId, undefined, true);
       if (existingChat && existingChat.userId && existingChat.userId !== userId) {
         return NextResponse.json(
           { error: "Access denied. Cannot modify a conversation belonging to another user." },
@@ -446,6 +496,12 @@ export async function POST(req: NextRequest) {
       }
     }
 
+    // A new chat gets an AI-written title. The title call starts now and runs alongside the reply.
+    // Existing chats keep the title they already have.
+    const titleSource = safeMessages.find((m: Message) => m.role === "user");
+    const titlePromise: Promise<string> | null =
+      !existingChat && titleSource ? generateChatTitle(titleSource.content || "") : null;
+
     // Generate response from RoleFlow AI Engine
     const result = await generateRoleFlowResponse({
       messages: cappedMessages,
@@ -453,6 +509,7 @@ export async function POST(req: NextRequest) {
       effort: safeEffort,
       customInstructions: effectiveInstructions,
       memories: persistentMemories,
+      onDelta,
     });
 
     // Upstream safety block: Groq refused the request or filtered the generation. Our scanner
@@ -566,10 +623,7 @@ export async function POST(req: NextRequest) {
 
     // Persist chat to Database strictly under user
     const currentChatId = chatId || "chat-" + Date.now();
-    const firstUserMsg = messages.find((m: Message) => m.role === "user");
-    const title = firstUserMsg
-      ? firstUserMsg.content.slice(0, 36) + (firstUserMsg.content.length > 36 ? "..." : "")
-      : "New Conversation";
+    const title = existingChat?.title || (titlePromise ? await titlePromise : "New Conversation");
 
     const chatToSave: Chat = {
       id: currentChatId,
