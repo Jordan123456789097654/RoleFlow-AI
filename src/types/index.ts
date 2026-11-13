@@ -15,6 +15,8 @@ export interface SystemConfig {
   apiKeyDefaultRpm: number;
   apiKeyDefaultRpd: number;
   apiKeyMaxPerUser: number;
+  forcedModel?: ModelId | null;
+  forcedEffort?: EffortLevel | null;
 }
 
 export type EffortLevel = "low" | "medium" | "high" | "extra" | "max";

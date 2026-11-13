@@ -2,7 +2,7 @@
 
 import React, { useState, useRef, useEffect, useLayoutEffect, useCallback } from "react";
 import { createPortal } from "react-dom";
-import { Brain, ChevronDown, Crown, Lock, Sparkles, Zap, Check } from "lucide-react";
+import { Brain, ChevronDown, Crown, Lock, Sparkles, Zap, Check, AlertTriangle } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
 import { ModelId } from "@/types";
 import { DEFAULT_MODEL, MODEL_IDS, getModelSpec, isGuestAllowedModel } from "@/lib/models";
@@ -16,6 +16,9 @@ interface ModelSelectorProps {
   guest?: boolean;
   /** Called when a guest picks a locked model. The chat page opens the sign-in modal here. */
   onRequireAccount?: () => void;
+  /** When set, only this model is reachable. Other models show error warning. */
+  forcedModel?: ModelId | null;
+  forcedModelName?: string | null;
 }
 
 const MODEL_ICONS: Record<ModelId, LucideIcon> = {
@@ -59,6 +62,8 @@ export const ModelSelector: React.FC<ModelSelectorProps> = ({
   placement = "down",
   guest = false,
   onRequireAccount,
+  forcedModel,
+  forcedModelName,
 }) => {
   const [isOpen, setIsOpen] = useState(false);
   const [menuPos, setMenuPos] = useState<MenuPosition | null>(null);
@@ -135,6 +140,9 @@ export const ModelSelector: React.FC<ModelSelectorProps> = ({
         className="flex items-center gap-1 min-h-[36px] px-2.5 rounded-lg text-sm font-medium text-ink hover:bg-hover transition-colors duration-150 outline-none focus-visible:ring-2 focus-visible:ring-accent/40"
       >
         <span className="truncate max-w-[180px] sm:max-w-none">{activeModel.name}</span>
+        {forcedModel && currentModel !== forcedModel && (
+          <AlertTriangle className="w-3.5 h-3.5 text-danger" />
+        )}
         <ChevronDown className="w-4 h-4 text-muted" strokeWidth={1.75} />
       </button>
 
@@ -153,20 +161,41 @@ export const ModelSelector: React.FC<ModelSelectorProps> = ({
               top: menuPos.top,
               bottom: menuPos.bottom,
             }}
-            className="overflow-y-auto overscroll-contain rounded-xl bg-card shadow-menu p-1.5 z-[60] animate-message"
+            className="overflow-y-auto overscroll-contain rounded-xl bg-card shadow-menu p-2 z-[60] animate-message"
           >
+            {forcedModel && (
+              <div className="flex items-start gap-2 p-2.5 mb-2 rounded-lg bg-accent/10 border border-accent/25 text-xs text-ink leading-relaxed">
+                <AlertTriangle className="w-4 h-4 text-accent shrink-0 mt-0.5" strokeWidth={1.75} />
+                <div>
+                  <span className="font-semibold text-accent block">Model Incident Notice</span>
+                  We are experiencing issues reaching other models. Please switch to {forcedModelName || "the allowed model"}.
+                </div>
+              </div>
+            )}
+
             {MODELS.map((model) => {
               const Icon = model.icon;
               const isSelected = model.id === currentModel;
               const locked = guest && !isGuestAllowedModel(model.id);
+              const isForcedBlocked = Boolean(forcedModel && model.id !== forcedModel);
+
               return (
                 <button
                   key={model.id}
                   type="button"
                   role="option"
+                  disabled={isForcedBlocked}
                   aria-selected={isSelected}
-                  aria-disabled={locked || undefined}
+                  aria-disabled={locked || isForcedBlocked || undefined}
+                  title={
+                    isForcedBlocked
+                      ? `We are experiencing issues reaching this model. Please switch to ${forcedModelName || "the allowed model"}.`
+                      : undefined
+                  }
                   onClick={() => {
+                    if (isForcedBlocked) {
+                      return;
+                    }
                     setIsOpen(false);
                     if (locked) {
                       onRequireAccount?.();
@@ -174,24 +203,38 @@ export const ModelSelector: React.FC<ModelSelectorProps> = ({
                     }
                     onSelect(model.id);
                   }}
-                  className={`w-full flex items-start gap-3 p-2.5 rounded-lg text-left transition-colors duration-150 hover:bg-hover ${
-                    locked ? "opacity-70" : ""
-                  }`}
+                  className={`w-full flex items-start gap-3 p-2.5 rounded-lg text-left transition-colors duration-150 ${
+                    isForcedBlocked
+                      ? "opacity-40 cursor-not-allowed bg-app/40"
+                      : "hover:bg-hover cursor-pointer"
+                  } ${locked ? "opacity-70" : ""}`}
                 >
                   <Icon className="w-[18px] h-[18px] mt-0.5 shrink-0 text-accent" strokeWidth={1.75} />
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center gap-2">
                       <span className="text-sm font-medium text-ink">{model.name}</span>
-                      <span className="text-[10px] uppercase tracking-wider px-1.5 py-0.5 rounded bg-hover text-muted font-semibold">
-                        {model.badge}
-                      </span>
+                      {isForcedBlocked ? (
+                        <span className="text-[10px] tracking-wider px-1.5 py-0.5 rounded bg-danger-soft text-danger font-semibold">
+                          Unavailable
+                        </span>
+                      ) : (
+                        <span className="text-[10px] uppercase tracking-wider px-1.5 py-0.5 rounded bg-hover text-muted font-semibold">
+                          {model.badge}
+                        </span>
+                      )}
                     </div>
                     <p className="text-xs text-muted mt-0.5 leading-relaxed">
-                      {locked ? "Sign in to use this model." : model.description}
+                      {isForcedBlocked
+                        ? `We are experiencing issues reaching this model. Please switch to ${forcedModelName || "the allowed model"}.`
+                        : locked
+                        ? "Sign in to use this model."
+                        : model.description}
                     </p>
                   </div>
                   {locked && <Lock className="w-4 h-4 text-muted shrink-0 mt-1" strokeWidth={1.75} />}
-                  {!locked && isSelected && <Check className="w-4 h-4 text-accent shrink-0 mt-1" strokeWidth={2} />}
+                  {!locked && !isForcedBlocked && isSelected && (
+                    <Check className="w-4 h-4 text-accent shrink-0 mt-1" strokeWidth={2} />
+                  )}
                 </button>
               );
             })}

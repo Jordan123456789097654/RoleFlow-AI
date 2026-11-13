@@ -25,6 +25,9 @@ interface HeaderProps {
   /** Signed-out users see other models locked. */
   guest?: boolean;
   onRequireAccount?: () => void;
+  forcedModel?: ModelId | null;
+  forcedModelName?: string | null;
+  forcedEffort?: EffortLevel | null;
 }
 
 export const Header: React.FC<HeaderProps> = ({
@@ -43,6 +46,9 @@ export const Header: React.FC<HeaderProps> = ({
   onToggleSidebar,
   guest,
   onRequireAccount,
+  forcedModel,
+  forcedModelName,
+  forcedEffort,
 }) => {
   return (
     <header className="h-14 px-3 sm:px-4 flex items-center justify-between gap-2 shrink-0 z-20 bg-app/90 backdrop-blur-sm">
@@ -64,6 +70,8 @@ export const Header: React.FC<HeaderProps> = ({
           placement="down"
           guest={guest}
           onRequireAccount={onRequireAccount}
+          forcedModel={forcedModel}
+          forcedModelName={forcedModelName}
         />
 
         {currentProject && (
@@ -86,7 +94,12 @@ export const Header: React.FC<HeaderProps> = ({
         )}
 
         <div className="hidden sm:block">
-          <EffortDropdown effort={effort} onChange={onEffortChange} placement="down" />
+          <EffortDropdown
+            effort={effort}
+            onChange={onEffortChange}
+            placement="down"
+            forcedEffort={forcedEffort}
+          />
         </div>
 
         {user ? (

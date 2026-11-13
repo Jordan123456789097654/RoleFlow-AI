@@ -14,7 +14,7 @@ import { compactHistory } from "@/lib/compaction";
 import { formatSourcesForPrompt, isWebSearchConfigured, searchWeb } from "@/lib/web-search";
 import { buildAttachmentScanText, buildIncidentContext, classifyImagesForSafety } from "@/lib/attachments";
 import { imageHeldNotice, moderationRefusalNotice, notifyUser, suspensionNotice, usageWarningNotice } from "@/lib/notify";
-import { DEFAULT_MODEL, GUEST_MODEL, MODEL_IDS, isGuestAllowedModel, resolveModelId } from "@/lib/models";
+import { DEFAULT_MODEL, GUEST_MODEL, MODEL_IDS, MODELS, isGuestAllowedModel, resolveModelId } from "@/lib/models";
 import { IMAGE_UPLOADS_ENABLED, IMAGE_UPLOADS_PAUSED_MESSAGE, isImageMimeType } from "@/lib/features";
 import { generateChatTitle } from "@/lib/titles";
 
@@ -158,10 +158,27 @@ async function handleChat(req: NextRequest, onDelta?: (text: string) => void): P
     }
 
     const safeModel: ModelId = ALLOWED_MODELS.includes(model) ? model : DEFAULT_MODEL;
-    let safeEffort: EffortLevel = ALLOWED_EFFORTS.includes(effort) ? effort : "medium";
-    if (!sysConfig.allowHighEffort && (safeEffort === "extra" || safeEffort === "max")) {
-      safeEffort = "high";
+
+    // Check forced model override (e.g. during outage / maintenance / high traffic)
+    if (sysConfig.forcedModel && safeModel !== sysConfig.forcedModel) {
+      const allowedModelSpec = MODELS[sysConfig.forcedModel];
+      const allowedModelName = allowedModelSpec?.name || sysConfig.forcedModel;
+      return NextResponse.json(
+        {
+          error: `We are experiencing issues reaching this model. Please switch to ${allowedModelName}.`,
+          forcedModel: sysConfig.forcedModel,
+          forcedModelName: allowedModelName,
+        },
+        { status: 400 }
+      );
     }
+
+    // Check forced effort override
+    let safeEffort: EffortLevel = sysConfig.forcedEffort
+      ? sysConfig.forcedEffort
+      : ALLOWED_EFFORTS.includes(effort)
+      ? effort
+      : "low";
 
     // Defense-in-depth: Verify chat ownership if existing chatId supplied
     let existingChat: Chat | null | undefined = null;

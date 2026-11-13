@@ -1,7 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/lib/db";
 import { getSessionFromRequest } from "@/lib/auth";
-import { SystemConfig } from "@/types";
+import { SystemConfig, ModelId, EffortLevel } from "@/types";
+import { MODEL_IDS } from "@/lib/models";
 
 export const dynamic = "force-dynamic";
 
@@ -95,6 +96,22 @@ export async function PUT(req: NextRequest) {
       const val = parseInt(body.apiKeyMaxPerUser, 10);
       if (!isNaN(val) && val >= 1 && val <= 50) {
         patch.apiKeyMaxPerUser = val;
+      }
+    }
+
+    if (body.forcedModel !== undefined) {
+      if (body.forcedModel === null || body.forcedModel === "" || body.forcedModel === "none") {
+        patch.forcedModel = null;
+      } else if (MODEL_IDS.includes(body.forcedModel as ModelId)) {
+        patch.forcedModel = body.forcedModel as ModelId;
+      }
+    }
+
+    if (body.forcedEffort !== undefined) {
+      if (body.forcedEffort === null || body.forcedEffort === "" || body.forcedEffort === "none") {
+        patch.forcedEffort = null;
+      } else if (["low", "medium", "high", "extra", "max"].includes(body.forcedEffort)) {
+        patch.forcedEffort = body.forcedEffort as EffortLevel;
       }
     }
 

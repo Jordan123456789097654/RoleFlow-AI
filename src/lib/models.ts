@@ -56,7 +56,7 @@ export interface ModelSpec {
   reasoningEffort?: "low" | "medium" | "high";
 }
 
-const SPECS: Record<ModelId, ModelSpec> = {
+export const SPECS: Record<ModelId, ModelSpec> = {
   "roleflow-apex-1": {
     id: "roleflow-apex-1",
     name: "RoleFlow Apex 1.0",
@@ -139,6 +139,8 @@ export function resolveModelList(values: unknown[]): ModelId[] {
 export function getModelSpec(id: ModelId): ModelSpec {
   return SPECS[id];
 }
+
+export const MODELS = SPECS;
 
 /** Lineup summary used in identity answers, so each model can describe its siblings accurately. */
 export const LINEUP_SUMMARY = `RoleFlow's lineup, from highest to fastest:

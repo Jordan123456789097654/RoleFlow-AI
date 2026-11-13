@@ -2,7 +2,7 @@ import fs from "fs";
 import path from "path";
 import os from "os";
 import { sql } from "@vercel/postgres";
-import { Chat, Project, UserProfile, ModerationLogEntry, ModerationStatus, SystemConfig, MemoryItem, ApiKey, ModelId, EmailBroadcastLog } from "@/types";
+import { Chat, Project, UserProfile, ModerationLogEntry, ModerationStatus, SystemConfig, MemoryItem, ApiKey, ModelId, EffortLevel, EmailBroadcastLog } from "@/types";
 import { MODEL_IDS, resolveModelList } from "@/lib/models";
 
 const DATA_DIR = process.env.VERCEL ? path.join(os.tmpdir(), "roleflow-data") : path.join(process.cwd(), ".data");
@@ -22,6 +22,8 @@ export const DEFAULT_SYSTEM_CONFIG: SystemConfig = {
   apiKeyDefaultRpm: 30,
   apiKeyDefaultRpd: 2500,
   apiKeyMaxPerUser: 5,
+  forcedModel: null,
+  forcedEffort: "low",
 };
 
 interface LocalStore {
@@ -950,6 +952,217 @@ export const db = {
     );
   },
 
+  /**
+   * Admin-only: Retrieve all user chats across the entire system for customer support,
+   * debugging issues, reproducing errors, and quality assurance.
+   */
+  async getAdminChats(options?: {
+    search?: string;
+    userId?: string;
+    limit?: number;
+    offset?: number;
+  }): Promise<{
+    chats: Array<
+      Chat & {
+        userEmail?: string;
+        userName?: string;
+        messageCount: number;
+        snippet?: string;
+      }
+    >;
+    total: number;
+  }> {
+    await ensureDb();
+    const limit = Math.min(Math.max(1, options?.limit || 50), 200);
+    const offset = Math.max(0, options?.offset || 0);
+    const search = options?.search ? options.search.trim().toLowerCase() : "";
+    const filterUserId = options?.userId ? options.userId.trim() : "";
+
+    if (isPostgresConfigured) {
+      try {
+        let rows: any[] = [];
+        let total = 0;
+
+        if (filterUserId && search) {
+          const searchPattern = `%${search}%`;
+          const countRes = await sql`
+            SELECT COUNT(*) as count 
+            FROM roleflow_chats c
+            LEFT JOIN roleflow_users u ON c.user_id = u.id
+            WHERE c.user_id = ${filterUserId}
+              AND (LOWER(c.title) LIKE ${searchPattern} OR LOWER(COALESCE(u.email, '')) LIKE ${searchPattern} OR LOWER(c.id) LIKE ${searchPattern});
+          `;
+          total = parseInt(countRes.rows[0]?.count || "0", 10);
+
+          const res = await sql`
+            SELECT 
+              c.id, 
+              c.user_id as "userId", 
+              u.email as "userEmail",
+              u.name as "userName",
+              c.title, 
+              c.project_id as "projectId", 
+              c.pinned, 
+              c.model, 
+              c.effort, 
+              c.messages, 
+              c.compaction, 
+              c.created_at as "createdAt", 
+              c.updated_at as "updatedAt"
+            FROM roleflow_chats c
+            LEFT JOIN roleflow_users u ON c.user_id = u.id
+            WHERE c.user_id = ${filterUserId}
+              AND (LOWER(c.title) LIKE ${searchPattern} OR LOWER(COALESCE(u.email, '')) LIKE ${searchPattern} OR LOWER(c.id) LIKE ${searchPattern})
+            ORDER BY c.updated_at DESC
+            LIMIT ${limit} OFFSET ${offset};
+          `;
+          rows = res.rows;
+        } else if (filterUserId) {
+          const countRes = await sql`
+            SELECT COUNT(*) as count 
+            FROM roleflow_chats c
+            WHERE c.user_id = ${filterUserId};
+          `;
+          total = parseInt(countRes.rows[0]?.count || "0", 10);
+
+          const res = await sql`
+            SELECT 
+              c.id, 
+              c.user_id as "userId", 
+              u.email as "userEmail",
+              u.name as "userName",
+              c.title, 
+              c.project_id as "projectId", 
+              c.pinned, 
+              c.model, 
+              c.effort, 
+              c.messages, 
+              c.compaction, 
+              c.created_at as "createdAt", 
+              c.updated_at as "updatedAt"
+            FROM roleflow_chats c
+            LEFT JOIN roleflow_users u ON c.user_id = u.id
+            WHERE c.user_id = ${filterUserId}
+            ORDER BY c.updated_at DESC
+            LIMIT ${limit} OFFSET ${offset};
+          `;
+          rows = res.rows;
+        } else if (search) {
+          const searchPattern = `%${search}%`;
+          const countRes = await sql`
+            SELECT COUNT(*) as count 
+            FROM roleflow_chats c
+            LEFT JOIN roleflow_users u ON c.user_id = u.id
+            WHERE (LOWER(c.title) LIKE ${searchPattern} OR LOWER(COALESCE(u.email, '')) LIKE ${searchPattern} OR LOWER(c.id) LIKE ${searchPattern});
+          `;
+          total = parseInt(countRes.rows[0]?.count || "0", 10);
+
+          const res = await sql`
+            SELECT 
+              c.id, 
+              c.user_id as "userId", 
+              u.email as "userEmail",
+              u.name as "userName",
+              c.title, 
+              c.project_id as "projectId", 
+              c.pinned, 
+              c.model, 
+              c.effort, 
+              c.messages, 
+              c.compaction, 
+              c.created_at as "createdAt", 
+              c.updated_at as "updatedAt"
+            FROM roleflow_chats c
+            LEFT JOIN roleflow_users u ON c.user_id = u.id
+            WHERE (LOWER(c.title) LIKE ${searchPattern} OR LOWER(COALESCE(u.email, '')) LIKE ${searchPattern} OR LOWER(c.id) LIKE ${searchPattern})
+            ORDER BY c.updated_at DESC
+            LIMIT ${limit} OFFSET ${offset};
+          `;
+          rows = res.rows;
+        } else {
+          const countRes = await sql`
+            SELECT COUNT(*) as count 
+            FROM roleflow_chats;
+          `;
+          total = parseInt(countRes.rows[0]?.count || "0", 10);
+
+          const res = await sql`
+            SELECT 
+              c.id, 
+              c.user_id as "userId", 
+              u.email as "userEmail",
+              u.name as "userName",
+              c.title, 
+              c.project_id as "projectId", 
+              c.pinned, 
+              c.model, 
+              c.effort, 
+              c.messages, 
+              c.compaction, 
+              c.created_at as "createdAt", 
+              c.updated_at as "updatedAt"
+            FROM roleflow_chats c
+            LEFT JOIN roleflow_users u ON c.user_id = u.id
+            ORDER BY c.updated_at DESC
+            LIMIT ${limit} OFFSET ${offset};
+          `;
+          rows = res.rows;
+        }
+
+        const chats = rows.map((r: any) => {
+          const msgs = Array.isArray(r.messages) ? r.messages : [];
+          const lastMsg = msgs[msgs.length - 1];
+          const snippet = typeof lastMsg?.content === "string" ? lastMsg.content.slice(0, 180) : "";
+          return {
+            ...r,
+            messageCount: msgs.length,
+            snippet,
+          };
+        });
+
+        return { chats, total };
+      } catch (e) {
+        console.error("Postgres getAdminChats error:", e);
+      }
+    }
+
+    // Local file store fallback
+    const store = getLocalStore();
+    let all = Object.values(store.chats).map((c) => {
+      const user = c.userId ? store.users[c.userId] : undefined;
+      const msgs = Array.isArray(c.messages) ? c.messages : [];
+      const lastMsg = msgs[msgs.length - 1];
+      const snippet = typeof lastMsg?.content === "string" ? lastMsg.content.slice(0, 180) : "";
+      return {
+        ...c,
+        userEmail: user?.email,
+        userName: user?.name,
+        messageCount: msgs.length,
+        snippet,
+      };
+    });
+
+    if (filterUserId) {
+      all = all.filter((c) => c.userId === filterUserId);
+    }
+
+    if (search) {
+      all = all.filter(
+        (c) =>
+          c.title?.toLowerCase().includes(search) ||
+          c.userEmail?.toLowerCase().includes(search) ||
+          c.userName?.toLowerCase().includes(search) ||
+          c.id.toLowerCase().includes(search)
+      );
+    }
+
+    all.sort((a, b) => new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime());
+    const total = all.length;
+    const paginated = all.slice(offset, offset + limit);
+
+    return { chats: paginated, total };
+  },
+
   // Projects
   async getProjects(userId?: string): Promise<Project[]> {
     if (!userId) return [];
@@ -1272,6 +1485,8 @@ export const db = {
       apiKeyDefaultRpm: typeof patch.apiKeyDefaultRpm === "number" && patch.apiKeyDefaultRpm >= 1 ? patch.apiKeyDefaultRpm : current.apiKeyDefaultRpm,
       apiKeyDefaultRpd: typeof patch.apiKeyDefaultRpd === "number" && patch.apiKeyDefaultRpd >= 1 ? patch.apiKeyDefaultRpd : current.apiKeyDefaultRpd,
       apiKeyMaxPerUser: typeof patch.apiKeyMaxPerUser === "number" && patch.apiKeyMaxPerUser >= 1 ? patch.apiKeyMaxPerUser : current.apiKeyMaxPerUser,
+      forcedModel: patch.forcedModel !== undefined ? (patch.forcedModel as ModelId | null) : current.forcedModel ?? null,
+      forcedEffort: patch.forcedEffort !== undefined ? (patch.forcedEffort as EffortLevel | null) : current.forcedEffort ?? null,
     };
 
     if (isPostgresConfigured) {

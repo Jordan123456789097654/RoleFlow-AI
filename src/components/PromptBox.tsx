@@ -31,6 +31,9 @@ interface PromptBoxProps {
   webSearchAvailable?: boolean;
   webSearchEnabled?: boolean;
   onWebSearchToggle?: () => void;
+  forcedModel?: ModelId | null;
+  forcedModelName?: string | null;
+  forcedEffort?: EffortLevel | null;
 }
 
 const MAX_IMAGE_BYTES = 4 * 1024 * 1024;
@@ -66,6 +69,9 @@ export const PromptBox: React.FC<PromptBoxProps> = ({
   webSearchAvailable,
   webSearchEnabled,
   onWebSearchToggle,
+  forcedModel,
+  forcedModelName,
+  forcedEffort,
 }) => {
   const [content, setContent] = useState("");
   const [listening, setListening] = useState(false);
@@ -470,8 +476,15 @@ export const PromptBox: React.FC<PromptBoxProps> = ({
               placement="up"
               guest={guest}
               onRequireAccount={onRequireAccount}
+              forcedModel={forcedModel}
+              forcedModelName={forcedModelName}
             />
-            <EffortDropdown effort={effort} onChange={onEffortChange} placement="up" />
+            <EffortDropdown
+              effort={effort}
+              onChange={onEffortChange}
+              placement="up"
+              forcedEffort={forcedEffort}
+            />
 
             {isLoading && onStop ? (
               <button

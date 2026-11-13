@@ -25,11 +25,13 @@ import {
   Clock,
   Sparkles,
   Mail,
+  MessageSquare,
 } from "lucide-react";
 import { UserProfile, SystemConfig, ModerationLogEntry, IncidentContext, IncidentTurn } from "@/types";
 import AdminEmailsPanel from "@/components/AdminEmailsPanel";
+import AdminChatsPanel from "@/components/AdminChatsPanel";
 
-type AdminTab = "telemetry" | "config" | "users" | "moderation" | "emails";
+type AdminTab = "telemetry" | "config" | "users" | "chats" | "moderation" | "emails";
 
 const focusRing = "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/40";
 
@@ -47,6 +49,7 @@ const NAV: { id: AdminTab; label: string; icon: React.ReactNode }[] = [
   { id: "telemetry", label: "Overview", icon: <Activity className="h-4 w-4" /> },
   { id: "config", label: "System settings", icon: <Sliders className="h-4 w-4" /> },
   { id: "users", label: "Users", icon: <Users className="h-4 w-4" /> },
+  { id: "chats", label: "User Chats (Support)", icon: <MessageSquare className="h-4 w-4" /> },
   { id: "moderation", label: "Moderation", icon: <AlertTriangle className="h-4 w-4" /> },
   { id: "emails", label: "Emails", icon: <Mail className="h-4 w-4" /> },
 ];
@@ -245,9 +248,12 @@ export default function AdminPage() {
     apiKeyDefaultRpm: 30,
     apiKeyDefaultRpd: 2500,
     apiKeyMaxPerUser: 5,
+    forcedModel: null,
+    forcedEffort: "low",
   });
   const [configSaving, setConfigSaving] = useState(false);
   const [configSuccess, setConfigSuccess] = useState(false);
+  const [selectedUserForChats, setSelectedUserForChats] = useState("");
 
   // Users data
   const [usersList, setUsersList] = useState<UserProfile[]>([]);
@@ -830,6 +836,78 @@ export default function AdminPage() {
                     </div>
                   )}
                 </div>
+
+                {/* Emergency Model & Effort Overrides */}
+                <div className="space-y-4 p-5 bg-accent/5">
+                  <div className="flex items-center gap-2">
+                    <AlertTriangle className="h-4 w-4 text-accent" />
+                    <span className="text-sm font-semibold text-ink">
+                      Outage & High Traffic Overrides (Forced Model & Effort)
+                    </span>
+                  </div>
+                  <p className="text-xs text-muted leading-relaxed">
+                    Lock the entire system to a single model or effort level during upstream Groq outages or TPM spikes.
+                    When a model is forced, any attempts to use other models will display:
+                    <span className="font-mono text-ink block mt-1 p-2 rounded bg-app border border-line">
+                      &quot;We are experiencing issues reaching this model. Please switch to [allowed model name].&quot;
+                    </span>
+                  </p>
+
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 pt-1">
+                    {/* Forced Model Dropdown */}
+                    <div className="space-y-1.5">
+                      <label htmlFor="forced-model" className="block text-xs font-semibold text-ink">
+                        Forced Model Restriction
+                      </label>
+                      <select
+                        id="forced-model"
+                        value={config.forcedModel || ""}
+                        onChange={(e) =>
+                          setConfig({ ...config, forcedModel: (e.target.value as any) || null })
+                        }
+                        className={`rounded-xl border border-line bg-card px-3.5 py-2 text-sm text-ink w-full ${focusRing}`}
+                      >
+                        <option value="">None (All 4 models active)</option>
+                        <option value="roleflow-flash-2">RoleFlow Flash 2.0 (Fast, lightweight)</option>
+                        <option value="roleflow-genesis-1">RoleFlow Genesis 1.5 (Balanced)</option>
+                        <option value="roleflow-omni-1">RoleFlow Omni 1.0 (Frontier reasoning)</option>
+                        <option value="roleflow-apex-1">RoleFlow Apex 1.0 (Highest intelligence)</option>
+                      </select>
+                      {config.forcedModel && (
+                        <p className="text-[11px] text-accent font-medium">
+                          Active: Other models blocked with switch notice.
+                        </p>
+                      )}
+                    </div>
+
+                    {/* Forced Effort Dropdown */}
+                    <div className="space-y-1.5">
+                      <label htmlFor="forced-effort" className="block text-xs font-semibold text-ink">
+                        Forced Effort Restriction
+                      </label>
+                      <select
+                        id="forced-effort"
+                        value={config.forcedEffort || ""}
+                        onChange={(e) =>
+                          setConfig({ ...config, forcedEffort: (e.target.value as any) || null })
+                        }
+                        className={`rounded-xl border border-line bg-card px-3.5 py-2 text-sm text-ink w-full ${focusRing}`}
+                      >
+                        <option value="">None (Users choose freely)</option>
+                        <option value="low">Low (Fastest, lowest tokens - Prevents 413 TPM limits)</option>
+                        <option value="medium">Medium (Standard)</option>
+                        <option value="high">High (Deep reasoning)</option>
+                        <option value="extra">Extra</option>
+                        <option value="max">Max</option>
+                      </select>
+                      {config.forcedEffort && (
+                        <p className="text-[11px] text-accent font-medium">
+                          Active: Only {config.forcedEffort.toUpperCase()} effort allowed.
+                        </p>
+                      )}
+                    </div>
+                  </div>
+                </div>
               </div>
 
               <div className="flex items-center justify-end gap-3">
@@ -1010,6 +1088,19 @@ export default function AdminPage() {
 
                                   <button
                                     type="button"
+                                    onClick={() => {
+                                      setSelectedUserForChats(u.email);
+                                      setActiveTab("chats");
+                                    }}
+                                    className={`rounded-lg border border-line p-1.5 text-muted transition-colors hover:bg-hover hover:text-ink disabled:opacity-50 ${focusRing}`}
+                                    title="Inspect user chats (Support)"
+                                    aria-label="Inspect user chats"
+                                  >
+                                    <MessageSquare className="h-3.5 w-3.5" />
+                                  </button>
+
+                                  <button
+                                    type="button"
                                     onClick={() => handleUserAction("resetQuota", u)}
                                     disabled={userActionLoading === `resetQuota-${u.id}`}
                                     className={`rounded-lg border border-line p-1.5 text-muted transition-colors hover:bg-hover hover:text-ink disabled:opacity-50 ${focusRing}`}
@@ -1030,6 +1121,9 @@ export default function AdminPage() {
               </div>
             </div>
           )}
+
+          {/* USER CHATS (SUPPORT & BUG INSPECTOR) */}
+          {activeTab === "chats" && <AdminChatsPanel initialUserFilter={selectedUserForChats} />}
 
           {/* EMAILS */}
           {activeTab === "emails" && <AdminEmailsPanel />}

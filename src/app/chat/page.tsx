@@ -26,7 +26,7 @@ import {
   UserProfile,
   UsageStats,
 } from "@/types";
-import { Code, Bug, Compass } from "lucide-react";
+import { Code, Bug, Compass, AlertTriangle } from "lucide-react";
 
 /** Messages a signed-out visitor can send before being asked to sign in. */
 const GUEST_MESSAGE_LIMIT = 5;
@@ -154,7 +154,7 @@ export default function ChatPage() {
     if (window.innerWidth >= 768) setSidebarOpen(true);
   }, []);
   const [model, setModel] = useState<ModelId>(DEFAULT_MODEL);
-  const [effort, setEffort] = useState<EffortLevel>("medium");
+  const [effort, setEffort] = useState<EffortLevel>("low");
 
   // User & Session Identity
   const [user, setUser] = useState<UserProfile | null>(null);
@@ -185,6 +185,47 @@ export default function ChatPage() {
   const thinkingTimerRef = useRef<NodeJS.Timeout | null>(null);
   const abortRef = useRef<AbortController | null>(null);
   const [webSearchOn, setWebSearchOn] = useState(false);
+  const [systemConfig, setSystemConfig] = useState<{
+    forcedModel: ModelId | null;
+    forcedModelName: string | null;
+    forcedEffort: EffortLevel | null;
+    broadcastBanner: string;
+  } | null>(null);
+  const [modelIncidentWarning, setModelIncidentWarning] = useState<string | null>(null);
+
+  // Poll/fetch public config for forced model, forced effort, and broadcast banner
+  useEffect(() => {
+    let mounted = true;
+    const fetchConfig = async () => {
+      try {
+        const res = await fetch("/api/config");
+        if (res.ok) {
+          const data = await res.json();
+          if (mounted) {
+            setSystemConfig({
+              forcedModel: data.forcedModel || null,
+              forcedModelName: data.forcedModelName || null,
+              forcedEffort: data.forcedEffort || null,
+              broadcastBanner: data.broadcastBanner || "",
+            });
+
+            if (data.forcedModel && model !== data.forcedModel) {
+              setModel(data.forcedModel);
+            }
+            if (data.forcedEffort && effort !== data.forcedEffort) {
+              setEffort(data.forcedEffort);
+            }
+          }
+        }
+      } catch (err) {
+        console.error("Failed to load config:", err);
+      }
+    };
+    fetchConfig();
+    return () => {
+      mounted = false;
+    };
+  }, [model, effort]);
 
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
@@ -291,7 +332,8 @@ export default function ChatPage() {
       setMessages(chat.messages);
       // Chats saved under a retired model ID open on its successor.
       setModel(resolveModelId(chat.model) ?? DEFAULT_MODEL);
-      setEffort(chat.effort);
+      // Locked to low effort during high model usage
+      setEffort("low");
       setSelectedProjectId(chat.projectId);
 
       const latestMsgWithArt = [...chat.messages].reverse().find((m) => m.artifact);
@@ -458,6 +500,18 @@ export default function ChatPage() {
             createdAt: new Date().toISOString(),
           };
           setMessages((prev) => [...prev, banMessage]);
+          return;
+        }
+        if (data.forcedModel || (data.error && data.error.includes("issues reaching this model"))) {
+          setModelIncidentWarning(data.error);
+          toast(data.error, "error");
+          const errorMsg: Message = {
+            id: "msg-" + Date.now(),
+            role: "assistant",
+            content: data.error,
+            createdAt: new Date().toISOString(),
+          };
+          setMessages((prev) => [...prev, errorMsg]);
           return;
         }
         if (reply.status === 429) {
@@ -716,6 +770,9 @@ export default function ChatPage() {
       webSearchAvailable={WEB_SEARCH_AVAILABLE}
       webSearchEnabled={webSearchOn}
       onWebSearchToggle={() => setWebSearchOn((on) => !on)}
+      forcedModel={systemConfig?.forcedModel}
+      forcedModelName={systemConfig?.forcedModelName}
+      forcedEffort={systemConfig?.forcedEffort}
     />
   );
 
@@ -772,7 +829,33 @@ export default function ChatPage() {
           onClearConversation={handleNewChat}
           onSignOut={handleSignOut}
           onToggleSidebar={() => setSidebarOpen(true)}
+          forcedModel={systemConfig?.forcedModel}
+          forcedModelName={systemConfig?.forcedModelName}
+          forcedEffort={systemConfig?.forcedEffort}
         />
+
+        {/* Emergency Model Incident Warning Banner */}
+        {systemConfig?.forcedModel && activeModel !== systemConfig.forcedModel && (
+          <div className="mx-4 mt-2 p-3 rounded-xl bg-accent/10 border border-accent/25 flex items-center justify-between gap-3 text-xs text-ink animate-message shrink-0">
+            <div className="flex items-center gap-2 min-w-0">
+              <AlertTriangle className="w-4 h-4 text-accent shrink-0" />
+              <span className="truncate">
+                We are experiencing issues reaching <strong>{activeModel}</strong>. Please switch to{" "}
+                <strong>{systemConfig.forcedModelName || systemConfig.forcedModel}</strong>.
+              </span>
+            </div>
+            <button
+              type="button"
+              onClick={() => {
+                if (systemConfig.forcedModel) setModel(systemConfig.forcedModel);
+                setModelIncidentWarning(null);
+              }}
+              className="px-2.5 py-1 rounded-lg bg-accent text-white font-medium hover:bg-accent-hover shrink-0 transition-colors"
+            >
+              Switch to {systemConfig.forcedModelName || "Allowed Model"}
+            </button>
+          </div>
+        )}
 
         {messages.length === 0 ? (
           /* Empty state: greeting and composer centered in the viewport */

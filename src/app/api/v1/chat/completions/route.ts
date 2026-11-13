@@ -7,7 +7,7 @@ import { sendSecurityAlertEmail } from "@/lib/email";
 import { checkRateLimit } from "@/lib/rate-limit";
 import { authenticateApiKey, getKeyDailyCount } from "@/lib/api-keys";
 import { buildIncidentContext } from "@/lib/attachments";
-import { DEFAULT_MODEL, MODEL_IDS, resolveModelId } from "@/lib/models";
+import { DEFAULT_MODEL, MODEL_IDS, MODELS, resolveModelId } from "@/lib/models";
 
 export const dynamic = "force-dynamic";
 
@@ -282,13 +282,19 @@ export async function POST(req: NextRequest) {
       return apiError(403, `This API key is not allowed to use ${model}.`, "model_not_allowed", "permission_error");
     }
 
-    let effort: EffortLevel = body.effort === undefined ? "medium" : body.effort;
-    if (!ALLOWED_EFFORTS.includes(effort)) {
-      return apiError(400, "'effort' must be one of low, medium, high, extra, max.", "invalid_effort");
+    if (config.forcedModel && model !== config.forcedModel) {
+      const allowedModelSpec = MODELS[config.forcedModel];
+      const allowedModelName = allowedModelSpec?.name || config.forcedModel;
+      return apiError(
+        400,
+        `We are experiencing issues reaching this model. Please switch to ${allowedModelName}.`,
+        "model_unavailable"
+      );
     }
-    if (!config.allowHighEffort && (effort === "extra" || effort === "max")) {
-      effort = "high";
-    }
+
+    let effort: EffortLevel = config.forcedEffort
+      ? config.forcedEffort
+      : (body.effort || "low");
 
     // 4. Per-key limits: requests per minute (sliding window), then requests per UTC day.
     const minute = checkRateLimit(`key:${record.id}`, { windowMs: 60_000, max: record.rateLimit.rpm });
