@@ -3,6 +3,7 @@ import { db } from "@/lib/db";
 import { getSessionFromRequest } from "@/lib/auth";
 import { SystemConfig, ModelId, EffortLevel } from "@/types";
 import { MODEL_IDS } from "@/lib/models";
+import { enableBetterStackMaintenance, disableBetterStackMaintenance } from "@/lib/betterstack";
 
 export const dynamic = "force-dynamic";
 
@@ -63,7 +64,18 @@ export async function PUT(req: NextRequest) {
     }
 
     if (body.maintenanceMode !== undefined) {
-      patch.maintenanceMode = Boolean(body.maintenanceMode);
+      const newMaint = Boolean(body.maintenanceMode);
+      patch.maintenanceMode = newMaint;
+      // Sync with Better Stack status page and uptime monitor
+      if (newMaint) {
+        enableBetterStackMaintenance().catch((err) =>
+          console.error("BetterStack maintenance enable error:", err)
+        );
+      } else {
+        disableBetterStackMaintenance().catch((err) =>
+          console.error("BetterStack maintenance disable error:", err)
+        );
+      }
     }
 
     if (body.broadcastBanner !== undefined) {
