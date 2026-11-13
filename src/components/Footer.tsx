@@ -10,6 +10,7 @@ const PRODUCT_LINKS: FooterLink[] = [
   { label: "Features", href: "/#features" },
   { label: "Models", href: "/#models" },
   { label: "Blog", href: "/blog" },
+  { label: "Help & Contact", href: "/help" },
   { label: "FAQ", href: "/#faq" },
   { label: "System status", href: "https://status.roleflow.site", external: true },
 ];
