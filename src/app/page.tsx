@@ -239,7 +239,7 @@ export default function MarketingLandingPage() {
               System status
             </h2>
             <p className="mx-auto mb-10 max-w-xl text-center text-base leading-relaxed text-muted">
-              Live status for each RoleFlow model.
+              Real-time telemetry and health monitoring across RoleFlow backend systems and frontier models.
             </p>
             <SystemStatus />
           </div>

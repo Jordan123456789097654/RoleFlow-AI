@@ -1,11 +1,19 @@
 /**
- * Shared, client-safe status types and display helpers. Keep this file free of server imports so
- * both the public status section and the admin dashboard can use it.
+ * Shared, client-safe status types and display helpers.
  */
 
 export type HealthStatus = "operational" | "degraded" | "down";
 
-/** One model as shown to the public. Never includes key labels or raw provider errors. */
+export interface MonitorTelemetryItem {
+  id: string;
+  name: string;
+  section: "Monitors" | "Models";
+  status: HealthStatus;
+  uptimePercent: number;
+  historyBars: ("none" | "up" | "incident" | "maintenance")[];
+}
+
+/** One model or backend service as shown to the public. */
 export interface PublicModelStatus {
   id: string;
   name: string;
@@ -13,11 +21,24 @@ export interface PublicModelStatus {
   latencyMs: number | null;
   checkedAt: string;
   detail: string;
+  category?: "backend" | "model";
+}
+
+export interface SystemStats {
+  uptimePercent: number;
+  avgLatencyMs: number;
+  healthySystems: number;
+  totalSystems: number;
+  activeKeys: number;
+  totalKeys: number;
 }
 
 export interface PublicStatus {
   overall: HealthStatus;
   checkedAt: string;
+  stats?: SystemStats;
+  telemetry?: MonitorTelemetryItem[];
+  backend?: PublicModelStatus[];
   models: PublicModelStatus[];
 }
 
@@ -29,8 +50,8 @@ export const STATUS_LABEL: Record<HealthStatus, string> = {
 
 export const STATUS_BANNER: Record<HealthStatus, string> = {
   operational: "All systems operational",
-  degraded: "Some models are degraded",
-  down: "Some models are down",
+  degraded: "Some systems are degraded",
+  down: "Some systems are experiencing outages",
 };
 
 export const STATUS_DOT: Record<HealthStatus, string> = {
@@ -45,10 +66,11 @@ export const STATUS_TEXT: Record<HealthStatus, string> = {
   down: "text-danger",
 };
 
-/** "just now", "3 min ago", "2 h ago". */
+/** "just now", "5s ago", "3 min ago", "2 h ago". */
 export function timeAgo(iso: string, now: number = Date.now()): string {
   const seconds = Math.max(0, Math.round((now - Date.parse(iso)) / 1000));
-  if (seconds < 60) return "just now";
+  if (seconds < 5) return "just now";
+  if (seconds < 60) return `${seconds}s ago`;
   const minutes = Math.round(seconds / 60);
   if (minutes < 60) return `${minutes} min ago`;
   return `${Math.round(minutes / 60)} h ago`;

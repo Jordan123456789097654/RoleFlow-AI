@@ -1,24 +1,34 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32" width="32" height="32">
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100" width="100" height="100">
   <defs>
-    <linearGradient id="roleflow-icon-grad" x1="0%" y1="0%" x2="100%" y2="100%">
+    <linearGradient id="rf-top-wave" x1="0%" y1="0%" x2="100%" y2="100%">
       <stop offset="0%" stop-color="#f59e0b" />
-      <stop offset="50%" stop-color="#d97706" />
+      <stop offset="45%" stop-color="#d97706" />
       <stop offset="100%" stop-color="#ea580c" />
     </linearGradient>
+    <linearGradient id="rf-bot-wave" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#a16207" />
+      <stop offset="50%" stop-color="#92400e" />
+      <stop offset="100%" stop-color="#7c2d12" />
+    </linearGradient>
   </defs>
-  <rect width="32" height="32" rx="7" fill="#0d0e11" />
+  <rect width="100" height="100" rx="22" fill="#242422" />
+  <!-- Under wave (terracotta warm shadow wave) -->
   <path
-    d="M4 16C8 7 12 7 16 16C20 25 24 25 28 16"
-    stroke="url(#roleflow-icon-grad)"
-    stroke-width="3.5"
+    d="M 26 57.5 C 30 46, 36 45, 41 46.5 C 47 48.5, 52 64.5, 60.5 66.5 C 66 67.5, 71 63, 74 57"
+    fill="none"
+    stroke="url(#rf-bot-wave)"
+    stroke-width="9"
     stroke-linecap="round"
     stroke-linejoin="round"
+    opacity="0.95"
   />
+  <!-- Top wave (amber to orange vibrant hero wave) -->
   <path
-    d="M4 22C8 13 12 13 16 22C20 31 24 31 28 22"
-    stroke="url(#roleflow-icon-grad)"
-    stroke-width="2.5"
+    d="M 26 48 C 30 36.5, 36 35.5, 41 37 C 47 39, 52 55.5, 60.5 57.5 C 66 58.5, 71 54, 74 48"
+    fill="none"
+    stroke="url(#rf-top-wave)"
+    stroke-width="9.6"
     stroke-linecap="round"
-    stroke-opacity="0.5"
+    stroke-linejoin="round"
   />
 </svg>
