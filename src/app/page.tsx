@@ -7,6 +7,7 @@ import { Logo } from "@/components/Logo";
 import { Footer } from "@/components/Footer";
 import { AuthModal } from "@/components/AuthModal";
 import { SystemStatus } from "@/components/SystemStatus";
+import { ShowcaseCatalog } from "@/components/ShowcaseCatalog";
 import { UserProfile } from "@/types";
 import {
   ArrowRight,
@@ -205,30 +206,9 @@ export default function MarketingLandingPage() {
             </div>
           </div>
 
-          {/* Static product preview */}
-          <div className="mx-auto mt-16 max-w-2xl rounded-2xl border border-line bg-card p-5 text-left shadow-composer sm:p-6">
-            <div className="flex justify-end">
-              <div className="max-w-[85%] rounded-2xl bg-hover px-4 py-2.5 text-sm text-ink">
-                Make a one-page countdown timer I can share with my team.
-              </div>
-            </div>
-            <div className="mt-5 space-y-3">
-              <p className="text-sm leading-relaxed text-ink">
-                Here&apos;s a single HTML file. It has a date picker, a live countdown, and a reset button.
-              </p>
-              <div className="flex items-center justify-between rounded-lg border border-line bg-app px-4 py-3">
-                <div className="flex items-center gap-3">
-                  <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-accent-soft text-accent">
-                    <Code2 className="h-4 w-4" />
-                  </div>
-                  <div>
-                    <p className="text-sm font-medium text-ink">Countdown timer</p>
-                    <p className="text-xs text-muted">index.html · Preview ready</p>
-                  </div>
-                </div>
-                <Download className="h-4 w-4 text-muted" />
-              </div>
-            </div>
+          {/* Rotating Product Showcase Catalog */}
+          <div className="mx-auto mt-14 sm:mt-18">
+            <ShowcaseCatalog />
           </div>
         </section>
 

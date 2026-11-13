@@ -47,18 +47,18 @@ export const metadata: Metadata = {
     type: "website",
     images: [
       {
-        url: "https://roleflow.site/icon.png",
-        width: 512,
-        height: 512,
-        alt: "RoleFlow AI Logo",
+        url: "https://roleflow.site/assets/catalog-meet-roleflow.jpg",
+        width: 1024,
+        height: 572,
+        alt: "RoleFlow AI — Thinking, writing, building",
       },
     ],
   },
   twitter: {
-    card: "summary",
-    title: "RoleFlow AI",
+    card: "summary_large_image",
+    title: "RoleFlow — Advanced AI Assistant & Engineering Platform",
     description: "Advanced AI platform with live code execution previews and persistent memory.",
-    images: ["https://roleflow.site/icon.png"],
+    images: ["https://roleflow.site/assets/catalog-meet-roleflow.jpg"],
   },
   icons: {
     icon: [{ url: "/icon.png", type: "image/png" }, { url: "/icon.svg", type: "image/svg+xml" }],
