@@ -106,6 +106,7 @@ export default function AdminBlogPanel() {
 
   // Delete Confirm
   const [deleteId, setDeleteId] = useState<string | null>(null);
+  const [isDeleteAllConfirmOpen, setIsDeleteAllConfirmOpen] = useState(false);
   const [deleting, setDeleting] = useState(false);
 
   const fetchPosts = async () => {
@@ -297,6 +298,43 @@ export default function AdminBlogPanel() {
     }
   };
 
+  const handleDeleteAll = async () => {
+    setDeleting(true);
+    try {
+      const res = await fetch("/api/admin/blog?all=true", { method: "DELETE" });
+      const data = await res.json();
+      if (res.ok && data?.success) {
+        setNotice({ tone: "ok", text: "All blog posts have been permanently deleted." });
+        setIsDeleteAllConfirmOpen(false);
+        fetchPosts();
+      } else {
+        throw new Error(data?.error || "Failed to delete all blog posts");
+      }
+    } catch (err: any) {
+      setNotice({ tone: "error", text: err?.message || "Failed to delete all blog posts" });
+    } finally {
+      setDeleting(false);
+    }
+  };
+
+  const handleReseed = async () => {
+    setLoading(true);
+    try {
+      const res = await fetch("/api/admin/blog?action=reseed", { method: "POST" });
+      const data = await res.json();
+      if (res.ok && data?.success) {
+        setNotice({ tone: "ok", text: "Default technical articles restored." });
+        fetchPosts();
+      } else {
+        throw new Error(data?.error || "Failed to restore default posts");
+      }
+    } catch (err: any) {
+      setNotice({ tone: "error", text: err?.message || "Failed to restore default posts" });
+    } finally {
+      setLoading(false);
+    }
+  };
+
   const handleGenerateAi = async () => {
     if (!aiPrompt.trim()) {
       setAiError("Please provide an article brief or topic.");
@@ -376,6 +414,25 @@ export default function AdminBlogPanel() {
           </div>
         </div>
         <div className="flex items-center gap-2">
+          {posts.length > 0 ? (
+            <button
+              type="button"
+              onClick={() => setIsDeleteAllConfirmOpen(true)}
+              className="inline-flex items-center gap-1.5 rounded-xl border border-danger/30 text-danger hover:bg-danger/10 px-3 py-2 text-xs font-medium transition-colors"
+            >
+              <Trash2 className="h-3.5 w-3.5" />
+              Delete All
+            </button>
+          ) : (
+            <button
+              type="button"
+              onClick={handleReseed}
+              className="inline-flex items-center gap-1.5 rounded-xl border border-line bg-card hover:bg-hover px-3 py-2 text-xs font-medium text-ink transition-colors"
+            >
+              <RefreshCw className="h-3.5 w-3.5" />
+              Restore Default Posts
+            </button>
+          )}
           <button
             type="button"
             onClick={() => setIsAiModalOpen(true)}
@@ -1143,6 +1200,36 @@ export default function AdminBlogPanel() {
                 className="inline-flex items-center gap-1.5 rounded-xl border border-danger/30 bg-danger px-3.5 py-2 text-xs font-medium text-white hover:bg-danger/80 transition-colors"
               >
                 {deleting ? "Deleting..." : "Permanently Delete"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Delete ALL Posts Confirmation Modal */}
+      {isDeleteAllConfirmOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm">
+          <div className="w-full max-w-md rounded-2xl border border-danger/40 bg-card p-6 shadow-2xl space-y-4">
+            <h4 className="text-base font-semibold text-danger">Delete All Blog Posts?</h4>
+            <p className="text-xs text-muted leading-relaxed">
+              Are you sure you want to permanently delete <strong>all {posts.length} blog posts</strong>?
+              The blog will be completely empty. You can write your own posts or restore defaults anytime.
+            </p>
+            <div className="flex justify-end gap-2 pt-2 border-t border-line">
+              <button
+                type="button"
+                onClick={() => setIsDeleteAllConfirmOpen(false)}
+                className={secondaryButtonClass}
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                disabled={deleting}
+                onClick={handleDeleteAll}
+                className="inline-flex items-center gap-1.5 rounded-xl border border-danger/30 bg-danger px-4 py-2 text-xs font-medium text-white hover:bg-danger/80 transition-colors"
+              >
+                {deleting ? "Deleting All..." : "Delete All Posts"}
               </button>
             </div>
           </div>

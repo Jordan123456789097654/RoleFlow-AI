@@ -49,6 +49,18 @@ export async function POST(req: NextRequest) {
   const session = getSessionFromRequest(req);
   if (!session?.isAdmin) return unauthorized();
 
+  const action = req.nextUrl.searchParams.get("action");
+  if (action === "reseed") {
+    try {
+      await db.seedDefaultBlogPosts();
+      const posts = await db.listBlogPosts(false);
+      return NextResponse.json({ success: true, message: "Default blog posts restored.", posts });
+    } catch (err: any) {
+      console.error("Admin blog reseed error:", err);
+      return NextResponse.json({ error: err?.message || "Failed to restore default posts." }, { status: 500 });
+    }
+  }
+
   let raw: any;
   try {
     raw = await req.json();
@@ -124,10 +136,24 @@ export async function POST(req: NextRequest) {
   }
 }
 
-/** Admin only. Deletes a blog post: DELETE /api/admin/blog?id=... */
+/** Admin only. Deletes a blog post: DELETE /api/admin/blog?id=... or DELETE /api/admin/blog?all=true */
 export async function DELETE(req: NextRequest) {
   const session = getSessionFromRequest(req);
   if (!session?.isAdmin) return unauthorized();
+
+  const isAll = req.nextUrl.searchParams.get("all") === "true";
+  if (isAll) {
+    try {
+      await db.deleteAllBlogPosts();
+      return NextResponse.json({ success: true, message: "All blog posts deleted." });
+    } catch (error: any) {
+      console.error("Admin blog delete-all error:", error);
+      return NextResponse.json(
+        { error: error?.message || "Failed to delete all blog posts." },
+        { status: 500 }
+      );
+    }
+  }
 
   const id = req.nextUrl.searchParams.get("id") || "";
   if (!id) {

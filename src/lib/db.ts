@@ -80,6 +80,7 @@ interface LocalStore {
   licenseKeys?: Record<string, LicenseKeyRecord>;
   emailTemplates?: Record<string, CustomEmailTemplateRecord>;
   blogPosts?: Record<string, BlogPostRecord>;
+  blogInitialized?: boolean;
   referrals?: Record<string, ReferralRecord>;
   lawRequests?: Record<string, LawRequestRecord>;
   systemIncidents?: Record<string, SystemIncident>;
@@ -971,22 +972,16 @@ export const db = {
         ? await sql`SELECT * FROM roleflow_blog_posts WHERE is_published = true ORDER BY published_at DESC;`
         : await sql`SELECT * FROM roleflow_blog_posts ORDER BY published_at DESC;`;
 
-      if (rows.length === 0 && !onlyPublished) {
-        // Seed default articles
-        for (const s of SEED_BLOG_POSTS) {
-          const tagsJson = JSON.stringify(s.tags || []);
-          await sql`
-            INSERT INTO roleflow_blog_posts
-              (id, title, summary, content, category, icon, author, author_role, read_time, published_at, is_published, tags, created_at, updated_at)
-            VALUES
-              (${s.id}, ${s.title}, ${s.summary}, ${s.content}, ${s.category}, ${s.icon},
-               ${s.author}, ${s.authorRole ?? null}, ${s.readTime}, ${s.publishedAt}, ${s.isPublished},
-               ${tagsJson}, ${s.publishedAt}, ${s.publishedAt})
-            ON CONFLICT (id) DO NOTHING;
-          `;
+      if (rows.length === 0) {
+        const { rows: configRows } = await sql`SELECT value FROM roleflow_system_configs WHERE key = 'blog_cleared' LIMIT 1;`;
+        const isCleared = configRows[0]?.value === true || configRows[0]?.value === "true";
+        if (!isCleared) {
+          await this.seedDefaultBlogPosts();
+          const refetch = onlyPublished
+            ? await sql`SELECT * FROM roleflow_blog_posts WHERE is_published = true ORDER BY published_at DESC;`
+            : await sql`SELECT * FROM roleflow_blog_posts ORDER BY published_at DESC;`;
+          rows = refetch.rows;
         }
-        const refetch = await sql`SELECT * FROM roleflow_blog_posts ORDER BY published_at DESC;`;
-        rows = refetch.rows;
       }
 
       return rows.map((r) => {
@@ -1018,16 +1013,9 @@ export const db = {
     }
 
     const store = getLocalStore();
-    if (!store.blogPosts || Object.keys(store.blogPosts).length === 0) {
-      store.blogPosts = {};
-      for (const s of SEED_BLOG_POSTS) {
-        store.blogPosts[s.id] = {
-          ...s,
-          createdAt: s.publishedAt,
-          updatedAt: s.publishedAt,
-        };
-      }
-      saveLocalStore(store);
+    if (!store.blogPosts && !store.blogInitialized) {
+      await this.seedDefaultBlogPosts();
+      return this.listBlogPosts(onlyPublished);
     }
 
     let posts = Object.values(store.blogPosts || {});
@@ -1128,6 +1116,64 @@ export const db = {
     delete store.blogPosts[id];
     saveLocalStore(store);
     return true;
+  },
+
+  async deleteAllBlogPosts(): Promise<boolean> {
+    await ensureDb();
+    if (isPostgresConfigured) {
+      await sql`DELETE FROM roleflow_blog_posts;`;
+      await sql`
+        INSERT INTO roleflow_system_configs (key, value)
+        VALUES ('blog_cleared', 'true'::jsonb)
+        ON CONFLICT (key) DO UPDATE SET value = 'true'::jsonb;
+      `;
+      return true;
+    }
+    const store = getLocalStore();
+    store.blogPosts = {};
+    store.blogInitialized = true;
+    saveLocalStore(store);
+    return true;
+  },
+
+  async seedDefaultBlogPosts(): Promise<void> {
+    await ensureDb();
+    if (isPostgresConfigured) {
+      for (const s of SEED_BLOG_POSTS) {
+        const tagsJson = JSON.stringify(s.tags || []);
+        await sql`
+          INSERT INTO roleflow_blog_posts
+            (id, title, summary, content, category, icon, author, author_role, read_time, published_at, is_published, tags, created_at, updated_at)
+          VALUES
+            (${s.id}, ${s.title}, ${s.summary}, ${s.content}, ${s.category}, ${s.icon},
+             ${s.author}, ${s.authorRole ?? null}, ${s.readTime}, ${s.publishedAt}, ${s.isPublished},
+             ${tagsJson}, ${s.publishedAt}, ${s.publishedAt})
+          ON CONFLICT (id) DO UPDATE SET
+            title = EXCLUDED.title, summary = EXCLUDED.summary, content = EXCLUDED.content,
+            category = EXCLUDED.category, icon = EXCLUDED.icon, author = EXCLUDED.author,
+            author_role = EXCLUDED.author_role, read_time = EXCLUDED.read_time,
+            published_at = EXCLUDED.published_at, is_published = EXCLUDED.is_published,
+            tags = EXCLUDED.tags, updated_at = EXCLUDED.updated_at;
+        `;
+      }
+      await sql`
+        INSERT INTO roleflow_system_configs (key, value)
+        VALUES ('blog_cleared', 'false'::jsonb)
+        ON CONFLICT (key) DO UPDATE SET value = 'false'::jsonb;
+      `;
+      return;
+    }
+    const store = getLocalStore();
+    store.blogPosts = store.blogPosts || {};
+    for (const s of SEED_BLOG_POSTS) {
+      store.blogPosts[s.id] = {
+        ...s,
+        createdAt: s.publishedAt,
+        updatedAt: s.publishedAt,
+      };
+    }
+    store.blogInitialized = true;
+    saveLocalStore(store);
   },
 
   async listLicenseKeys(): Promise<LicenseKeyRecord[]> {

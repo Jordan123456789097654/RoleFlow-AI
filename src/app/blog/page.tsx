@@ -6,7 +6,7 @@ import { emailIconUrl } from "@/lib/email-icons";
 import { BlogHeader } from "@/components/BlogHeader";
 import { Footer } from "@/components/Footer";
 import { FlowLine } from "@/components/FlowLine";
-import { ArrowRight, Calendar, Clock, Tag, User } from "lucide-react";
+import { ArrowRight, Calendar, Clock, Tag, User, BookOpen, Sparkles } from "lucide-react";
 
 export const dynamic = "force-dynamic";
 
@@ -78,53 +78,72 @@ export default async function BlogIndexPage({
               and our evolving developer experience. Authored by Jordan Daniels and the RoleFlow team.
             </p>
 
-            {/* Category Filter Pills */}
-            <div className="mt-8 flex flex-wrap items-center justify-center gap-2">
-              <Link
-                href="/blog"
-                className={`rounded-full px-4 py-1.5 text-xs font-medium transition-all ${
-                  !category || category === "all"
-                    ? "bg-accent text-on-accent shadow-sm"
-                    : "border border-line bg-card text-muted hover:text-ink hover:border-line-hover"
-                }`}
-              >
-                All Dispatches ({allPosts.length})
-              </Link>
-              {BLOG_CATEGORIES.map((c) => {
-                const count = allPosts.filter((p) => p.category === c.id).length;
-                if (count === 0 && category !== c.id) return null;
-                const isSelected = category === c.id;
-                return (
-                  <Link
-                    key={c.id}
-                    href={`/blog?category=${c.id}`}
-                    className={`rounded-full px-4 py-1.5 text-xs font-medium transition-all ${
-                      isSelected
-                        ? "bg-accent text-on-accent shadow-sm"
-                        : "border border-line bg-card text-muted hover:text-ink hover:border-line-hover"
-                    }`}
-                  >
-                    {c.label} ({count})
-                  </Link>
-                );
-              })}
-            </div>
+            {/* Category Filter Pills (rendered only when articles exist) */}
+            {allPosts.length > 0 && (
+              <div className="mt-8 flex flex-wrap items-center justify-center gap-2">
+                <Link
+                  href="/blog"
+                  className={`rounded-full px-4 py-1.5 text-xs font-medium transition-all ${
+                    !category || category === "all"
+                      ? "bg-accent text-on-accent shadow-sm"
+                      : "border border-line bg-card text-muted hover:text-ink hover:border-line-hover"
+                  }`}
+                >
+                  All Dispatches ({allPosts.length})
+                </Link>
+                {BLOG_CATEGORIES.map((c) => {
+                  const count = allPosts.filter((p) => p.category === c.id).length;
+                  if (count === 0 && category !== c.id) return null;
+                  const isSelected = category === c.id;
+                  return (
+                    <Link
+                      key={c.id}
+                      href={`/blog?category=${c.id}`}
+                      className={`rounded-full px-4 py-1.5 text-xs font-medium transition-all ${
+                        isSelected
+                          ? "bg-accent text-on-accent shadow-sm"
+                          : "border border-line bg-card text-muted hover:text-ink hover:border-line-hover"
+                      }`}
+                    >
+                      {c.label} ({count})
+                    </Link>
+                  );
+                })}
+              </div>
+            )}
           </div>
         </section>
 
         {/* Content Section */}
         <div className="mx-auto max-w-6xl px-4 sm:px-6 lg:px-8 py-12 sm:py-16 space-y-12">
-          {filteredPosts.length === 0 ? (
-            <div className="rounded-2xl border border-line bg-card p-12 text-center">
-              <h3 className="text-base font-semibold text-ink mb-2">No articles found</h3>
-              <p className="text-sm text-muted mb-6">
-                There are no published articles matching the chosen filter.
+          {allPosts.length === 0 ? (
+            <div className="rounded-3xl border border-line bg-card/60 p-12 sm:p-16 text-center max-w-lg mx-auto backdrop-blur-sm">
+              <div className="h-12 w-12 rounded-2xl bg-accent/10 border border-accent/20 text-accent flex items-center justify-center mx-auto mb-4">
+                <BookOpen className="h-6 w-6" />
+              </div>
+              <h3 className="font-display text-xl font-semibold text-ink mb-2">No dispatches published yet</h3>
+              <p className="text-xs sm:text-sm text-muted leading-relaxed mb-6">
+                Our engineering team is preparing new technical deep dives, architecture notes, and release updates. Check back soon.
+              </p>
+              <Link
+                href="/chat"
+                className="rf-btn rf-btn-primary inline-flex items-center gap-2 rounded-xl bg-accent px-5 py-2.5 text-xs font-semibold text-on-accent"
+              >
+                <Sparkles className="h-4 w-4" />
+                Explore RoleFlow v5
+              </Link>
+            </div>
+          ) : filteredPosts.length === 0 ? (
+            <div className="rounded-3xl border border-line bg-card/60 p-12 text-center max-w-lg mx-auto backdrop-blur-sm">
+              <h3 className="font-display text-lg font-semibold text-ink mb-2">No articles in this category</h3>
+              <p className="text-xs sm:text-sm text-muted mb-6">
+                There are currently no published dispatches matching &ldquo;{category || q}&rdquo;.
               </p>
               <Link
                 href="/blog"
-                className="inline-flex items-center gap-2 rounded-xl bg-accent px-4 py-2 text-sm font-medium text-on-accent"
+                className="inline-flex items-center gap-2 rounded-xl bg-accent px-4 py-2 text-xs font-semibold text-on-accent"
               >
-                View all articles
+                Show all dispatches
               </Link>
             </div>
           ) : (
