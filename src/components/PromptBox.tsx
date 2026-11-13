@@ -305,7 +305,7 @@ export const PromptBox: React.FC<PromptBoxProps> = ({
       onDrop={handleDrop}
     >
       <div
-        className={`flow-focus bg-card rounded-[1.75rem] border shadow-composer ${
+        className={`flow-focus bg-card rounded-xl border shadow-composer ${
           isDragging ? "border-accent ring-2 ring-accent/30" : "border-line"
         }`}
       >
@@ -492,7 +492,7 @@ export const PromptBox: React.FC<PromptBoxProps> = ({
                 onClick={onStop}
                 aria-label="Stop generating"
                 title="Stop generating (Esc)"
-                className="ml-1 w-9 h-9 flex items-center justify-center rounded-full bg-ink text-app transition-colors duration-150 outline-none focus-visible:ring-2 focus-visible:ring-accent/40"
+                className="ml-1 w-9 h-9 flex items-center justify-center rounded-md bg-ink text-app transition-colors duration-150 outline-none focus-visible:ring-2 focus-visible:ring-accent/40"
               >
                 <Square className="w-3.5 h-3.5 fill-current" strokeWidth={2} />
               </button>
@@ -502,7 +502,7 @@ export const PromptBox: React.FC<PromptBoxProps> = ({
               onClick={handleSubmit}
               disabled={!canSend}
               aria-label="Send message"
-              className={`ml-1 w-9 h-9 flex items-center justify-center rounded-full transition-colors duration-150 outline-none focus-visible:ring-2 focus-visible:ring-accent/40 ${
+              className={`ml-1 w-9 h-9 flex items-center justify-center rounded-md transition-colors duration-150 outline-none focus-visible:ring-2 focus-visible:ring-accent/40 ${
                 canSend
                   ? "bg-accent hover:bg-accent-hover text-on-accent"
                   : "bg-hover text-muted cursor-not-allowed"

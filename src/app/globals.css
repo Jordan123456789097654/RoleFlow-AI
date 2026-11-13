@@ -116,7 +116,7 @@ body {
 .prose-rf pre {
   background: rgb(var(--c-panel));
   border: 1px solid rgb(var(--c-line));
-  border-radius: 14px;
+  border-radius: 6px;
   padding: 0.9em 1em;
   overflow-x: auto;
   margin: 0.9em 0;
@@ -206,5 +206,5 @@ body {
 
 /* A low ember light behind the home screen and the landing hero. */
 .ember-glow {
-  background: radial-gradient(72% 58% at 50% 0%, rgb(var(--c-accent) / 0.13), transparent 72%);
+  background: radial-gradient(70% 60% at 0% 0%, rgb(var(--c-accent) / 0.14), transparent 70%);
 }

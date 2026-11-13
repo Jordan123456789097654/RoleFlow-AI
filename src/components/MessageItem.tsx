@@ -363,7 +363,7 @@ export const MessageItem: React.FC<MessageItemProps> = ({
                   <Pencil className="w-4 h-4" strokeWidth={1.75} />
                 </button>
               )}
-              <div className="bg-accent-soft text-ink border border-accent/25 px-4 py-2.5 rounded-3xl rounded-br-lg text-[16px] leading-relaxed whitespace-pre-wrap break-words select-text">
+              <div className="bg-panel text-ink border border-line border-l-2 border-l-accent px-4 py-3 rounded-md text-[16px] leading-relaxed whitespace-pre-wrap break-words select-text">
                 {message.content}
               </div>
             </div>

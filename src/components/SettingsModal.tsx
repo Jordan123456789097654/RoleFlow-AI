@@ -37,7 +37,7 @@ import { UserProfile, ModerationLogEntry, UsageStats, MemoryItem } from "@/types
 
 
 /** localStorage key for the theme choice. Values: "light" | "dark" | "system". */
-const THEME_STORAGE_KEY = "roleflow_theme";
+const THEME_STORAGE_KEY = "roleflow_theme_v2";
 
 export type SettingsTab =
   | "general"

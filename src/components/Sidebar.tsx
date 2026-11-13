@@ -47,34 +47,19 @@ interface SidebarProps {
   onExportChat?: (chatId: string) => void;
 }
 
-type ChatGroup = { label: string; chats: Chat[] };
+/** Most recent first. */
+function sortRecent(chats: Chat[]): Chat[] {
+  const t = (c: Chat) => new Date(c.updatedAt || c.createdAt).getTime() || 0;
+  return [...chats].sort((x, y) => t(y) - t(x));
+}
 
-/** Buckets chats into Today, Previous 7 days, and Older, newest first. */
-function groupChatsByDate(chats: Chat[]): ChatGroup[] {
-  const now = new Date();
-  const startOfToday = new Date(now.getFullYear(), now.getMonth(), now.getDate()).getTime();
-  const weekAgo = startOfToday - 6 * 24 * 60 * 60 * 1000;
-
-  const buckets: Record<"today" | "week" | "older", Chat[]> = { today: [], week: [], older: [] };
-  const sorted = [...chats].sort((a, b) => {
-    const ta = new Date(b.updatedAt || b.createdAt).getTime() || 0;
-    const tb = new Date(a.updatedAt || a.createdAt).getTime() || 0;
-    return ta - tb;
-  });
-
-  for (const chat of sorted) {
-    const t = new Date(chat.updatedAt || chat.createdAt).getTime() || 0;
-    if (t >= startOfToday) buckets.today.push(chat);
-    else if (t >= weekAgo) buckets.week.push(chat);
-    else buckets.older.push(chat);
-  }
-
-  const groups: ChatGroup[] = [
-    { label: "Today", chats: buckets.today },
-    { label: "Previous 7 days", chats: buckets.week },
-    { label: "Older", chats: buckets.older },
-  ];
-  return groups.filter((g) => g.chats.length > 0);
+/** Short stamp under each title, e.g. "Nov 13, 10:31". */
+function formatStamp(value: string): string {
+  const d = new Date(value);
+  if (isNaN(d.getTime())) return "";
+  const date = d.toLocaleDateString(undefined, { month: "short", day: "numeric" });
+  const time = d.toLocaleTimeString(undefined, { hour: "2-digit", minute: "2-digit" });
+  return `${date}, ${time}`;
 }
 
 export const Sidebar: React.FC<SidebarProps> = ({
@@ -109,8 +94,8 @@ export const Sidebar: React.FC<SidebarProps> = ({
   );
 
   const pinnedChats = filteredChats.filter((c) => c.pinned);
-  const groups = useMemo(
-    () => groupChatsByDate(filteredChats.filter((c) => !c.pinned)),
+  const recent = useMemo(
+    () => sortRecent(filteredChats.filter((c) => !c.pinned)),
     [filteredChats]
   );
 
@@ -163,7 +148,10 @@ export const Sidebar: React.FC<SidebarProps> = ({
           className="flex-1 min-w-0 min-h-[28px] bg-transparent text-sm text-ink outline-none border-b border-accent/50"
         />
       ) : (
-        <span className="truncate flex-1 min-w-0">{chat.title}</span>
+        <span className="flex-1 min-w-0 flex flex-col py-1.5">
+          <span className="truncate">{chat.title}</span>
+          <span className="font-mono text-[10.5px] text-muted truncate">{formatStamp(chat.updatedAt || chat.createdAt)}</span>
+        </span>
       )}
       <div className="flex items-center gap-0.5 shrink-0 md:opacity-0 md:group-hover:opacity-100 focus-within:opacity-100 transition-opacity duration-150">
         {onRenameChat && editingId !== chat.id && (
@@ -334,12 +322,12 @@ export const Sidebar: React.FC<SidebarProps> = ({
             </section>
           )}
 
-          {groups.map((group) => (
-            <section key={group.label}>
-              <h3 className="px-2.5 pb-1.5 text-xs font-medium text-muted">{group.label}</h3>
-              <div className="space-y-0.5">{group.chats.map(renderChat)}</div>
+          {recent.length > 0 && (
+            <section>
+              <h3 className="px-2.5 pb-1.5 text-xs font-medium text-muted">Recent</h3>
+              <div className="space-y-0.5">{recent.map(renderChat)}</div>
             </section>
-          ))}
+          )}
 
           {filteredChats.length === 0 && (
             <div className="flex flex-col items-center gap-2 py-8 text-center">

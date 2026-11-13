@@ -12,7 +12,6 @@ import { formatCleanName, getTimeGreeting } from "@/lib/format";
 import { DEFAULT_MODEL, GUEST_MODEL, isGuestAllowedModel, resolveModelId } from "@/lib/models";
 import { CreateProjectModal } from "@/components/CreateProjectModal";
 import { ShareModal } from "@/components/ShareModal";
-import { Logo } from "@/components/Logo";
 import { FlowLine } from "@/components/FlowLine";
 import { Toaster } from "@/components/Toaster";
 import { toast } from "@/lib/toast";
@@ -897,19 +896,16 @@ export default function ChatPage() {
         {messages.length === 0 ? (
           /* Empty state: greeting and composer centered in the viewport */
           <div className="flex-1 overflow-y-auto">
-            <div className="ember-glow min-h-full flex flex-col items-center justify-center px-4 sm:px-6 pb-8 pt-4">
+            <div className="ember-glow min-h-full flex flex-col justify-center px-5 sm:px-10 lg:px-16 pb-8 pt-4">
               <div className="w-full max-w-3xl">
-                <div className="flex justify-center mb-5">
-                  <Logo size={36} showText={false} />
-                </div>
-                <h1 className="font-display text-[34px] sm:text-[48px] font-normal leading-[1.06] tracking-[-0.02em] text-center text-ink">
+                <h1 className="font-display text-[40px] sm:text-[60px] font-medium leading-[1.02] tracking-[-0.03em] text-ink">
                   {getGreeting()}
                 </h1>
-                <FlowLine className="mx-auto mt-4 mb-8 sm:mb-10 max-w-[260px]" />
+                <FlowLine className="mt-5 mb-9 max-w-[300px]" />
 
                 {composer}
 
-                <div className="flex flex-wrap items-center justify-center gap-2 mt-5">
+                <div className="mt-6 grid grid-cols-1 sm:grid-cols-2 gap-2">
                   {starterChips.map((chip, i) => {
                     const Icon = chip.icon;
                     return (
@@ -917,16 +913,16 @@ export default function ChatPage() {
                         key={i}
                         type="button"
                         onClick={() => handleSendMessage(chip.text, [])}
-                        className="flex items-center gap-2 min-h-[36px] px-3.5 rounded-full border border-line bg-card text-sm text-ink/80 hover:text-ink hover:bg-hover transition-colors duration-150 outline-none focus-visible:ring-2 focus-visible:ring-accent/40"
+                        className="flex items-start gap-3 min-h-[56px] px-4 py-3 rounded-md border border-line bg-card/60 text-left text-sm text-ink/85 hover:text-ink hover:border-accent/60 transition-colors duration-150 outline-none focus-visible:ring-2 focus-visible:ring-accent/40"
                       >
-                        <Icon className="w-4 h-4 text-accent shrink-0" strokeWidth={1.75} />
+                        <Icon className="w-4 h-4 mt-0.5 text-accent shrink-0" strokeWidth={1.75} />
                         <span>{chip.text}</span>
                       </button>
                     );
                   })}
                 </div>
 
-                <p className="text-xs text-muted text-center mt-8">
+                <p className="text-xs text-muted mt-8">
                   RoleFlow can make mistakes. Check important information.
                 </p>
               </div>

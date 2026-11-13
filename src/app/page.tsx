@@ -174,7 +174,7 @@ export default function MarketingLandingPage() {
 
       <main className="flex-1">
         {/* Hero */}
-        <section className="ember-glow px-4 pb-20 pt-16 text-center sm:px-6 sm:pt-24 lg:pb-28">
+        <section className="ember-glow px-4 pb-20 pt-16 text-left sm:px-6 sm:pt-24 lg:pb-28">
           <div className="mx-auto max-w-3xl">
             <div className="mb-7 inline-flex items-center gap-2 rounded-full border border-line bg-card px-3.5 py-1.5 text-xs text-muted">
               <Sparkles className="h-3.5 w-3.5 text-accent" />
@@ -185,16 +185,16 @@ export default function MarketingLandingPage() {
               An assistant for thinking, writing, and building
             </h1>
 
-            <p className="mx-auto mt-6 max-w-xl text-base leading-relaxed text-muted sm:text-lg">
+            <p className="mt-6 max-w-xl text-base leading-relaxed text-muted sm:text-lg">
               Ask questions, draft documents, and write code. Anything RoleFlow builds can be previewed and downloaded.
             </p>
 
-            <FlowLine className="mx-auto mt-8 max-w-[300px]" />
+            <FlowLine className="mt-8 max-w-[300px]" />
 
-            <div className="mt-10 flex flex-col items-center justify-center gap-3 sm:flex-row">
+            <div className="mt-10 flex flex-col items-start justify-start gap-3 sm:flex-row">
               <Link
                 href="/chat"
-                className="inline-flex min-h-12 w-full items-center justify-center gap-2 rounded-full bg-accent px-7 text-base font-semibold text-on-accent transition-colors hover:bg-accent-hover sm:w-auto"
+                className="inline-flex min-h-12 w-full items-center justify-center gap-2 rounded-md bg-accent px-7 text-base font-semibold text-on-accent transition-colors hover:bg-accent-hover sm:w-auto"
               >
                 <span>Start chatting</span>
                 <ArrowRight className="h-4 w-4" />
@@ -209,7 +209,7 @@ export default function MarketingLandingPage() {
           </div>
 
           {/* Static product preview */}
-          <div className="mx-auto mt-16 max-w-2xl rounded-2xl border border-line bg-card p-5 text-left shadow-composer sm:p-6">
+          <div className="mt-16 max-w-2xl rounded-xl border border-line bg-card p-5 text-left shadow-composer sm:p-6">
             <div className="flex justify-end">
               <div className="max-w-[85%] rounded-2xl bg-hover px-4 py-2.5 text-sm text-ink">
                 Make a one-page countdown timer I can share with my team.

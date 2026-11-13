@@ -73,14 +73,25 @@ export const viewport: Viewport = {
   viewportFit: "cover",
 };
 
-// Runs before first paint so the saved theme never flashes. Reads "light" | "dark" | "system".
+// Runs before first paint so the saved theme never flashes. Reads "light" | "dark" | "system". Defaults to dark mode.
 const themeScript = `
 (function () {
   try {
-    var t = localStorage.getItem("roleflow_theme") || "dark";
-    var dark = t === "dark" || (t !== "light" && window.matchMedia("(prefers-color-scheme: dark)").matches);
-    if (dark) document.documentElement.classList.add("dark");
-  } catch (e) {}
+    var t = localStorage.getItem("roleflow_theme_v2") || localStorage.getItem("roleflow_theme") || "dark";
+    if (t === "light") {
+      document.documentElement.classList.remove("dark");
+    } else if (t === "system") {
+      if (window.matchMedia && window.matchMedia("(prefers-color-scheme: light)").matches) {
+        document.documentElement.classList.remove("dark");
+      } else {
+        document.documentElement.classList.add("dark");
+      }
+    } else {
+      document.documentElement.classList.add("dark");
+    }
+  } catch (e) {
+    document.documentElement.classList.add("dark");
+  }
 })();
 `;
 
@@ -124,7 +135,7 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="en" suppressHydrationWarning>
+    <html lang="en" className="dark" suppressHydrationWarning>
       <head>
         <script dangerouslySetInnerHTML={{ __html: themeScript }} />
         <script

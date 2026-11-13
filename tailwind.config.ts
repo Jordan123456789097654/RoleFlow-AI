@@ -48,8 +48,13 @@ const config: Config = {
         mono: ["Martian Mono", "ui-monospace", "SFMono-Regular", "Menlo", "Monaco", "Consolas", "monospace"],
       },
       borderRadius: {
-        xl2: "1.25rem",
-        "4xl": "2rem",
+        DEFAULT: "3px",
+        sm: "2px",
+        md: "4px",
+        lg: "5px",
+        xl: "6px",
+        "2xl": "8px",
+        "3xl": "10px",
       },
       boxShadow: {
         composer: "0 0 0 1px rgb(var(--c-line)), 0 10px 40px -12px rgb(0 0 0 / 0.25)",
