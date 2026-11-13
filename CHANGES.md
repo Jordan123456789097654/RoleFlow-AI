@@ -60,3 +60,9 @@ Cooldown state lives in server memory, so each serverless instance tracks its ow
 - **All 100 library templates** now carry an `icon` key instead of `emoji`.
 - **Custom templates.** Admins can save any composed email as a template ("Save as template"), reuse it from "Your templates", and delete it. Stored in `roleflow_email_templates` (Postgres) or the local store. API: `GET|POST|DELETE /api/admin/emails/templates`.
 - **AI draft** returns an icon id from the fixed list instead of an emoji.
+
+## v7: 50 new email templates
+- Added `src/lib/email-templates/extra.ts` with 50 templates across security, legal, ops, product, billing, trust and community.
+- Facts that vary (dates, amounts, regulators, links, counts) are placeholders. Placeholders beyond the six built-in ones (name, email, date, incident_id, app_url, action_url) must be filled before sending. The send validator blocks unknown placeholders.
+- Five IDs that collided with existing templates were renamed with a `-v2` suffix.
+- Existing 100 templates are unchanged in this release. Several still state specific facts (for example regulator notices and forensic reviews) that admins must confirm before sending.

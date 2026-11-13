@@ -7,11 +7,12 @@ import { PRODUCT_TEMPLATES } from "./product";
 import { BILLING_TEMPLATES } from "./billing";
 import { TRUST_TEMPLATES } from "./trust";
 import { COMMUNITY_TEMPLATES } from "./community";
+import { EXTRA_TEMPLATES } from "./extra";
 
 export type { EmailTemplate, EmailTemplateCategoryId } from "./types";
 export { EMAIL_TEMPLATE_CATEGORIES } from "./types";
 
-/** The curated library of 100 templates, in category order. */
+/** The curated library, in category order. */
 export const EMAIL_TEMPLATES: EmailTemplate[] = [
   ...SECURITY_TEMPLATES,
   ...LEGAL_TEMPLATES,
@@ -20,6 +21,7 @@ export const EMAIL_TEMPLATES: EmailTemplate[] = [
   ...BILLING_TEMPLATES,
   ...TRUST_TEMPLATES,
   ...COMMUNITY_TEMPLATES,
+  ...EXTRA_TEMPLATES,
 ];
 
 const BY_ID = new Map(EMAIL_TEMPLATES.map((t) => [t.id, t]));
