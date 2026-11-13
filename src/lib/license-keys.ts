@@ -91,7 +91,7 @@ export async function sendLicenseKeyEmail(opts: {
       : `These extra messages expire ${opts.durationDays} days after you redeem the key.`;
   const html = wrapEmailInBrandedTemplate({
     title: "Your RoleFlow license key",
-    emoji: "🔑",
+    icon: "key",
     body: [
       `You have been given ${opts.amount} extra messages on RoleFlow. They are used after your daily limit runs out, in chat and in the API.`,
       `Your license key:\n\n${opts.plainKey}`,

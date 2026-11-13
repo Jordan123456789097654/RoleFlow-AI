@@ -25,7 +25,8 @@ export interface ComposeRequest {
   to?: string;
   subject: string;
   body: string;
-  emoji?: string;
+  /** Vector icon id from src/lib/email-icons.ts. */
+  icon?: string;
   templateId?: string | null;
   ctaText?: string;
   ctaUrl?: string;
@@ -95,7 +96,7 @@ export function validateComposeRequest(raw: any): ValidationResult<ComposeReques
     mode,
     subject,
     body,
-    emoji: cleanLine(raw.emoji, 8) || undefined,
+    icon: cleanLine(raw.icon, 40) || undefined,
     templateId: cleanLine(raw.templateId, 120) || null,
     ctaText: cleanLine(raw.ctaText, 80) || undefined,
     ctaUrl: ctaUrl || undefined,
@@ -147,7 +148,7 @@ export function buildMessage(req: ComposeRequest, recipientEmail: string, recipi
 
   const html = wrapEmailInBrandedTemplate({
     title: subject,
-    emoji: req.emoji,
+    icon: req.icon,
     body,
     ctaText: ctaText && ctaUrl ? ctaText : undefined,
     ctaUrl: ctaText && ctaUrl ? ctaUrl : undefined,

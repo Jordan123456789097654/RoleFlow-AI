@@ -1,3 +1,4 @@
+import { EMAIL_ICONS, isEmailIcon, type EmailIconId } from "@/lib/email-icons";
 import { NextRequest, NextResponse } from "next/server";
 import { getSessionFromRequest } from "@/lib/auth";
 import { groqChatCompletion, ModelMessage } from "@/lib/ai-engine";
@@ -32,17 +33,17 @@ Tone: ${TONE_GUIDE[tone]}
 
 Output rules:
 - Reply with ONLY a JSON object, no commentary, no code fences, in this exact shape:
-  {"subject": "...", "body": "...", "emoji": "..."}
+  {"subject": "...", "body": "...", "icon": "..."}
 - "subject": a professional subject line under 90 characters.
 - "body": plain text. Start with a greeting like "Hi {{name}}," and end with a sign-off "The RoleFlow Team". Separate paragraphs with a blank line. No HTML, no markdown, no bullet symbols other than simple hyphens.
-- "emoji": one single emoji that fits the topic (for example 🚨 for security, ⚖️ for policy, ⚡ for product, 🛠️ for maintenance).
+- "icon": exactly one id from this list that fits the topic: ${EMAIL_ICONS.map((i) => i.id).join(", ")}. For example "alert" for incidents, "scale" for policy, "bolt" for product launches, "wrench" for maintenance. Never use icon.
 - Use only these placeholders where they help: ${ALLOWED_PLACEHOLDERS.join(", ")}. Do not invent other placeholders.
 - Never invent specific figures, prices, dates, reference numbers or commitments the admin did not provide. Use a placeholder instead.
 - Keep the body under 250 words.`;
 }
 
 /** Pulls the first JSON object out of a model reply, tolerating stray prose or code fences. */
-function parseEmailJson(text: string): { subject: string; body: string; emoji?: string } | null {
+function parseEmailJson(text: string): { subject: string; body: string; icon?: EmailIconId } | null {
   const start = text.indexOf("{");
   const end = text.lastIndexOf("}");
   if (start === -1 || end <= start) return null;
@@ -52,15 +53,15 @@ function parseEmailJson(text: string): { subject: string; body: string; emoji?: 
     const subject = obj.subject.trim().slice(0, 200);
     const body = obj.body.replace(/\r\n/g, "\n").trim().slice(0, 20000);
     if (!subject || body.length < 10) return null;
-    const emoji = typeof obj.emoji === "string" && obj.emoji.trim() ? obj.emoji.trim().slice(0, 8) : undefined;
-    return { subject, body, emoji };
+    const icon = isEmailIcon(obj.icon) ? obj.icon : undefined;
+    return { subject, body, icon };
   } catch {
     return null;
   }
 }
 
 /**
- * Admin only. "Prompt for AI to Make": turns a short brief into a subject, body and emoji
+ * Admin only. "Prompt for AI to Make": turns a short brief into a subject, body and icon
  * using the inference key pool. The admin reviews the result in the composer before sending.
  *
  * Body: { prompt: string, tone?: one of EMAIL_TONES }

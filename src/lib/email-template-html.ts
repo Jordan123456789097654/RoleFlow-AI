@@ -2,22 +2,18 @@
  * Client-safe email rendering. This file must NOT import the Resend SDK, so the admin UI can use
  * the same wrapper for its live preview that the server uses for sending.
  *
- * The layout mirrors the sign-in email in src/lib/email.ts: white canvas, 520px centred column,
- * amber wave logo, 26px title, 15px body copy, dark CTA button, and a divider-plus-footer.
+ * Layout: a light canvas, a 560px card, a brand row, a vector icon tile above the title, body copy,
+ * an optional extra block (for example a one-time code), a dark call-to-action, and a quiet footer.
+ * Icons are hosted PNGs from src/lib/email-icons.ts. No emoji are used anywhere in the layout.
  */
+import { emailIconUrl, isEmailIcon } from "./email-icons";
 
-export const EMAIL_PLACEHOLDERS = [
-  "name",
-  "email",
-  "date",
-  "incident_id",
-  "app_url",
-  "action_url",
-] as const;
+export const EMAIL_PLACEHOLDERS = ["name", "email", "date", "incident_id", "app_url", "action_url"] as const;
 
 export type EmailPlaceholder = (typeof EMAIL_PLACEHOLDERS)[number];
 
 export const DEFAULT_APP_URL = "https://roleflow.site";
+const LOGO_URL = "https://roleflow.site/icon.png";
 
 export interface PlaceholderValues {
   name?: string;
@@ -85,7 +81,7 @@ function bodyToHtml(text: string): string {
     .filter(Boolean)
     .map(
       (para) =>
-        `<p style="margin: 0 0 16px 0; font-size: 15px; line-height: 24px; color: #374151;">${escapeHtml(para).replace(
+        `<p style="margin: 0 0 16px 0; font-size: 16px; line-height: 26px; color: #3f3f46;">${escapeHtml(para).replace(
           /\n/g,
           "<br>"
         )}</p>`
@@ -96,43 +92,72 @@ function bodyToHtml(text: string): string {
 export interface BrandedEmailOptions {
   /** Used as the document title and the H1 heading. */
   title: string;
-  /** Optional contextual emoji badge, such as 🚨 or ⚖️. */
-  emoji?: string;
+  /** Vector icon id shown above the title, such as "shield". Unknown ids are ignored. */
+  icon?: string;
   /** Plain text. Blank lines start a new paragraph. Placeholders must already be rendered. */
   body: string;
   ctaText?: string;
   ctaUrl?: string;
+  /** Optional line shown in the inbox preview next to the subject. */
+  preheader?: string;
+  /**
+   * Trusted HTML inserted after the body and before the button, for example a one-time code block.
+   * Build it only from escapeHtml()-escaped values.
+   */
+  extraHtml?: string;
   /** Optional line shown in the footer subtitle. */
   footnote?: string;
 }
 
+/** A one-time code block for sign-in and verification emails. Escapes the code itself. */
+export function codeBlockHtml(code: string): string {
+  return `<div style="margin: 0 0 24px 0; padding: 18px 16px; border-radius: 12px; background-color: #fafaf9; border: 1px solid #e7e5e4; text-align: center;">
+  <div style="font-family: 'SFMono-Regular', Menlo, Consolas, monospace; font-size: 28px; font-weight: 600; letter-spacing: 8px; color: #18181b;">${escapeHtml(code)}</div>
+</div>`;
+}
+
 /**
- * Wraps plain-text content in the RoleFlow sign-in email layout. Used by the send engine
- * (src/app/api/admin/emails/send) and by the admin live preview.
+ * Wraps plain-text content in the RoleFlow email layout. Used by the send engine
+ * (src/app/api/admin/emails/send), the sign-in email, and the admin live preview.
  */
-export function wrapEmailInBrandedTemplate({ title, emoji, body, ctaText, ctaUrl, footnote }: BrandedEmailOptions): string {
+export function wrapEmailInBrandedTemplate({
+  title,
+  icon,
+  body,
+  ctaText,
+  ctaUrl,
+  preheader,
+  extraHtml,
+  footnote,
+}: BrandedEmailOptions): string {
   const safeTitle = escapeHtml(title);
-  const emojiBlock = emoji
+  const iconBlock = isEmailIcon(icon)
     ? `
-    <tr>
-      <td style="padding-bottom: 24px;">
-        <div style="display: inline-block; width: 68px; height: 68px; line-height: 68px; font-size: 48px;">
-          ${escapeHtml(emoji)}
-        </div>
-      </td>
-    </tr>`
+          <tr>
+            <td align="center" style="padding-bottom: 20px;">
+              <table align="center" border="0" cellpadding="0" cellspacing="0"><tr>
+                <td align="center" valign="middle" width="64" height="64" style="width: 64px; height: 64px; background-color: #fef3c7; border-radius: 16px; text-align: center; vertical-align: middle;">
+                  <img src="${emailIconUrl(icon)}" width="32" height="32" alt="" style="display: inline-block; width: 32px; height: 32px; border: 0;" />
+                </td>
+              </tr></table>
+            </td>
+          </tr>`
+    : "";
+
+  const preheaderBlock = preheader
+    ? `<div style="display: none; max-height: 0; overflow: hidden; opacity: 0; color: transparent;">${escapeHtml(preheader)}</div>`
     : "";
 
   const ctaBlock =
     ctaText && ctaUrl
       ? `
-    <tr>
-      <td style="padding-bottom: 24px;">
-        <a href="${escapeHtml(ctaUrl)}" style="display: inline-block; background-color: #111827; color: #ffffff; font-size: 15px; font-weight: 600; text-decoration: none; padding: 12px 32px; border-radius: 8px; box-shadow: 0 1px 2px rgba(0,0,0,0.05);">
-          ${escapeHtml(ctaText)}
-        </a>
-      </td>
-    </tr>`
+          <tr>
+            <td align="center" style="padding: 8px 0 28px 0;">
+              <a href="${escapeHtml(ctaUrl)}" style="display: inline-block; background-color: #18181b; color: #ffffff; font-size: 15px; font-weight: 600; text-decoration: none; padding: 13px 32px; border-radius: 10px;">
+                ${escapeHtml(ctaText)}
+              </a>
+            </td>
+          </tr>`
       : "";
 
   return `<!DOCTYPE html>
@@ -140,85 +165,63 @@ export function wrapEmailInBrandedTemplate({ title, emoji, body, ctaText, ctaUrl
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="color-scheme" content="light">
   <title>${safeTitle}</title>
 </head>
-<body style="margin: 0; padding: 40px 16px; background-color: #f3f4f6; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; color: #111827;">
-  <table align="center" border="0" cellpadding="0" cellspacing="0" width="100%" style="max-width: 560px; margin: 0 auto; background-color: #ffffff; border: 1px solid #e5e7eb; border-radius: 16px; overflow: hidden; box-shadow: 0 4px 16px rgba(0,0,0,0.04);">
-    <!-- Brand Header -->
+<body style="margin: 0; padding: 40px 16px; background-color: #f4f4f5; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; color: #18181b;">
+  ${preheaderBlock}
+  <table align="center" border="0" cellpadding="0" cellspacing="0" width="100%" style="max-width: 560px; margin: 0 auto; background-color: #ffffff; border: 1px solid #e4e4e7; border-radius: 20px; overflow: hidden;">
     <tr>
-      <td style="padding: 32px 36px 24px 36px; text-align: center; border-bottom: 1px solid #f3f4f6;">
-        <table align="center" border="0" cellpadding="0" cellspacing="0">
-          <tr>
-            <td style="vertical-align: middle; padding-right: 12px;">
-              <img src="https://roleflow.site/icon.png" width="36" height="36" alt="RoleFlow" style="display: block; width: 36px; height: 36px; border-radius: 8px; border: 0;" />
-            </td>
-            <td style="vertical-align: middle; text-align: left;">
-              <span style="font-size: 22px; font-weight: 700; color: #111827; letter-spacing: -0.5px; display: block; line-height: 1.1;">RoleFlow</span>
-            </td>
-          </tr>
-        </table>
+      <td style="padding: 28px 36px; border-bottom: 1px solid #f4f4f5;">
+        <table border="0" cellpadding="0" cellspacing="0"><tr>
+          <td style="vertical-align: middle; padding-right: 12px;">
+            <img src="${LOGO_URL}" width="32" height="32" alt="RoleFlow" style="display: block; width: 32px; height: 32px; border-radius: 8px; border: 0;" />
+          </td>
+          <td style="vertical-align: middle;">
+            <span style="font-size: 19px; font-weight: 700; color: #18181b; letter-spacing: -0.4px;">RoleFlow</span>
+          </td>
+        </tr></table>
       </td>
     </tr>
 
-    <!-- Body Container -->
     <tr>
-      <td style="padding: 32px 36px 24px 36px; text-align: center;">
-        <table width="100%" border="0" cellpadding="0" cellspacing="0">
-${emojiBlock}
+      <td style="padding: 36px 36px 8px 36px; text-align: center;">
+        <table width="100%" border="0" cellpadding="0" cellspacing="0">${iconBlock}
           <tr>
-            <td style="padding-bottom: 16px; text-align: center;">
-              <h1 style="margin: 0; font-size: 24px; font-weight: 700; color: #111827; letter-spacing: -0.5px; line-height: 1.3;">
-                ${safeTitle}
-              </h1>
+            <td style="padding-bottom: 20px; text-align: center;">
+              <h1 style="margin: 0; font-size: 24px; font-weight: 700; color: #18181b; letter-spacing: -0.6px; line-height: 1.3;">${safeTitle}</h1>
             </td>
           </tr>
           <tr>
-            <td style="padding-bottom: 24px; text-align: left;">
+            <td style="text-align: left;">
               ${bodyToHtml(body)}
+              ${extraHtml || ""}
             </td>
-          </tr>
-${ctaBlock}
+          </tr>${ctaBlock}
         </table>
       </td>
     </tr>
 
-    <!-- Footnote & Support -->
     <tr>
-      <td style="padding: 0 36px 28px 36px;">
-        <table width="100%" border="0" cellpadding="0" cellspacing="0" style="border-top: 1px solid #f3f4f6; padding-top: 20px;">
-          <tr>
-            <td style="font-size: 13px; line-height: 20px; color: #6b7280; text-align: center;">
-              <p style="margin: 0 0 8px 0;">
-                ${escapeHtml(
-                  footnote || "You are receiving this message because you have a RoleFlow account or were addressed directly by the RoleFlow team."
-                )}
-              </p>
-              <p style="margin: 0;">
-                Need assistance? Visit our <a href="https://status.roleflow.site" style="color: #d97706; text-decoration: underline; font-weight: 500;">Live Status Page</a> or contact <a href="mailto:support@roleflow.site" style="color: #4b5563; text-decoration: underline;">RoleFlow Support</a>.
-              </p>
-            </td>
-          </tr>
-        </table>
+      <td style="padding: 0 36px 32px 36px;">
+        <div style="border-top: 1px solid #f4f4f5; padding-top: 20px; font-size: 13px; line-height: 20px; color: #71717a; text-align: center;">
+          <p style="margin: 0 0 8px 0;">${escapeHtml(
+            footnote || "You are receiving this message because you have a RoleFlow account or were addressed directly by the RoleFlow team."
+          )}</p>
+          <p style="margin: 0;">
+            Need help? <a href="mailto:support@roleflow.site" style="color: #18181b; text-decoration: underline;">Contact support</a>
+            &nbsp;·&nbsp; <a href="https://status.roleflow.site" style="color: #18181b; text-decoration: underline;">System status</a>
+          </p>
+        </div>
       </td>
     </tr>
 
-    <!-- Footer Links -->
     <tr>
-      <td style="padding: 20px 36px; background-color: #f9fafb; border-top: 1px solid #e5e7eb; font-size: 12px; line-height: 18px; color: #9ca3af; text-align: center;">
-        <table width="100%" border="0" cellpadding="0" cellspacing="0">
-          <tr>
-            <td style="color: #6b7280; font-size: 12px; text-align: center;">
-              <span style="font-weight: 600; color: #374151;">RoleFlow</span> • Founded & Built by Jordan Daniels<br>
-              <a href="https://roleflow.site" style="color: #6b7280; text-decoration: underline;">roleflow.site</a>
-              <div style="margin-top: 10px;">
-                <a href="https://roleflow.site" style="color: #6b7280; text-decoration: underline; margin: 0 8px;">Home</a>
-                <a href="https://status.roleflow.site" style="color: #6b7280; text-decoration: underline; margin: 0 8px;">System Status</a>
-                <a href="https://roleflow.site/privacy" style="color: #6b7280; text-decoration: underline; margin: 0 8px;">Privacy</a>
-                <a href="https://roleflow.site/terms" style="color: #6b7280; text-decoration: underline; margin: 0 8px;">Terms</a>
-              </div>
-            </td>
-          </tr>
-        </table>
+      <td style="padding: 18px 36px; background-color: #fafafa; border-top: 1px solid #e4e4e7; font-size: 12px; line-height: 18px; color: #71717a; text-align: center;">
+        <span style="font-weight: 600; color: #3f3f46;">RoleFlow, Inc.</span>
+        &nbsp;·&nbsp; <a href="https://roleflow.site/privacy" style="color: #71717a; text-decoration: underline;">Privacy</a>
+        &nbsp;·&nbsp; <a href="https://roleflow.site/terms" style="color: #71717a; text-decoration: underline;">Terms</a>
+        &nbsp;·&nbsp; <a href="https://roleflow.site/acceptable-use" style="color: #71717a; text-decoration: underline;">Acceptable use</a>
       </td>
     </tr>
   </table>

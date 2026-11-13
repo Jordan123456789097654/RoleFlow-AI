@@ -53,3 +53,10 @@ Cooldown state lives in server memory, so each serverless instance tracks its ow
 - **Footer rebuilt**: CTA band, grouped link columns, the Law enforcement link is now its own item (it was nested inside Moderation), status pill, back-to-top.
 - **Prompt quality**: conversation-reference resolution, consistent names across turns, root-cause-first bug fixes with complete files, and a final requirements check.
 - **Legal**: dates set to November 13, 2026; privacy policy now discloses web search query sharing. Needs legal review before publishing.
+
+## v6: email redesign, vector icons, custom templates
+- **No emoji in email.** Every template and the composer use one of 19 vector icons (`src/lib/email-icons.ts`, PNGs in `public/email/`, rendered from 24px stroke SVG). The sign-in email and the security alert also drop their emoji.
+- **Email layout remade** (`src/lib/email-template-html.ts`): icon tile, clearer hierarchy, preheader support, trusted extra block for one-time codes. Sign-in now uses the same renderer.
+- **All 100 library templates** now carry an `icon` key instead of `emoji`.
+- **Custom templates.** Admins can save any composed email as a template ("Save as template"), reuse it from "Your templates", and delete it. Stored in `roleflow_email_templates` (Postgres) or the local store. API: `GET|POST|DELETE /api/admin/emails/templates`.
+- **AI draft** returns an icon id from the fixed list instead of an emoji.

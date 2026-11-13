@@ -5,23 +5,26 @@ export type EmailTemplateCategoryId =
   | "product"
   | "billing"
   | "trust"
-  | "community";
+  | "community"
+  | "custom";
 
 export interface EmailTemplate {
-  /** Unique slug, such as "sec-breach-critical". */
+  /** Unique slug, such as "sec-breach-critical". Custom templates use "custom-<id>". */
   id: string;
   title: string;
   category: EmailTemplateCategoryId;
   /** Professional subject line. May contain placeholders. */
   subject: string;
   tags: string[];
-  /** Header badge emoji. */
-  emoji: string;
+  /** Vector icon id from src/lib/email-icons.ts, such as "shield". */
+  icon: string;
   /** Plain-text body. Blank lines separate paragraphs. Uses {{placeholders}}. */
   body: string;
   ctaText?: string;
   /** May be a placeholder such as {{action_url}}. */
   ctaUrl?: string;
+  /** True for templates an admin saved from the composer. */
+  custom?: boolean;
 }
 
 export const EMAIL_TEMPLATE_CATEGORIES: { id: EmailTemplateCategoryId; label: string; description: string }[] = [
@@ -32,4 +35,5 @@ export const EMAIL_TEMPLATE_CATEGORIES: { id: EmailTemplateCategoryId; label: st
   { id: "billing", label: "Billing & Quotas", description: "Quotas, invoices, renewals and account lifecycle." },
   { id: "trust", label: "Trust & Safety", description: "Suspensions, strikes, appeals and safety policy." },
   { id: "community", label: "Community & Roadmap", description: "Letters, surveys, interviews, beta calls and spotlights." },
+  { id: "custom", label: "Your templates", description: "Templates saved from the composer." },
 ];

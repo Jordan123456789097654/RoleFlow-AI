@@ -8,7 +8,7 @@ export const BILLING_TEMPLATES: EmailTemplate[] = [
     category: "billing",
     subject: "You have used 80% of your daily RoleFlow quota",
     tags: ["quota", "limit", "warning", "80%", "usage"],
-    emoji: "📊",
+    icon: "chart",
     body: `Hi {{name}},
 
 You have used about 80% of your daily message quota on RoleFlow. Your quota resets at midnight UTC.
@@ -25,7 +25,7 @@ No action is required right now.`,
     category: "billing",
     subject: "You have reached your daily RoleFlow quota",
     tags: ["quota", "exhausted", "limit", "100%", "reset"],
-    emoji: "⏸️",
+    icon: "alert",
     body: `Hi {{name}},
 
 You have used your full daily message quota on RoleFlow. You can continue again when your quota resets at midnight UTC.
@@ -40,7 +40,7 @@ Your chats and saved settings are safe. If you need more capacity today, you can
     category: "billing",
     subject: "Your RoleFlow upgrade is confirmed",
     tags: ["upgrade", "subscription", "confirmation", "plan"],
-    emoji: "🎉",
+    icon: "sparkle",
     body: `Hi {{name}},
 
 Thank you for upgrading your RoleFlow subscription. Your new plan is active as of {{date}}.
@@ -57,7 +57,7 @@ Your receipt is available in your billing settings. If anything looks wrong, con
     category: "billing",
     subject: "Your RoleFlow invoice for {{date}}",
     tags: ["invoice", "receipt", "tax", "billing"],
-    emoji: "🧾",
+    icon: "card",
     body: `Hi {{name}},
 
 Your RoleFlow invoice for {{date}} is ready. Your invoice includes the billing period, the plan charged, and any applicable tax, along with your invoice number.
@@ -74,7 +74,7 @@ Keep this email for your records. Reply to this message if you need a corrected 
     category: "billing",
     subject: "Action needed: we could not process your RoleFlow payment",
     tags: ["payment", "failed", "grace period", "billing", "dunning"],
-    emoji: "💳",
+    icon: "card",
     body: `Hi {{name}},
 
 We could not process the most recent payment for your RoleFlow subscription on {{date}}. Your account stays active during a grace period of seven days, so nothing is lost.
@@ -91,7 +91,7 @@ If you believe this is an error, contact your bank or card issuer, then reply to
     category: "billing",
     subject: "Your RoleFlow trial ends in 48 hours",
     tags: ["trial", "ending", "reminder", "subscription"],
-    emoji: "⏰",
+    icon: "calendar",
     body: `Hi {{name}},
 
 Your RoleFlow trial ends in 48 hours, on {{date}}. After that, your account moves to the plan you selected, or to the Free plan if you did not choose one.
@@ -106,7 +106,7 @@ If you want to keep the features you have been using, choose a plan before the t
     category: "billing",
     subject: "Your RoleFlow annual plan renews on {{date}}",
     tags: ["renewal", "annual", "reminder", "subscription"],
-    emoji: "📅",
+    icon: "calendar",
     body: `Hi {{name}},
 
 Your annual RoleFlow plan will renew on {{date}}. The renewal will be charged to the payment method on file, unless you change or cancel your plan before then.
@@ -121,7 +121,7 @@ If you want to change plans, do so before the renewal date. Changes take effect 
     category: "billing",
     subject: "Your inactive RoleFlow account will be closed on {{date}}",
     tags: ["inactive", "deactivation", "closure", "lifecycle"],
-    emoji: "💤",
+    icon: "calendar",
     body: `Hi {{name}},
 
 We have not seen activity on your RoleFlow account ({{email}}) for a long time. To keep our records clean, we will deactivate inactive accounts on {{date}}.
@@ -138,7 +138,7 @@ If you have saved content you want to keep, export it before then.`,
     category: "billing",
     subject: "Your referral reward has been applied",
     tags: ["referral", "reward", "credit", "promotion"],
-    emoji: "🎁",
+    icon: "sparkle",
     body: `Hi {{name}},
 
 Thank you for referring a friend to RoleFlow. Your referral reward has been applied to your account as of {{date}}, and it will appear on your next invoice.
@@ -153,7 +153,7 @@ Rewards apply automatically. Referred accounts must be active and in good standi
     category: "billing",
     subject: "Your RoleFlow plan change is scheduled",
     tags: ["downgrade", "plan", "change", "confirmation"],
-    emoji: "📉",
+    icon: "chart",
     body: `Hi {{name}},
 
 We have received your request to change your RoleFlow plan. The change takes effect at the end of your current billing period, on {{date}}. Until then, you keep the features of your current plan.
@@ -168,7 +168,7 @@ Your chats, projects and memories remain available after the change. Some featur
     category: "billing",
     subject: "Upcoming price change for your RoleFlow plan",
     tags: ["price", "change", "notice", "billing"],
-    emoji: "🏷️",
+    icon: "card",
     body: `Hi {{name}},
 
 We are updating the price of your RoleFlow plan. The new price will apply starting {{date}}, at least 30 days from this notice.
@@ -185,7 +185,7 @@ Thank you for being part of RoleFlow. Questions? Reply to this email.`,
     category: "billing",
     subject: "Your saved payment card expires soon",
     tags: ["card", "expiring", "payment", "billing"],
-    emoji: "🗓️",
+    icon: "calendar",
     body: `Hi {{name}},
 
 The payment card saved to your RoleFlow account expires at the end of this month. To avoid any interruption to your subscription, add a new card before your next renewal.
@@ -200,7 +200,7 @@ Your subscription and data are not affected today. You can update your card in j
     category: "billing",
     subject: "Your RoleFlow refund has been processed",
     tags: ["refund", "processed", "billing"],
-    emoji: "💸",
+    icon: "card",
     body: `Hi {{name}},
 
 We have processed your refund on {{date}}. Depending on your bank or card issuer, it may take 5 to 10 business days to appear on your statement.
@@ -213,7 +213,7 @@ Reference: {{incident_id}}. If the refund does not appear after that period, con
     category: "billing",
     subject: "Welcome to RoleFlow paid",
     tags: ["welcome", "paid", "onboarding", "plan"],
-    emoji: "👋",
+    icon: "signin",
     body: `Hi {{name}},
 
 Welcome to RoleFlow paid. Your plan is active, and your higher limits and additional models are ready to use.
@@ -230,7 +230,7 @@ Thank you for supporting RoleFlow.`,
     category: "billing",
     subject: "Your RoleFlow subscription has been cancelled",
     tags: ["cancel", "subscription", "confirmation", "billing"],
-    emoji: "👋",
+    icon: "signin",
     body: `Hi {{name}},
 
 We have received your request to cancel your RoleFlow subscription. You keep paid access until the end of your current billing period, on {{date}}. After that, your account moves to the Free plan.

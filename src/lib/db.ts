@@ -27,6 +27,20 @@ export const DEFAULT_SYSTEM_CONFIG: SystemConfig = {
   forcedEffort: "low",
 };
 
+/** An email template an admin saved from the composer. */
+export interface CustomEmailTemplateRecord {
+  id: string;
+  title: string;
+  subject: string;
+  body: string;
+  icon: string;
+  ctaText?: string;
+  ctaUrl?: string;
+  createdBy: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
 interface LocalStore {
   users: Record<string, UserProfile>;
   chats: Record<string, Chat>;
@@ -45,6 +59,7 @@ interface LocalStore {
   apiKeys?: Record<string, ApiKey>;
   emailBroadcasts?: EmailBroadcastLog[];
   licenseKeys?: Record<string, LicenseKeyRecord>;
+  emailTemplates?: Record<string, CustomEmailTemplateRecord>;
   referrals?: Record<string, ReferralRecord>;
   lawRequests?: Record<string, LawRequestRecord>;
   systemIncidents?: Record<string, SystemIncident>;
@@ -430,6 +445,21 @@ async function ensureDb() {
         failed_count INTEGER NOT NULL DEFAULT 0,
         status VARCHAR(20) NOT NULL,
         created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+      );
+    `;
+
+    await sql`
+      CREATE TABLE IF NOT EXISTS roleflow_email_templates (
+        id VARCHAR(120) PRIMARY KEY,
+        title TEXT NOT NULL,
+        subject TEXT NOT NULL,
+        body TEXT NOT NULL,
+        icon VARCHAR(40) NOT NULL,
+        cta_text TEXT,
+        cta_url TEXT,
+        created_by VARCHAR(255) NOT NULL,
+        created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+        updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
       );
     `;
 
@@ -834,6 +864,64 @@ export const db = {
     store.licenseKeys[record.id] = record;
     saveLocalStore(store);
     return record;
+  },
+
+  // Custom email templates
+  async listEmailTemplates(): Promise<CustomEmailTemplateRecord[]> {
+    await ensureDb();
+    if (isPostgresConfigured) {
+      const { rows } = await sql`SELECT * FROM roleflow_email_templates ORDER BY updated_at DESC;`;
+      return rows.map((r) => ({
+        id: String(r.id),
+        title: String(r.title),
+        subject: String(r.subject),
+        body: String(r.body),
+        icon: String(r.icon),
+        ctaText: r.cta_text ?? undefined,
+        ctaUrl: r.cta_url ?? undefined,
+        createdBy: String(r.created_by),
+        createdAt: new Date(r.created_at).toISOString(),
+        updatedAt: new Date(r.updated_at).toISOString(),
+      }));
+    }
+    const store = getLocalStore();
+    return Object.values(store.emailTemplates || {}).sort((a, b) => b.updatedAt.localeCompare(a.updatedAt));
+  },
+
+  async upsertEmailTemplate(record: CustomEmailTemplateRecord): Promise<CustomEmailTemplateRecord> {
+    await ensureDb();
+    if (isPostgresConfigured) {
+      await sql`
+        INSERT INTO roleflow_email_templates
+          (id, title, subject, body, icon, cta_text, cta_url, created_by, created_at, updated_at)
+        VALUES
+          (${record.id}, ${record.title}, ${record.subject}, ${record.body}, ${record.icon},
+           ${record.ctaText ?? null}, ${record.ctaUrl ?? null}, ${record.createdBy}, ${record.createdAt}, ${record.updatedAt})
+        ON CONFLICT (id) DO UPDATE SET
+          title = EXCLUDED.title, subject = EXCLUDED.subject, body = EXCLUDED.body, icon = EXCLUDED.icon,
+          cta_text = EXCLUDED.cta_text, cta_url = EXCLUDED.cta_url, updated_at = EXCLUDED.updated_at;
+      `;
+      return record;
+    }
+    const store = getLocalStore();
+    store.emailTemplates = store.emailTemplates || {};
+    const existing = store.emailTemplates[record.id];
+    store.emailTemplates[record.id] = { ...record, createdAt: existing?.createdAt || record.createdAt, createdBy: existing?.createdBy || record.createdBy };
+    saveLocalStore(store);
+    return store.emailTemplates[record.id];
+  },
+
+  async deleteEmailTemplate(id: string): Promise<boolean> {
+    await ensureDb();
+    if (isPostgresConfigured) {
+      const { rowCount } = await sql`DELETE FROM roleflow_email_templates WHERE id = ${id};`;
+      return (rowCount ?? 0) > 0;
+    }
+    const store = getLocalStore();
+    if (!store.emailTemplates?.[id]) return false;
+    delete store.emailTemplates[id];
+    saveLocalStore(store);
+    return true;
   },
 
   async listLicenseKeys(): Promise<LicenseKeyRecord[]> {

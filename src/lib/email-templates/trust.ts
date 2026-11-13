@@ -8,7 +8,7 @@ export const TRUST_TEMPLATES: EmailTemplate[] = [
     category: "trust",
     subject: "Your RoleFlow account has been suspended",
     tags: ["suspension", "terms", "violation", "account", "moderation"],
-    emoji: "🚫",
+    icon: "ban",
     body: `Hi {{name}},
 
 On {{date}}, we suspended your RoleFlow account ({{email}}) because activity on it violated our Acceptable Use Policy. Reference: {{incident_id}}.
@@ -25,7 +25,7 @@ If you believe this decision is wrong, you can submit an appeal from the moderat
     category: "trust",
     subject: "Formal warning: Tier 2 policy strike on your account",
     tags: ["strike", "tier 2", "warning", "policy", "moderation"],
-    emoji: "⚠️",
+    icon: "alert",
     body: `Hi {{name}},
 
 Our review found that content submitted from your account on {{date}} violated our Acceptable Use Policy at the Tier 2 level. We have recorded a formal strike against your account. Reference: {{incident_id}}.
@@ -42,7 +42,7 @@ Please review the Acceptable Use Policy and make sure your future use follows it
     category: "trust",
     subject: "Clarification about the strikes on your account",
     tags: ["strike", "status", "clarification", "moderation"],
-    emoji: "📋",
+    icon: "document",
     body: `Hi {{name}},
 
 You asked about the status of the strikes on your RoleFlow account. As of {{date}}, your account has the following status: strikes are active and count toward future reviews, unless they have expired under our moderation policy.
@@ -59,7 +59,7 @@ Strikes do not expire on a fixed schedule for serious violations, but they are r
     category: "trust",
     subject: "We have received your appeal",
     tags: ["appeal", "received", "moderation", "review"],
-    emoji: "📥",
+    icon: "mail",
     body: `Hi {{name}},
 
 Thank you for submitting an appeal on {{date}}. We have received it, and it is now in the review queue. Reference: {{incident_id}}.
@@ -72,7 +72,7 @@ A reviewer who did not make the original decision will look at your appeal. We a
     category: "trust",
     subject: "Your appeal was approved",
     tags: ["appeal", "approved", "reinstatement", "moderation"],
-    emoji: "✅",
+    icon: "check",
     body: `Hi {{name}},
 
 We have reviewed your appeal (reference {{incident_id}}) and approved it. The decision was updated on {{date}}, and the related restriction has been lifted.
@@ -89,7 +89,7 @@ Thank you for taking the time to write to us. We appreciate your patience during
     category: "trust",
     subject: "Our decision on your appeal",
     tags: ["appeal", "denied", "decision", "moderation"],
-    emoji: "📄",
+    icon: "document",
     body: `Hi {{name}},
 
 We have completed our review of your appeal (reference {{incident_id}}). After careful consideration, we have decided to uphold the original decision made on {{date}}.
@@ -106,7 +106,7 @@ Thank you for engaging with our process.`,
     category: "trust",
     subject: "RoleFlow's zero-tolerance policy on child sexual abuse material",
     tags: ["child safety", "csam", "zero tolerance", "policy", "reporting"],
-    emoji: "🛑",
+    icon: "alert",
     body: `Hi {{name}},
 
 RoleFlow has a zero-tolerance policy for child sexual abuse material and for any content that sexualizes minors. Any such content is blocked, reported where required by law, and results in immediate termination of the account involved.
@@ -123,7 +123,7 @@ If you encounter content that concerns the safety of a child, report it to us ri
     category: "trust",
     subject: "A shared conversation was removed",
     tags: ["content", "removed", "shared link", "moderation"],
-    emoji: "🧹",
+    icon: "wrench",
     body: `Hi {{name}},
 
 On {{date}}, we removed a conversation you shared through a RoleFlow link because it violated our Acceptable Use Policy. Reference: {{incident_id}}.
@@ -138,7 +138,7 @@ If you think we made a mistake, you can reply to this email to request a review.
     category: "trust",
     subject: "A friendly reminder about our community guidelines",
     tags: ["guidelines", "reminder", "community", "conduct"],
-    emoji: "🤝",
+    icon: "users",
     body: `Hi {{name}},
 
 We want RoleFlow to be a useful and respectful place for everyone. This is a friendly reminder of the guidelines that apply to all accounts:
@@ -158,7 +158,7 @@ No action is needed. We send reminders like this to help everyone stay on the ri
     category: "trust",
     subject: "Your RoleFlow account has been reinstated",
     tags: ["reinstatement", "ban lifted", "account", "restored"],
-    emoji: "🔓",
+    icon: "lock",
     body: `Hi {{name}},
 
 We have completed the review of your RoleFlow account and have lifted the restriction placed on it. Your account is active again as of {{date}}.

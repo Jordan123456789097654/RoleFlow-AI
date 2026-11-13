@@ -8,7 +8,7 @@ export const OPS_TEMPLATES: EmailTemplate[] = [
     category: "ops",
     subject: "Scheduled maintenance on {{date}}: brief interruption expected",
     tags: ["maintenance", "database", "scheduled", "downtime"],
-    emoji: "🛠️",
+    icon: "wrench",
     body: `Hi {{name}},
 
 We will perform scheduled database maintenance on {{date}}. During the window, RoleFlow may be read-only or briefly unavailable. We expect the window to last no more than 45 minutes.
@@ -25,7 +25,7 @@ We scheduled this window at a time of low traffic. Reference: {{incident_id}}. T
     category: "ops",
     subject: "Emergency maintenance in progress on RoleFlow",
     tags: ["emergency", "infrastructure", "maintenance", "urgent"],
-    emoji: "🚧",
+    icon: "wrench",
     body: `Hi {{name}},
 
 We have started emergency maintenance on part of the RoleFlow infrastructure as of {{date}}. We chose to act now rather than wait for a scheduled window because the work reduces a risk to service stability.
@@ -40,7 +40,7 @@ We are sorry for the disruption and appreciate your patience.`,
     category: "ops",
     subject: "[P1] RoleFlow service disruption in progress",
     tags: ["p1", "outage", "disruption", "critical", "alert"],
-    emoji: "🔴",
+    icon: "alert",
     body: `Hi {{name}},
 
 We are currently experiencing a P1 service disruption that affects {{incident_id}}. Some users may be unable to sign in, load chats, or receive responses. Our engineers are actively working on a fix.
@@ -57,7 +57,7 @@ Your data has not been lost. Please avoid repeatedly retrying actions, as this c
     category: "ops",
     subject: "Slower AI responses while we manage high demand",
     tags: ["degradation", "latency", "queue", "ai", "performance"],
-    emoji: "⏳",
+    icon: "calendar",
     body: `Hi {{name}},
 
 Since {{date}}, some AI responses on RoleFlow have taken longer than usual. Demand has risen faster than our current capacity, and requests are waiting in a queue before they are processed.
@@ -74,7 +74,7 @@ Your conversations and saved data are not affected. You may find that responses 
     category: "ops",
     subject: "RoleFlow moved traffic to a backup provider",
     tags: ["failover", "provider", "backup", "routing", "advisory"],
-    emoji: "🔀",
+    icon: "globe",
     body: `Hi {{name}},
 
 On {{date}}, one of our upstream AI providers began returning errors. To keep RoleFlow available, we automatically moved affected traffic to a backup provider and model. Reference: {{incident_id}}.
@@ -89,7 +89,7 @@ We will move traffic back to the primary provider once it has been stable for a 
     category: "ops",
     subject: "Incident resolved: root cause analysis for {{incident_id}}",
     tags: ["rca", "post-mortem", "resolved", "incident", "review"],
-    emoji: "✅",
+    icon: "check",
     body: `Hi {{name}},
 
 The incident {{incident_id}}, which began on {{date}}, is now resolved. Service has returned to normal for all users.
@@ -108,7 +108,7 @@ What we are changing: a canary step for production configuration changes, faster
     category: "ops",
     subject: "Deprecation notice: an API endpoint will be retired on {{date}}",
     tags: ["api", "deprecation", "endpoint", "migration", "developers"],
-    emoji: "📦",
+    icon: "document",
     body: `Hi {{name}},
 
 We are deprecating one of the RoleFlow API endpoints. It will stop accepting requests on {{date}}. Until then, it will keep working, but responses include a deprecation header.
@@ -125,7 +125,7 @@ If you need more time, reply to this email with your use case and we will consid
     category: "ops",
     subject: "Planned platform release on {{date}}",
     tags: ["release", "deploy", "window", "planned"],
-    emoji: "🚀",
+    icon: "bolt",
     body: `Hi {{name}},
 
 We will deploy a planned platform release on {{date}}. We expect no user-visible downtime. If anything does change, we will show a short banner in the app.
@@ -140,7 +140,7 @@ Reference: {{incident_id}}.`,
     category: "ops",
     subject: "Web search is temporarily degraded on RoleFlow",
     tags: ["search", "degradation", "web", "provider"],
-    emoji: "🔍",
+    icon: "chart",
     body: `Hi {{name}},
 
 Since {{date}}, web search results in RoleFlow may be slower or incomplete. Our search provider is experiencing elevated error rates.
@@ -155,7 +155,7 @@ We will confirm when search is back to normal. Reference: {{incident_id}}.`,
     category: "ops",
     subject: "Delayed sign-in and notification emails",
     tags: ["email", "delay", "sign-in", "delivery"],
-    emoji: "📭",
+    icon: "mail",
     body: `Hi {{name}},
 
 Since {{date}}, some RoleFlow emails, including sign-in codes and notifications, have been delivered later than usual. This is caused by a delay at our email delivery provider.
@@ -170,7 +170,7 @@ Check your spam folder if you do not see the email. We will confirm once deliver
     category: "ops",
     subject: "Certificate renewal for roleflow.site completed",
     tags: ["certificate", "tls", "renewal", "security", "no action"],
-    emoji: "🔐",
+    icon: "lock",
     body: `Hi {{name}},
 
 We renewed the TLS certificate for roleflow.site on {{date}}. The renewal completed without interruption, and no action is needed on your side.
@@ -185,7 +185,7 @@ Thank you for keeping your integrations current.`,
     category: "ops",
     subject: "A data reprocessing job affected some exports",
     tags: ["backfill", "export", "reprocessing", "data"],
-    emoji: "🗃️",
+    icon: "document",
     body: `Hi {{name}},
 
 On {{date}}, we ran a background job to reprocess stored data. For a short period, some data exports may have been delayed or may have omitted recent items.
@@ -202,7 +202,7 @@ Reference: {{incident_id}}. Your chats and settings were not changed by this job
     category: "ops",
     subject: "A new feature is rolling out in stages",
     tags: ["rollout", "feature flag", "staged", "beta"],
-    emoji: "🌱",
+    icon: "sparkle",
     body: `Hi {{name}},
 
 Starting {{date}}, we are rolling out a new feature in stages. You may see it appear in your account over the coming days, or you may not see it until a later stage.
@@ -217,7 +217,7 @@ There is nothing you need to do to receive the feature. Reference: {{incident_id
     category: "ops",
     subject: "RoleFlow reliability report for {{date}}",
     tags: ["uptime", "report", "reliability", "monthly", "sla"],
-    emoji: "📈",
+    icon: "chart",
     body: `Hi {{name}},
 
 Here is a summary of RoleFlow reliability for the period ending {{date}}.
@@ -236,7 +236,7 @@ Thank you for trusting RoleFlow with your work. Reference: {{incident_id}}.`,
     category: "ops",
     subject: "A legacy model will be retired on {{date}}",
     tags: ["model", "retirement", "deprecation", "legacy"],
-    emoji: "🕰️",
+    icon: "calendar",
     body: `Hi {{name}},
 
 We will retire a legacy model on {{date}}. After that date, chats that were set to use it will automatically use the closest current model in the same family.

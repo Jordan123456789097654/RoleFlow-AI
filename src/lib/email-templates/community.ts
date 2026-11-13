@@ -8,7 +8,7 @@ export const COMMUNITY_TEMPLATES: EmailTemplate[] = [
     category: "community",
     subject: "A letter from the founder: where RoleFlow is headed",
     tags: ["letter", "founder", "quarterly", "update", "vision"],
-    emoji: "✉️",
+    icon: "mail",
     body: `Hi {{name}},
 
 It has been a busy quarter, and I wanted to share where RoleFlow stands and where we are going.
@@ -29,7 +29,7 @@ Thank you for trusting us with your work. Just reply to this email if something 
     category: "community",
     subject: "Two minutes to help us improve RoleFlow?",
     tags: ["nps", "survey", "feedback", "satisfaction"],
-    emoji: "📝",
+    icon: "document",
     body: `Hi {{name}},
 
 Would you take two minutes to tell us how likely you are to recommend RoleFlow to a friend or colleague? It is one question, plus an optional comment, and your answer goes straight to the product team.
@@ -44,7 +44,7 @@ Your feedback helps us decide what to build next, and we read every response.`,
     category: "community",
     subject: "Would you join a 30-minute conversation about RoleFlow?",
     tags: ["interview", "research", "customer", "invite", "feedback"],
-    emoji: "🎙️",
+    icon: "users",
     body: `Hi {{name}},
 
 We are talking with a small group of RoleFlow users about how they work, and we would love to hear from you. The conversation takes about 30 minutes, on video or by phone, at a time that suits you.
@@ -61,7 +61,7 @@ Reply with a few times that work for you and we will send an invitation.`,
     category: "community",
     subject: "Invitation: join the RoleFlow beta program",
     tags: ["beta", "tester", "early access", "invite"],
-    emoji: "🧪",
+    icon: "sparkle",
     body: `Hi {{name}},
 
 We are looking for a small group of beta testers to try new features before they reach everyone. Beta features may change or be removed, and we will ask for specific feedback as you use them.
@@ -78,7 +78,7 @@ Applications close on {{date}}.`,
     category: "community",
     subject: "Vote for the next feature we build",
     tags: ["vote", "feature", "roadmap", "community", "poll"],
-    emoji: "🗳️",
+    icon: "users",
     body: `Hi {{name}},
 
 It is time for another community voting round. We have shortlisted several features based on requests from our users. Pick the ones you most want to see.
@@ -93,7 +93,7 @@ Voting is open until {{date}}. The top-voted feature goes onto the roadmap for t
     category: "community",
     subject: "Meet a RoleFlow user: how they use it every day",
     tags: ["spotlight", "story", "community", "user", "feature"],
-    emoji: "🌟",
+    icon: "sparkle",
     body: `Hi {{name}},
 
 This month we are spotlighting a member of the RoleFlow community. They use RoleFlow to plan projects, check their drafts, and keep track of ideas across multiple teams.
@@ -108,7 +108,7 @@ Their workflow is a great example of how Projects and Custom Instructions can wo
     category: "community",
     subject: "RoleFlow in review: our year in numbers and milestones",
     tags: ["year end", "review", "recap", "milestones", "community"],
-    emoji: "🎆",
+    icon: "sparkle",
     body: `Hi {{name}},
 
 As the year comes to a close on {{date}}, we wanted to thank you for being part of RoleFlow.
@@ -125,7 +125,7 @@ Looking ahead, we will keep focusing on quality, safety and features that help y
     category: "community",
     subject: "RoleFlow roadmap update",
     tags: ["roadmap", "update", "plans", "transparency"],
-    emoji: "🗺️",
+    icon: "globe",
     body: `Hi {{name}},
 
 Here is a short update on our public roadmap, as of {{date}}.
@@ -144,7 +144,7 @@ Roadmap items are estimates, not promises, and we will update you when plans cha
     category: "community",
     subject: "Join our community office hours on {{date}}",
     tags: ["office hours", "community", "q&a", "event", "invite"],
-    emoji: "🧑‍💻",
+    icon: "users",
     body: `Hi {{name}},
 
 We are hosting an open office hours session on {{date}}. Bring your questions about RoleFlow, your workflows, or features you would like to see. Members of the product team will be there to answer questions and take notes.
@@ -159,7 +159,7 @@ The session is open to all users, and you do not need to prepare anything. We wi
     category: "community",
     subject: "How was your first week with RoleFlow?",
     tags: ["onboarding", "feedback", "new user", "first week"],
-    emoji: "🌱",
+    icon: "sparkle",
     body: `Hi {{name}},
 
 Thanks for joining RoleFlow. We would love to know how your first week has gone. What did you try, what worked well, and what felt confusing?
@@ -174,7 +174,7 @@ Just reply to this email with a few sentences. Your answers help us make the fir
     category: "community",
     subject: "Welcome to RoleFlow",
     tags: ["welcome", "onboarding", "new user", "getting started"],
-    emoji: "👋",
+    icon: "signin",
     body: `Hi {{name}},
 
 Welcome to RoleFlow. We are glad to have you.
@@ -189,7 +189,7 @@ To get started, ask a question in a new chat, try a different model in the model
     category: "community",
     subject: "Thank you for your feedback",
     tags: ["thanks", "feedback", "gratitude", "community"],
-    emoji: "💛",
+    icon: "users",
     body: `Hi {{name}},
 
 Thank you for taking the time to send us your feedback. We read it, and it has been shared with the team that works on this area of RoleFlow.
@@ -202,7 +202,7 @@ We cannot promise every request will ship, but your input directly shapes what w
     category: "community",
     subject: "RoleFlow support hours over the holidays",
     tags: ["holiday", "support", "hours", "schedule"],
-    emoji: "🎄",
+    icon: "sparkle",
     body: `Hi {{name}},
 
 Our support team will have reduced hours from {{date}} through the holiday period. We will still respond to urgent security and account issues, and our self-serve help center is available at any time.
@@ -217,7 +217,7 @@ Responses to other messages may take longer than usual. Thank you for your patie
     category: "community",
     subject: "You are invited: a RoleFlow community event",
     tags: ["event", "community", "invite", "meetup"],
-    emoji: "🎟️",
+    icon: "card",
     body: `Hi {{name}},
 
 You are invited to a RoleFlow community event on {{date}}. We will share how power users approach their workflows, demonstrate new features, and hear your ideas for what comes next.
@@ -232,7 +232,7 @@ Attendance is free, and space is limited. Reply to reserve your place.`,
     category: "community",
     subject: "Halfway through the year: how is RoleFlow working for you?",
     tags: ["check-in", "mid-year", "feedback", "community"],
-    emoji: "🧭",
+    icon: "globe",
     body: `Hi {{name}},
 
 We are halfway through the year, and we wanted to check in. How is RoleFlow working for you? Has it saved you time, helped you think through hard problems, or gotten in your way?

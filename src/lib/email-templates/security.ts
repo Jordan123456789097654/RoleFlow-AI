@@ -8,7 +8,7 @@ export const SECURITY_TEMPLATES: EmailTemplate[] = [
     category: "security",
     subject: "Important: security incident affecting your RoleFlow account",
     tags: ["breach", "incident", "data", "critical", "notice"],
-    emoji: "🚨",
+    icon: "alert",
     body: `Hi {{name}},
 
 We are writing to tell you about a security incident that may have affected information associated with your RoleFlow account ({{email}}). We detected the incident on {{date}} and have contained it. Reference: {{incident_id}}.
@@ -29,7 +29,7 @@ What you should do: sign in, change your password, and review your recent activi
     category: "security",
     subject: "Security notice: read-only access to a backup store ({{incident_id}})",
     tags: ["backup", "read-only", "incident", "access"],
-    emoji: "🔒",
+    icon: "lock",
     body: `Hi {{name}},
 
 On {{date}}, we identified that a read-only credential for one of our backup stores was used outside its approved scope. Reference: {{incident_id}}.
@@ -46,7 +46,7 @@ No action is required from you at this time. If you have questions, reply to thi
     category: "security",
     subject: "Action required: reset your RoleFlow password",
     tags: ["password", "reset", "credentials", "required"],
-    emoji: "🔑",
+    icon: "key",
     body: `Hi {{name}},
 
 As a precaution, we have expired the password on your RoleFlow account ({{email}}). This is part of a routine security measure and is not a sign that your account has been misused.
@@ -63,7 +63,7 @@ If you did not expect this change, please contact us right away so we can review
     category: "security",
     subject: "We noticed an unusual sign-in to your RoleFlow account",
     tags: ["login", "suspicious", "ip", "unauthorized", "alert"],
-    emoji: "🛡️",
+    icon: "shield",
     body: `Hi {{name}},
 
 We noticed a sign-in to your RoleFlow account ({{email}}) on {{date}} from a location and network that do not match your usual activity. We temporarily limited sensitive actions on the account as a precaution.
@@ -84,7 +84,7 @@ Reference: {{incident_id}}. Our team can also review the sign-in history with yo
     category: "security",
     subject: "Your RoleFlow API key was revoked because it may be exposed",
     tags: ["api key", "exposed", "revoked", "rotation"],
-    emoji: "🗝️",
+    icon: "key",
     body: `Hi {{name}},
 
 We found one of your RoleFlow API keys in a public location, such as a public code repository or a shared log. To protect your account and your data, we revoked that key on {{date}}. Reference: {{incident_id}}.
@@ -106,7 +106,7 @@ If you believe you received this notice in error, please reply to this email.`,
     category: "security",
     subject: "Two-factor sign-in will be required for your account",
     tags: ["2fa", "mfa", "enforcement", "security", "policy"],
-    emoji: "📱",
+    icon: "mail",
     body: `Hi {{name}},
 
 Starting {{date}}, RoleFlow will require two-step verification for all accounts. This helps protect your conversations, memories and API keys from unauthorized sign-in, even if a password is leaked.
@@ -123,7 +123,7 @@ If you do not set up two-step verification before the deadline, you will be aske
     category: "security",
     subject: "Security advisory: vulnerability in a third-party component ({{incident_id}})",
     tags: ["zero-day", "vulnerability", "advisory", "disclosure", "patch"],
-    emoji: "🧩",
+    icon: "sparkle",
     body: `Hi {{name}},
 
 On {{date}}, a publicly disclosed vulnerability was identified in a third-party component used by parts of the RoleFlow platform. Reference: {{incident_id}}.
@@ -138,7 +138,7 @@ You do not need to take action. We will publish a full write-up once the upgrade
     category: "security",
     subject: "Warning: phishing emails pretending to be RoleFlow",
     tags: ["phishing", "scam", "warning", "advisory", "fraud"],
-    emoji: "🎣",
+    icon: "alert",
     body: `Hi {{name}},
 
 We have received reports of emails that pretend to come from RoleFlow. They ask you to "verify your account", "confirm a payment" or "restore access" through a link that does not go to roleflow.site.
@@ -155,7 +155,7 @@ Reference: {{incident_id}}.`,
     category: "security",
     subject: "We signed you out of all RoleFlow sessions",
     tags: ["session", "sign out", "invalidated", "security"],
-    emoji: "🚪",
+    icon: "wrench",
     body: `Hi {{name}},
 
 For your protection, we have ended all active RoleFlow sessions on your account ({{email}}). This happened on {{date}} after a security check, and it affects every browser and device where you were signed in.
@@ -172,7 +172,7 @@ If you did not expect this, please change your password once you sign in and let
     category: "security",
     subject: "Service in security lockdown while we mitigate an attack",
     tags: ["ddos", "lockdown", "attack", "availability", "security"],
-    emoji: "🧱",
+    icon: "wrench",
     body: `Hi {{name}},
 
 On {{date}}, RoleFlow experienced a large-scale denial-of-service attack. As a protective measure, we placed parts of the service into a temporary lockdown, which may have caused slow responses, sign-in delays or intermittent errors.
@@ -189,7 +189,7 @@ Your data was not accessed as part of this event. Reference: {{incident_id}}. Th
     category: "security",
     subject: "Updated password requirements for RoleFlow accounts",
     tags: ["password", "policy", "requirements", "update"],
-    emoji: "🔐",
+    icon: "lock",
     body: `Hi {{name}},
 
 Starting {{date}}, new RoleFlow passwords must be at least 12 characters long and must not appear in known data breach lists. Existing passwords will keep working until you next change them.
@@ -206,7 +206,7 @@ No action is needed right now. If you use RoleFlow with a password manager, it m
     category: "security",
     subject: "Thank you for reporting a security issue to RoleFlow",
     tags: ["bug bounty", "researcher", "thanks", "vulnerability", "responsible disclosure"],
-    emoji: "🙏",
+    icon: "users",
     body: `Hi {{name}},
 
 Thank you for reporting a potential security issue to RoleFlow. We have reviewed your report (reference {{incident_id}}) and confirmed the issue. Our engineering team has deployed a fix as of {{date}}.
@@ -221,7 +221,7 @@ Please keep the details confidential until we publish our write-up together.`,
     category: "security",
     subject: "Action required: rotate your RoleFlow API keys by {{date}}",
     tags: ["api key", "rotation", "deadline", "required"],
-    emoji: "🔄",
+    icon: "wrench",
     body: `Hi {{name}},
 
 As part of our key-hygiene program, API keys that were created before our 2026 security update must be rotated by {{date}}. After that date, older keys will stop working.
@@ -238,7 +238,7 @@ If you need help with the migration, reply to this email and our team will assis
     category: "security",
     subject: "New sign-in to your RoleFlow account",
     tags: ["new device", "sign-in", "alert", "verification"],
-    emoji: "💻",
+    icon: "wrench",
     body: `Hi {{name}},
 
 Your RoleFlow account ({{email}}) was signed in on a new device on {{date}}. If this was you, you can ignore this message.
@@ -253,7 +253,7 @@ If you do not recognize this sign-in, please sign out of all sessions and change
     category: "security",
     subject: "Security incident update ({{incident_id}})",
     tags: ["incident", "update", "status", "security"],
-    emoji: "📋",
+    icon: "document",
     body: `Hi {{name}},
 
 This is an update on security incident {{incident_id}}, which we first shared with you on {{date}}.

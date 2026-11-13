@@ -8,7 +8,7 @@ export const PRODUCT_TEMPLATES: EmailTemplate[] = [
     category: "product",
     subject: "Apex 1.0 is now generally available",
     tags: ["apex", "model", "launch", "general availability", "ga"],
-    emoji: "⚡",
+    icon: "bolt",
     body: `Hi {{name}},
 
 Apex 1.0 is now generally available on RoleFlow. Apex is our most capable model for complex reasoning, long-form writing, and multi-step analysis, and it is now available to every account in the model picker.
@@ -25,7 +25,7 @@ Try it on a question you have been saving for a rainy day, then compare it with 
     category: "product",
     subject: "Omni 1.0 brings multimodal reasoning to RoleFlow",
     tags: ["omni", "multimodal", "model", "release"],
-    emoji: "🌐",
+    icon: "globe",
     body: `Hi {{name}},
 
 Omni 1.0 is now available in RoleFlow. Omni is built for tasks that combine text with structured inputs and reasoning across different kinds of content, and it sits between Apex and Flash in our model lineup.
@@ -42,7 +42,7 @@ You can select Omni 1.0 in the model picker today.`,
     category: "product",
     subject: "Genesis 1.5 is here: faster, more accurate, and more consistent",
     tags: ["genesis", "update", "model", "upgrade"],
-    emoji: "🧬",
+    icon: "sparkle",
     body: `Hi {{name}},
 
 Genesis 1.5 is now live. This update improves accuracy on technical writing, reduces repeated phrasing in long answers, and makes responses more consistent when you ask follow-up questions.
@@ -59,7 +59,7 @@ Let us know how it performs for your work.`,
     category: "product",
     subject: "Flash 2.0: faster answers for quick questions",
     tags: ["flash", "speed", "inference", "model", "latency"],
-    emoji: "💨",
+    icon: "bolt",
     body: `Hi {{name}},
 
 Flash 2.0 is now available. Flash is our fastest model, designed for quick questions, rewrites, brainstorming and everyday tasks where a fast answer matters more than maximum depth.
@@ -76,7 +76,7 @@ Flash is available to all plans. Select it in the model picker to try it.`,
     category: "product",
     subject: "RoleFlow can now read .docx and .xlsx files",
     tags: ["office", "docx", "xlsx", "extraction", "documents"],
-    emoji: "📄",
+    icon: "document",
     body: `Hi {{name}},
 
 You can now attach Word (.docx) and Excel (.xlsx) files to your RoleFlow chats. RoleFlow reads the text, tables and sheet structure so you can ask questions, summarize, or request changes.
@@ -93,7 +93,7 @@ Your files are processed for your conversation and are handled under our Privacy
     category: "product",
     subject: "Answers with live web sources, now in RoleFlow",
     tags: ["search", "web", "grounding", "sources", "announcement"],
-    emoji: "🔎",
+    icon: "chart",
     body: `Hi {{name}},
 
 RoleFlow can now search the web when a question needs current information. When it uses search, it shows the sources it relied on, so you can check them yourself.
@@ -110,7 +110,7 @@ If a search cannot be completed, RoleFlow will say so instead of guessing.`,
     category: "product",
     subject: "Watch answers appear as they are written",
     tags: ["streaming", "sse", "realtime", "launch", "performance"],
-    emoji: "✨",
+    icon: "sparkle",
     body: `Hi {{name}},
 
 Responses in RoleFlow now stream in real time. Instead of waiting for a complete answer, you see text appear as the model writes it, and you can stop a response at any point.
@@ -127,7 +127,7 @@ Give it a try in your next chat.`,
     category: "product",
     subject: "Custom Instructions and Memory are now available",
     tags: ["custom instructions", "memory", "personalization", "feature"],
-    emoji: "🧠",
+    icon: "sparkle",
     body: `Hi {{name}},
 
 Custom Instructions and Memory are now live. Custom Instructions let you tell RoleFlow about your role, your preferences and how you like answers formatted. Memory lets RoleFlow remember useful details across chats when you want it to.
@@ -144,7 +144,7 @@ Find both settings in your account menu.`,
     category: "product",
     subject: "Developer API keys are here",
     tags: ["api", "keys", "developers", "launch", "platform"],
-    emoji: "🔑",
+    icon: "key",
     body: `Hi {{name}},
 
 You can now create RoleFlow API keys from your account to build with our models in your own applications. Each key has its own name, request limits and optional model restrictions, and you can revoke a key at any time.
@@ -161,7 +161,7 @@ Your first key takes less than a minute to create.`,
     category: "product",
     subject: "Organize your work with Projects",
     tags: ["projects", "organization", "feature", "launch"],
-    emoji: "🗂️",
+    icon: "document",
     body: `Hi {{name}},
 
 Projects are now available in RoleFlow. Group related chats together, add project instructions that apply to every chat inside, and keep your work in one place.
@@ -178,7 +178,7 @@ Create your first project from the sidebar.`,
     category: "product",
     subject: "Share a RoleFlow conversation with a link",
     tags: ["share", "links", "feature", "collaboration"],
-    emoji: "🔗",
+    icon: "globe",
     body: `Hi {{name}},
 
 You can now share a RoleFlow conversation with a link. Anyone with the link can read the conversation, but they cannot change it or see your other chats.
@@ -193,7 +193,7 @@ You choose when to share and can stop sharing at any time from the share menu. P
     category: "product",
     subject: "Choose the right model and effort for each task",
     tags: ["model selector", "effort", "settings", "feature"],
-    emoji: "🎚️",
+    icon: "wrench",
     body: `Hi {{name}},
 
 The RoleFlow model picker now includes effort levels. Higher effort gives the model more room to reason before it answers, which helps with difficult questions. Lower effort returns answers faster.
@@ -208,7 +208,7 @@ Quick guide: use Flash for quick tasks, Omni for balanced work, Genesis for tech
     category: "product",
     subject: "Attach PDFs and text documents to your chats",
     tags: ["pdf", "attachments", "documents", "feature"],
-    emoji: "📎",
+    icon: "document",
     body: `Hi {{name}},
 
 You can now attach PDF files and plain text documents to your RoleFlow chats. RoleFlow extracts the text and uses it to answer your questions, summarize sections, or compare documents.
@@ -223,7 +223,7 @@ For scanned PDFs without a text layer, results may be limited. Keep files under 
     category: "product",
     subject: "An update on image uploads in RoleFlow",
     tags: ["images", "roadmap", "update", "uploads"],
-    emoji: "🗺️",
+    icon: "globe",
     body: `Hi {{name}},
 
 Many of you have asked about image uploads. We are not yet ready to turn them on for all accounts. We are working on the safety, storage and moderation work needed to offer them responsibly.
@@ -238,7 +238,7 @@ Thank you for your patience and feedback.`,
     category: "product",
     subject: "A faster RoleFlow web app with a refreshed layout",
     tags: ["web", "layout", "performance", "design", "release"],
-    emoji: "🖥️",
+    icon: "wrench",
     body: `Hi {{name}},
 
 The RoleFlow web app has been refreshed. Pages load faster, the sidebar is easier to navigate on small screens, and message controls are clearer.

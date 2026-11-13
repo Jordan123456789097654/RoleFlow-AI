@@ -9,7 +9,7 @@ export const maxDuration = 300;
 /**
  * Admin only. Sends one composed email.
  *
- * Body: { mode: "broadcast" | "single" | "test", subject, body, to?, emoji?, templateId?, ctaText?, ctaUrl?,
+ * Body: { mode: "broadcast" | "single" | "test", subject, body, to?, icon?, templateId?, ctaText?, ctaUrl?,
  *         date?, incidentId?, actionUrl?, recipientName?, confirmPhrase? }
  * - test:      sends one copy to ADMIN_EMAIL
  * - single:    sends to any address in `to`, registered or not

@@ -1,14 +1,14 @@
 "use client";
 
 import React, { useEffect, useMemo, useRef, useState } from "react";
-import { AlertTriangle, Eye, History, Mail, Pencil, RefreshCw, Search, Send, Sparkles, Wand2, X } from "lucide-react";
+import { AlertTriangle, Eye, History, Mail, Pencil, Plus, RefreshCw, Search, Send, Sparkles, Trash2, Wand2, X } from "lucide-react";
+import { EMAIL_ICONS, emailIconUrl, isEmailIcon } from "@/lib/email-icons";
 import {
   EMAIL_TEMPLATES,
   EMAIL_TEMPLATE_CATEGORIES,
   EmailTemplate,
   EmailTemplateCategoryId,
   getCategoryLabel,
-  searchEmailTemplates,
 } from "@/lib/email-templates";
 import {
   DEFAULT_APP_URL,
@@ -34,7 +34,7 @@ type Audience = "broadcast" | "single" | "test";
 interface ComposerState {
   subject: string;
   body: string;
-  emoji: string;
+  icon: string;
   templateId: string | null;
   ctaText: string;
   ctaUrl: string;
@@ -47,7 +47,7 @@ interface ComposerState {
 const EMPTY_FORM: ComposerState = {
   subject: "",
   body: "",
-  emoji: "",
+  icon: "",
   templateId: null,
   ctaText: "",
   ctaUrl: "",
@@ -57,12 +57,28 @@ const EMPTY_FORM: ComposerState = {
   recipientName: "",
 };
 
+/** Maps a saved template row from the API into the library shape. Ids are prefixed "custom-". */
+function toLibraryTemplate(t: any): EmailTemplate {
+  return {
+    id: `custom-${String(t.id).replace(/^custom-/, "")}`,
+    title: t.title,
+    category: "custom",
+    subject: t.subject,
+    tags: ["custom"],
+    icon: t.icon,
+    body: t.body,
+    ctaText: t.ctaText,
+    ctaUrl: t.ctaUrl,
+    custom: true,
+  };
+}
+
 function fromTemplate(t: EmailTemplate): ComposerState {
   return {
     ...EMPTY_FORM,
     subject: t.subject,
     body: t.body,
-    emoji: t.emoji,
+    icon: t.icon,
     templateId: t.id,
     ctaText: t.ctaText || "",
     ctaUrl: t.ctaUrl || "",
@@ -108,13 +124,78 @@ export default function AdminEmailsPanel() {
 
   const composerRef = useRef<HTMLDivElement | null>(null);
 
-  const filteredTemplates = useMemo(() => searchEmailTemplates(query, category), [query, category]);
+  const [customTemplates, setCustomTemplates] = useState<EmailTemplate[]>([]);
+
+  useEffect(() => {
+    let cancelled = false;
+    fetch("/api/admin/emails/templates")
+      .then((res) => res.json())
+      .then((data) => {
+        if (cancelled || !Array.isArray(data?.templates)) return;
+        setCustomTemplates(data.templates.map(toLibraryTemplate));
+      })
+      .catch(() => {});
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  const libraryTemplates = useMemo(() => [...customTemplates, ...EMAIL_TEMPLATES], [customTemplates]);
+
+  const filteredTemplates = useMemo(() => {
+    const words = query.toLowerCase().split(/\s+/).filter(Boolean);
+    return libraryTemplates.filter((t) => {
+      if (category !== "all" && t.category !== category) return false;
+      if (words.length === 0) return true;
+      const haystack = `${t.title} ${t.subject} ${t.tags.join(" ")} ${t.body}`.toLowerCase();
+      return words.every((w) => haystack.includes(w));
+    });
+  }, [query, category, libraryTemplates]);
+
+  async function saveAsTemplate() {
+    const title = window.prompt("Name this template", form.subject.slice(0, 60))?.trim();
+    if (!title) return;
+    setNotice(null);
+    try {
+      const res = await fetch("/api/admin/emails/templates", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          title,
+          subject: form.subject,
+          body: form.body,
+          icon: form.icon || "sparkle",
+          ctaText: form.ctaText,
+          ctaUrl: form.ctaUrl,
+        }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data?.error || "Could not save the template.");
+      setCustomTemplates((prev) => [toLibraryTemplate(data.template), ...prev]);
+      setNotice({ tone: "ok", text: `Saved "${title}" to your templates.` });
+    } catch (error: any) {
+      setNotice({ tone: "error", text: error?.message || "Could not save the template." });
+    }
+  }
+
+  async function deleteTemplate(t: EmailTemplate) {
+    if (!window.confirm(`Delete the template "${t.title}"? This cannot be undone.`)) return;
+    const id = t.id.slice("custom-".length);
+    try {
+      const res = await fetch(`/api/admin/emails/templates?id=${encodeURIComponent(id)}`, { method: "DELETE" });
+      const data = await res.json();
+      if (!res.ok || !data.success) throw new Error(data?.error || "Could not delete the template.");
+      setCustomTemplates((prev) => prev.filter((x) => x.id !== t.id));
+    } catch (error: any) {
+      setNotice({ tone: "error", text: error?.message || "Could not delete the template." });
+    }
+  }
 
   const categoryCounts = useMemo(() => {
-    const counts: Record<string, number> = { all: EMAIL_TEMPLATES.length };
-    for (const t of EMAIL_TEMPLATES) counts[t.category] = (counts[t.category] || 0) + 1;
+    const counts: Record<string, number> = { all: libraryTemplates.length };
+    for (const t of libraryTemplates) counts[t.category] = (counts[t.category] || 0) + 1;
     return counts;
-  }, []);
+  }, [libraryTemplates]);
 
   // Live preview: placeholders resolve to sample values, or to what the admin typed in the fields.
   const previewHtml = useMemo(() => {
@@ -132,7 +213,7 @@ export default function AdminEmailsPanel() {
     const ctaUrl = renderPlaceholders(form.ctaUrl.trim(), values);
     return wrapEmailInBrandedTemplate({
       title: subject,
-      emoji: form.emoji.trim() || undefined,
+      icon: form.icon || undefined,
       body,
       ctaText: ctaText && ctaUrl ? ctaText : undefined,
       ctaUrl: ctaText && ctaUrl ? ctaUrl : undefined,
@@ -184,7 +265,7 @@ export default function AdminEmailsPanel() {
           to,
           subject: form.subject,
           body: form.body,
-          emoji: form.emoji.trim() || undefined,
+          icon: form.icon || undefined,
           templateId: form.templateId,
           ctaText: form.ctaText.trim() || undefined,
           ctaUrl: form.ctaUrl.trim() || undefined,
@@ -249,7 +330,7 @@ export default function AdminEmailsPanel() {
         setAiError(data.error || "Generation failed.");
         return;
       }
-      update({ subject: data.subject, body: data.body, emoji: data.emoji || form.emoji, templateId: null });
+      update({ subject: data.subject, body: data.body, icon: data.icon || form.icon, templateId: null });
       setAiOpen(false);
       setAiPrompt("");
       setView("compose");
@@ -287,7 +368,7 @@ export default function AdminEmailsPanel() {
             />
           </div>
           <span className="text-xs tabular-nums text-muted">
-            {filteredTemplates.length} of {EMAIL_TEMPLATES.length} templates
+            {filteredTemplates.length} of {libraryTemplates.length} templates
           </span>
         </div>
 
@@ -318,7 +399,7 @@ export default function AdminEmailsPanel() {
           {filteredTemplates.map((t) => (
             <article key={t.id} className="flex flex-col rounded-xl border border-line bg-app p-3.5">
               <div className="flex items-start gap-2.5">
-                <span className="text-xl leading-none" aria-hidden="true">{t.emoji}</span>
+                <img src={emailIconUrl(t.icon)} width={28} height={28} alt="" className="h-7 w-7 shrink-0" />
                 <div className="min-w-0">
                   <h3 className="truncate text-sm font-medium text-ink">{t.title}</h3>
                   <p className="text-[11px] uppercase tracking-wide text-muted">{getCategoryLabel(t.category)}</p>
@@ -330,6 +411,17 @@ export default function AdminEmailsPanel() {
                   <Pencil className="h-3.5 w-3.5" />
                   <span>Load into editor</span>
                 </button>
+                {t.custom && (
+                  <button
+                    type="button"
+                    onClick={() => deleteTemplate(t)}
+                    className={`${secondaryButtonClass} ml-2 text-red-600 dark:text-red-400`}
+                    aria-label={`Delete template ${t.title}`}
+                  >
+                    <Trash2 className="h-3.5 w-3.5" />
+                    <span>Delete</span>
+                  </button>
+                )}
               </div>
             </article>
           ))}
@@ -358,7 +450,7 @@ export default function AdminEmailsPanel() {
           </div>
           <button type="button" onClick={() => setAiOpen(true)} className={primaryButtonClass}>
             <Wand2 className="h-4 w-4" />
-            <span>🪄 Generate with AI</span>
+            <span>Generate with AI</span>
           </button>
         </div>
 
@@ -387,10 +479,26 @@ export default function AdminEmailsPanel() {
                   maxLength={20000}
                 />
               </div>
+              <div className="flex justify-end">
+                <button type="button" onClick={saveAsTemplate} disabled={!form.subject.trim() || !form.body.trim()} className={secondaryButtonClass}>
+                  <Plus className="h-3.5 w-3.5" />
+                  Save as template
+                </button>
+              </div>
               <div className="grid gap-3 sm:grid-cols-2">
                 <div>
-                  <label className={labelClass} htmlFor="em-emoji">Header emoji</label>
-                  <input id="em-emoji" className={inputClass} value={form.emoji} onChange={(e) => update({ emoji: e.target.value })} placeholder="🚨" maxLength={8} />
+                  <label className={labelClass} htmlFor="em-icon">Header icon</label>
+                  <div className="flex items-center gap-2.5">
+                    <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-accent-soft">
+                      {isEmailIcon(form.icon) ? <img src={emailIconUrl(form.icon)} width={22} height={22} alt="" className="h-[22px] w-[22px]" /> : null}
+                    </span>
+                    <select id="em-icon" className={inputClass} value={form.icon} onChange={(e) => update({ icon: e.target.value })}>
+                      <option value="">Default (sparkle)</option>
+                      {EMAIL_ICONS.map((i) => (
+                        <option key={i.id} value={i.id}>{i.label}</option>
+                      ))}
+                    </select>
+                  </div>
                 </div>
                 <div>
                   <label className={labelClass} htmlFor="em-date">{"{{date}}"} value</label>
