@@ -5,7 +5,7 @@ import { groqChatCompletion, ModelMessage } from "@/lib/ai-engine";
 export const dynamic = "force-dynamic";
 export const maxDuration = 60;
 
-const AI_EMAIL_MODEL = "llama-3.3-70b-versatile";
+const AI_EMAIL_MODEL = "openai/gpt-oss-120b";
 const EMAIL_TONES = [
   "Urgent & Serious",
   "Official & Legal",
