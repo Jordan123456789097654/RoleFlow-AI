@@ -26,11 +26,12 @@ import { UserProfile, SystemConfig, ModerationLogEntry, IncidentContext, Inciden
 import AdminEmailsPanel from "@/components/AdminEmailsPanel";
 import AdminLicenseKeysPanel from "@/components/AdminLicenseKeysPanel";
 import AdminLawRequestsPanel from "@/components/AdminLawRequestsPanel";
-import { Scale, Ticket } from "lucide-react";
+import { Scale, Ticket, BookOpen } from "lucide-react";
+import AdminHandbookPanel from "@/components/AdminHandbookPanel";
 import ReferralModal from "@/components/ReferralModal";
 import AdminChatsPanel from "@/components/AdminChatsPanel";
 
-type AdminTab = "attention" | "config" | "users" | "chats" | "moderation" | "emails" | "licenses" | "law";
+type AdminTab = "attention" | "config" | "users" | "chats" | "moderation" | "emails" | "licenses" | "law" | "handbook";
 
 const focusRing = "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/40";
 
@@ -53,6 +54,7 @@ const NAV: { id: AdminTab; label: string; icon: React.ReactNode }[] = [
   { id: "emails", label: "Emails", icon: <Mail className="h-4 w-4" /> },
   { id: "licenses", label: "License keys", icon: <Ticket className="h-4 w-4" /> },
   { id: "law", label: "Law enforcement", icon: <Scale className="h-4 w-4" /> },
+  { id: "handbook", label: "Handbook", icon: <BookOpen className="h-4 w-4" /> },
 ];
 
 /** Small status pill. Palette colors are reserved for status like this. */
@@ -1155,6 +1157,7 @@ export default function AdminPage() {
           {activeTab === "emails" && <AdminEmailsPanel />}
           {activeTab === "licenses" && <AdminLicenseKeysPanel />}
           {activeTab === "law" && <AdminLawRequestsPanel />}
+          {activeTab === "handbook" && <AdminHandbookPanel />}
 
           {/* MODERATION */}
           {referralLog && (
