@@ -248,3 +248,20 @@ export interface GeneratedFile {
   size: number;
   dataUrl: string;
 }
+
+export type EmailTargetType = "broadcast" | "single" | "test";
+
+/** One row of the admin email send history (table roleflow_email_broadcasts). */
+export interface EmailBroadcastLog {
+  id: string;
+  adminEmail: string;
+  targetType: EmailTargetType;
+  targetEmail: string | null;
+  subject: string;
+  templateId: string | null;
+  totalRecipients: number;
+  deliveredCount: number;
+  failedCount: number;
+  status: "completed" | "partial" | "failed";
+  createdAt: string;
+}

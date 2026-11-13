@@ -24,10 +24,12 @@ import {
   Lock,
   Clock,
   Sparkles,
+  Mail,
 } from "lucide-react";
 import { UserProfile, SystemConfig, ModerationLogEntry, IncidentContext, IncidentTurn } from "@/types";
+import AdminEmailsPanel from "@/components/AdminEmailsPanel";
 
-type AdminTab = "telemetry" | "config" | "users" | "moderation";
+type AdminTab = "telemetry" | "config" | "users" | "moderation" | "emails";
 
 const focusRing = "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/40";
 
@@ -46,6 +48,7 @@ const NAV: { id: AdminTab; label: string; icon: React.ReactNode }[] = [
   { id: "config", label: "System settings", icon: <Sliders className="h-4 w-4" /> },
   { id: "users", label: "Users", icon: <Users className="h-4 w-4" /> },
   { id: "moderation", label: "Moderation", icon: <AlertTriangle className="h-4 w-4" /> },
+  { id: "emails", label: "Emails", icon: <Mail className="h-4 w-4" /> },
 ];
 
 /** Small status pill. Palette colors are reserved for status like this. */
@@ -1027,6 +1030,9 @@ export default function AdminPage() {
               </div>
             </div>
           )}
+
+          {/* EMAILS */}
+          {activeTab === "emails" && <AdminEmailsPanel />}
 
           {/* MODERATION */}
           {activeTab === "moderation" && (

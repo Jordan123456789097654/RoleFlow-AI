@@ -2,7 +2,7 @@ import fs from "fs";
 import path from "path";
 import os from "os";
 import { sql } from "@vercel/postgres";
-import { Chat, Project, UserProfile, ModerationLogEntry, ModerationStatus, SystemConfig, MemoryItem, ApiKey, ModelId } from "@/types";
+import { Chat, Project, UserProfile, ModerationLogEntry, ModerationStatus, SystemConfig, MemoryItem, ApiKey, ModelId, EmailBroadcastLog } from "@/types";
 import { MODEL_IDS, resolveModelList } from "@/lib/models";
 
 const DATA_DIR = process.env.VERCEL ? path.join(os.tmpdir(), "roleflow-data") : path.join(process.cwd(), ".data");
@@ -37,6 +37,7 @@ interface LocalStore {
   memories?: Record<string, MemoryItem[]>;
   systemConfig?: SystemConfig;
   apiKeys?: Record<string, ApiKey>;
+  emailBroadcasts?: EmailBroadcastLog[];
 }
 
 export function getTodayDateString(): string {
@@ -280,6 +281,22 @@ async function ensureDb() {
         daily_count INTEGER DEFAULT 0,
         daily_date VARCHAR(20),
         allowed_models TEXT,
+        created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+      );
+    `;
+
+    await sql`
+      CREATE TABLE IF NOT EXISTS roleflow_email_broadcasts (
+        id VARCHAR(255) PRIMARY KEY,
+        admin_email VARCHAR(255) NOT NULL,
+        target_type VARCHAR(20) NOT NULL,
+        target_email TEXT,
+        subject TEXT NOT NULL,
+        template_id VARCHAR(120),
+        total_recipients INTEGER NOT NULL DEFAULT 0,
+        delivered_count INTEGER NOT NULL DEFAULT 0,
+        failed_count INTEGER NOT NULL DEFAULT 0,
+        status VARCHAR(20) NOT NULL,
         created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
       );
     `;
@@ -1274,6 +1291,70 @@ export const db = {
     saveLocalStore(store);
 
     return updated;
+  },
+
+  // ───────────────────────────────────────────────────────────────────────────
+  // Admin email broadcasts
+  // ───────────────────────────────────────────────────────────────────────────
+  async saveBroadcastLog(
+    entry: Omit<EmailBroadcastLog, "id" | "createdAt"> & { id?: string; createdAt?: string }
+  ): Promise<EmailBroadcastLog> {
+    await ensureDb();
+    const record: EmailBroadcastLog = {
+      id: entry.id || `bc_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 10)}`,
+      adminEmail: entry.adminEmail,
+      targetType: entry.targetType,
+      targetEmail: entry.targetEmail ?? null,
+      subject: entry.subject,
+      templateId: entry.templateId ?? null,
+      totalRecipients: entry.totalRecipients,
+      deliveredCount: entry.deliveredCount,
+      failedCount: entry.failedCount,
+      status: entry.status,
+      createdAt: entry.createdAt || new Date().toISOString(),
+    };
+
+    if (isPostgresConfigured) {
+      try {
+        await sql`
+          INSERT INTO roleflow_email_broadcasts
+            (id, admin_email, target_type, target_email, subject, template_id, total_recipients, delivered_count, failed_count, status, created_at)
+          VALUES
+            (${record.id}, ${record.adminEmail}, ${record.targetType}, ${record.targetEmail}, ${record.subject}, ${record.templateId}, ${record.totalRecipients}, ${record.deliveredCount}, ${record.failedCount}, ${record.status}, ${record.createdAt});
+        `;
+      } catch (e) {
+        console.error("Postgres save broadcast log error:", e);
+      }
+    } else {
+      const store = getLocalStore();
+      store.emailBroadcasts = [record, ...(store.emailBroadcasts || [])].slice(0, 500);
+      saveLocalStore(store);
+    }
+    return record;
+  },
+
+  async getBroadcastHistory(limit = 100): Promise<EmailBroadcastLog[]> {
+    await ensureDb();
+    const max = Math.min(Math.max(1, Math.floor(limit)), 500);
+
+    if (isPostgresConfigured) {
+      try {
+        const { rows } = await sql`
+          SELECT id, admin_email as "adminEmail", target_type as "targetType", target_email as "targetEmail", subject,
+                 template_id as "templateId", total_recipients as "totalRecipients", delivered_count as "deliveredCount",
+                 failed_count as "failedCount", status, created_at as "createdAt"
+          FROM roleflow_email_broadcasts
+          ORDER BY created_at DESC
+          LIMIT ${max};
+        `;
+        return rows as unknown as EmailBroadcastLog[];
+      } catch (e) {
+        console.error("Postgres get broadcast history error:", e);
+        return [];
+      }
+    }
+
+    return (getLocalStore().emailBroadcasts || []).slice(0, max);
   },
 
   // ───────────────────────────────────────────────────────────────────────────
