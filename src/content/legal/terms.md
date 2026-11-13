@@ -1,7 +1,7 @@
 # Terms of Service
 
-**Effective date:** November 12, 2026
-**Last updated:** November 12, 2026
+**Effective date:** November 13, 2026
+**Last updated:** November 13, 2026
 
 Please read these Terms of Service ("Terms") carefully. They form a binding agreement between you and RoleFlow, Inc. ("RoleFlow," "we," "us," or "our") governing your access to and use of the RoleFlow website at roleflow.site, the RoleFlow chat application, the artifacts and live previews, the application programming interface ("API"), and any related software, documentation, or services (together, the "Services").
 

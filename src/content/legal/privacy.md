@@ -1,7 +1,7 @@
 # Privacy Policy
 
-**Effective date:** November 12, 2026
-**Last updated:** November 12, 2026
+**Effective date:** November 13, 2026
+**Last updated:** November 13, 2026
 
 This Privacy Policy explains how RoleFlow, Inc. ("RoleFlow," "we," "us," or "our") collects, uses, discloses, retains, and protects personal information when you use the RoleFlow website at roleflow.site, the chat application, artifacts and live previews, the API, and related services (the "Services"). It also explains the choices and rights you have.
 
@@ -93,6 +93,7 @@ We share personal information only in the following circumstances:
 
 - **Service providers.** Vendors that host our application and database, deliver email, provide model inference, store logs, and provide security services. They may process information only on our instructions and under confidentiality and data protection obligations. Current categories include cloud hosting, managed Postgres, transactional email, and language model inference providers. Our core infrastructure partners include Vercel (cloud hosting), Neon (PostgreSQL database), Resend (transactional email), and dedicated neural network inference clusters.
 - **Model providers.** When you send a prompt, the relevant text, attachments, and images are transmitted to the model provider that runs the model you selected or that the Services use to answer. Those providers process data under their own terms and are restricted by contract from using your data for purposes beyond providing the service. Model inference providers process data under zero-retention or operational-only terms and do not use your inputs to train foundational models.
+- **Web search providers.** When web search is turned on for a reply, the search query (the words used to look things up, not your whole conversation) is sent to the search provider the Services use. That provider receives the query and the network information that comes with any request.
 - **Other users you share with.** Share links make the shared conversation visible to anyone who has the link.
 - **Law enforcement and legal process.** When required by law, valid legal process, or a good-faith belief that disclosure is necessary to prevent imminent death or serious bodily injury. We report apparent child sexual abuse material to the National Center for Missing and Exploited Children as required by 18 U.S.C. § 2258A.
 - **Protection of rights and safety.** To enforce our terms, investigate abuse, and protect users, the public, and our systems.

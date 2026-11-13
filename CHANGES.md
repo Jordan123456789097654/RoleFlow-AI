@@ -47,3 +47,9 @@ Cooldown state lives in server memory, so each serverless instance tracks its ow
 - The token check is shared by both health routes (`src/lib/health-auth.ts`).
 - Maintenance mode pauses every monitor listed in `BETTERSTACK_MODEL_MONITOR_IDS`, so planned
   downtime does not page anyone.
+
+## v5: motion, footer, prompt rules, legal updates
+- **Motion system** (`globals.css`): scroll-reveal for homepage sections (CSS scroll-driven, content stays visible where unsupported), animated hero preview, button lift and press, card hover, nav underline, live status dot, admin panel fade on tab change. All motion is disabled under `prefers-reduced-motion`.
+- **Footer rebuilt**: CTA band, grouped link columns, the Law enforcement link is now its own item (it was nested inside Moderation), status pill, back-to-top.
+- **Prompt quality**: conversation-reference resolution, consistent names across turns, root-cause-first bug fixes with complete files, and a final requirements check.
+- **Legal**: dates set to November 13, 2026; privacy policy now discloses web search query sharing. Needs legal review before publishing.

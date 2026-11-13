@@ -675,7 +675,7 @@ export default function AdminPage() {
           })}
         </nav>
 
-        <main className="min-w-0 flex-1 px-4 py-6 sm:px-6 md:py-8">
+        <main key={activeTab} className="rf-panel-enter min-w-0 flex-1 px-4 py-6 sm:px-6 md:py-8">
           {/* NEEDS ATTENTION */}
           {activeTab === "attention" && (
             <div className="space-y-8">

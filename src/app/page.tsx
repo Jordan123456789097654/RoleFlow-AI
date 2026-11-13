@@ -124,7 +124,7 @@ export default function MarketingLandingPage() {
   };
 
   return (
-    <div className="flex min-h-screen flex-col bg-app text-ink">
+    <div id="top" className="flex min-h-screen flex-col bg-app text-ink">
       {/* Navigation */}
       <header className="sticky top-0 z-50 w-full border-b border-line/70 bg-app/90 backdrop-blur-md">
         <div className="mx-auto flex h-16 max-w-6xl items-center justify-between gap-4 px-4 sm:px-6 lg:px-8">
@@ -133,13 +133,13 @@ export default function MarketingLandingPage() {
           </Link>
 
           <nav className="hidden items-center gap-1 md:flex">
-            <a href="#features" className="inline-flex min-h-10 items-center rounded-lg px-3 text-sm text-muted transition-colors hover:text-ink">
+            <a href="#features" className="rf-link inline-flex min-h-10 items-center rounded-lg px-3 text-sm text-muted transition-colors hover:text-ink">
               Features
             </a>
-            <a href="#models" className="inline-flex min-h-10 items-center rounded-lg px-3 text-sm text-muted transition-colors hover:text-ink">
+            <a href="#models" className="rf-link inline-flex min-h-10 items-center rounded-lg px-3 text-sm text-muted transition-colors hover:text-ink">
               Models
             </a>
-            <a href="#faq" className="inline-flex min-h-10 items-center rounded-lg px-3 text-sm text-muted transition-colors hover:text-ink">
+            <a href="#faq" className="rf-link inline-flex min-h-10 items-center rounded-lg px-3 text-sm text-muted transition-colors hover:text-ink">
               FAQ
             </a>
           </nav>
@@ -181,7 +181,7 @@ export default function MarketingLandingPage() {
               <span>RoleFlow Apex 1.0, Omni 1.0, Genesis 1.5, and Flash 2.0</span>
             </div>
 
-            <h1 className="font-display text-[44px] font-normal leading-[1.02] tracking-[-0.025em] text-ink sm:text-6xl lg:text-[76px]">
+            <h1 className="rf-rise font-display text-[44px] font-normal leading-[1.02] tracking-[-0.025em] text-ink sm:text-6xl lg:text-[76px]">
               An assistant for thinking, writing, and building
             </h1>
 
@@ -194,14 +194,14 @@ export default function MarketingLandingPage() {
             <div className="mt-10 flex flex-col items-start justify-start gap-3 sm:flex-row">
               <Link
                 href="/chat"
-                className="inline-flex min-h-12 w-full items-center justify-center gap-2 rounded-md bg-accent px-7 text-base font-semibold text-on-accent transition-colors hover:bg-accent-hover sm:w-auto"
+                className="rf-btn rf-btn-primary inline-flex min-h-12 w-full items-center justify-center gap-2 rounded-md bg-accent px-7 text-base font-semibold text-on-accent transition-colors hover:bg-accent-hover sm:w-auto"
               >
                 <span>Start chatting</span>
                 <ArrowRight className="h-4 w-4" />
               </Link>
               <a
                 href="#features"
-                className="inline-flex min-h-12 w-full items-center justify-center rounded-lg border border-line bg-card px-6 text-base font-medium text-ink transition-colors hover:bg-hover sm:w-auto"
+                className="rf-btn inline-flex min-h-12 w-full items-center justify-center rounded-lg border border-line bg-card px-6 text-base font-medium text-ink transition-colors hover:bg-hover sm:w-auto"
               >
                 See what it does
               </a>
@@ -209,7 +209,7 @@ export default function MarketingLandingPage() {
           </div>
 
           {/* Static product preview */}
-          <div className="mt-16 max-w-2xl rounded-xl border border-line bg-card p-5 text-left shadow-composer sm:p-6">
+          <div className="rf-hero-preview mx-auto mt-16 max-w-3xl rounded-xl border border-line bg-card p-5 text-left shadow-composer sm:p-6">
             <div className="flex justify-end">
               <div className="max-w-[85%] rounded-2xl bg-hover px-4 py-2.5 text-sm text-ink">
                 Make a one-page countdown timer I can share with my team.
@@ -236,7 +236,7 @@ export default function MarketingLandingPage() {
         </section>
 
         {/* Features */}
-        <section id="status" className="border-t border-line/70 px-4 py-14 sm:px-6 lg:py-16">
+        <section id="status" className="rf-reveal border-t border-line/70 px-4 py-14 sm:px-6 lg:py-16">
           <div className="mx-auto max-w-5xl">
             <h2 className="mb-4 text-center font-display text-3xl font-normal tracking-tight text-ink sm:text-4xl">
               System status
@@ -248,7 +248,7 @@ export default function MarketingLandingPage() {
           </div>
         </section>
 
-        <section id="features" className="border-t border-line/70 px-4 py-20 sm:px-6 lg:py-28">
+        <section id="features" className="rf-reveal border-t border-line/70 px-4 py-20 sm:px-6 lg:py-28">
           <div className="mx-auto max-w-6xl">
             <div className="mx-auto mb-14 max-w-2xl text-center">
               <h2 className="font-display text-3xl font-normal tracking-tight text-ink sm:text-4xl">
@@ -324,7 +324,7 @@ export default function MarketingLandingPage() {
         </section>
 
         {/* Models */}
-        <section id="models" className="border-t border-line/70 bg-panel px-4 py-20 sm:px-6 lg:py-28">
+        <section id="models" className="rf-reveal border-t border-line/70 bg-panel px-4 py-20 sm:px-6 lg:py-28">
           <div className="mx-auto max-w-6xl">
             <div className="mx-auto mb-14 max-w-2xl text-center">
               <h2 className="font-display text-3xl font-normal tracking-tight text-ink sm:text-4xl">
@@ -480,7 +480,7 @@ export default function MarketingLandingPage() {
         </section>
 
         {/* How it works */}
-        <section className="border-t border-line/70 px-4 py-20 sm:px-6 lg:py-28">
+        <section className="rf-reveal border-t border-line/70 px-4 py-20 sm:px-6 lg:py-28">
           <div className="mx-auto max-w-5xl">
             <h2 className="mb-14 text-center font-display text-3xl font-normal tracking-tight text-ink sm:text-4xl">
               How it works
@@ -498,7 +498,7 @@ export default function MarketingLandingPage() {
         </section>
 
         {/* FAQ */}
-        <section id="faq" className="border-t border-line/70 bg-panel px-4 py-20 sm:px-6 lg:py-28">
+        <section id="faq" className="rf-reveal border-t border-line/70 bg-panel px-4 py-20 sm:px-6 lg:py-28">
           <div className="mx-auto max-w-3xl">
             <h2 className="mb-12 text-center font-display text-3xl font-normal tracking-tight text-ink sm:text-4xl">
               Frequently asked questions
@@ -531,7 +531,7 @@ export default function MarketingLandingPage() {
         </section>
 
         {/* Closing CTA */}
-        <section className="border-t border-line/70 px-4 py-20 text-center sm:px-6 lg:py-24">
+        <section className="rf-reveal border-t border-line/70 px-4 py-20 text-center sm:px-6 lg:py-24">
           <div className="mx-auto max-w-2xl">
             <h2 className="font-display text-3xl font-normal tracking-tight text-ink sm:text-4xl">
               Start with a question

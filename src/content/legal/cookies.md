@@ -1,6 +1,6 @@
 # Cookie Policy
 
-**Effective date:** November 12, 2026
+**Effective date:** November 13, 2026
 
 This Cookie Policy describes how RoleFlow uses cookies and similar technologies on roleflow.site and in the chat application. Our Privacy Policy describes how we process personal information more generally.
 

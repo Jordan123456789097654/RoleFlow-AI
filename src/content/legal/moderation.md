@@ -1,7 +1,7 @@
 # Moderation and Appeals Policy
 
-**Effective date:** November 12, 2026
-**Last updated:** November 12, 2026
+**Effective date:** November 13, 2026
+**Last updated:** November 13, 2026
 
 This policy explains how RoleFlow reviews content, what happens when a request or upload is flagged, how enforcement decisions are made, and how you can appeal. It applies to prompts, messages, text attachments, images, custom instructions, project content, shared conversations, and API requests.
 

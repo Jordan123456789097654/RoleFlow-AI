@@ -1,6 +1,6 @@
 # AI Output and Content Policy
 
-**Effective date:** November 12, 2026
+**Effective date:** November 13, 2026
 
 This policy explains how RoleFlow's AI-generated output works, what you should and should not rely on it for, and how we handle content and feedback. It supplements the Terms of Service.
 
