@@ -277,3 +277,16 @@ export function notifyUser(email: string | undefined | null, notice: Notice): vo
   if (!email || email === "guest" || !email.includes("@")) return;
   void sendNotice(email, notice);
 }
+
+/** Sent to a user when their account activity is referred to authorities (unless held). */
+export function legalReferralNotice(opts: { reference: string; when: string }): Notice {
+  return {
+    subject: "Notice regarding activity on your RoleFlow account",
+    heading: "Your account activity has been referred to authorities",
+    paragraphs: [
+      `On ${opts.when}, RoleFlow referred certain activity on your account to local law enforcement. Reference: ${opts.reference}.`,
+      "The referral followed a review by our Trust and Safety team of content that violated our Acceptable Use Policy and may present a risk of harm. It is not a finding of criminal liability, and no conclusion has been reached about your conduct.",
+      "If you believe this was made in error, reply to this email or contact support@roleflow.site. Our Legal and Trust & Safety teams will review your response.",
+    ],
+  };
+}

@@ -30,10 +30,12 @@ import {
 import { UserProfile, SystemConfig, ModerationLogEntry, IncidentContext, IncidentTurn } from "@/types";
 import AdminEmailsPanel from "@/components/AdminEmailsPanel";
 import AdminLicenseKeysPanel from "@/components/AdminLicenseKeysPanel";
-import { Ticket } from "lucide-react";
+import AdminLawRequestsPanel from "@/components/AdminLawRequestsPanel";
+import { Scale, Ticket } from "lucide-react";
+import ReferralModal from "@/components/ReferralModal";
 import AdminChatsPanel from "@/components/AdminChatsPanel";
 
-type AdminTab = "telemetry" | "config" | "users" | "chats" | "moderation" | "emails" | "licenses";
+type AdminTab = "telemetry" | "config" | "users" | "chats" | "moderation" | "emails" | "licenses" | "law";
 
 const focusRing = "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/40";
 
@@ -55,6 +57,7 @@ const NAV: { id: AdminTab; label: string; icon: React.ReactNode }[] = [
   { id: "moderation", label: "Moderation", icon: <AlertTriangle className="h-4 w-4" /> },
   { id: "emails", label: "Emails", icon: <Mail className="h-4 w-4" /> },
   { id: "licenses", label: "License keys", icon: <Ticket className="h-4 w-4" /> },
+  { id: "law", label: "Law enforcement", icon: <Scale className="h-4 w-4" /> },
 ];
 
 /** Small status pill. Palette colors are reserved for status like this. */
@@ -271,6 +274,16 @@ export default function AdminPage() {
 
   // Notification Toast
   const [toastMessage, setToastMessage] = useState<string | null>(null);
+  const [referralLog, setReferralLog] = useState<ModerationLogEntry | null>(null);
+  const [referredIds, setReferredIds] = useState<Set<string>>(new Set());
+
+  useEffect(() => {
+    if (activeTab !== "moderation") return;
+    fetch("/api/admin/referrals", { cache: "no-store" })
+      .then((r) => (r.ok ? r.json() : { referrals: [] }))
+      .then((d) => setReferredIds(new Set((d.referrals || []).map((r: any) => r.incidentId))))
+      .catch(() => {});
+  }, [activeTab]);
 
   const showToast = (msg: string) => {
     setToastMessage(msg);
@@ -1131,8 +1144,16 @@ export default function AdminPage() {
           {/* EMAILS */}
           {activeTab === "emails" && <AdminEmailsPanel />}
           {activeTab === "licenses" && <AdminLicenseKeysPanel />}
+          {activeTab === "law" && <AdminLawRequestsPanel />}
 
           {/* MODERATION */}
+          {referralLog && (
+            <ReferralModal
+              log={referralLog}
+              onClose={() => setReferralLog(null)}
+              onSent={(id) => setReferredIds((s) => new Set(s).add(id))}
+            />
+          )}
           {activeTab === "moderation" && (
             <div className="space-y-6">
               <div className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
@@ -1196,6 +1217,13 @@ export default function AdminPage() {
                           <div className="flex flex-wrap items-center gap-2 text-xs text-muted">
                             <span className="tabular-nums">{new Date(log.createdAt).toLocaleString()}</span>
                             <span className="font-mono">IP {log.ipAddress || "127.0.0.1"}</span>
+                            {isTier1 && (referredIds.has(log.id) ? (
+                              <span className="rounded-full border border-line bg-app px-2 py-0.5 text-[11px] font-medium text-muted">Referred</span>
+                            ) : (
+                              <button type="button" onClick={() => setReferralLog(log)} className={dangerButtonClass}>
+                                Refer to authorities
+                              </button>
+                            ))}
                             <Badge
                               tone={
                                 log.status === "BANNED"

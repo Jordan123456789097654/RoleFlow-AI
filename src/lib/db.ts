@@ -2,7 +2,7 @@ import fs from "fs";
 import path from "path";
 import os from "os";
 import { sql } from "@vercel/postgres";
-import { Chat, Project, UserProfile, ModerationLogEntry, ModerationStatus, SystemConfig, MemoryItem, ApiKey, ModelId, EffortLevel, EmailBroadcastLog, LicenseKeyRecord } from "@/types";
+import { Chat, Project, UserProfile, ModerationLogEntry, ModerationStatus, SystemConfig, MemoryItem, ApiKey, ModelId, EffortLevel, EmailBroadcastLog, LicenseKeyRecord, ReferralRecord, LawRequestRecord, LawRequestStatus } from "@/types";
 import { MODEL_IDS, resolveModelList } from "@/lib/models";
 
 const DATA_DIR = process.env.VERCEL ? path.join(os.tmpdir(), "roleflow-data") : path.join(process.cwd(), ".data");
@@ -41,6 +41,8 @@ interface LocalStore {
   apiKeys?: Record<string, ApiKey>;
   emailBroadcasts?: EmailBroadcastLog[];
   licenseKeys?: Record<string, LicenseKeyRecord>;
+  referrals?: Record<string, ReferralRecord>;
+  lawRequests?: Record<string, LawRequestRecord>;
 }
 
 export function getTodayDateString(): string {
@@ -114,6 +116,48 @@ function activeLocalLicenseKey(store: LocalStore, email: string): LicenseKeyReco
     )
     .sort((a, b) => (a.redeemedAt || "").localeCompare(b.redeemedAt || ""));
   return found[0] ?? null;
+}
+
+/** Maps a roleflow_referrals row to ReferralRecord. */
+function rowToReferral(r: any): ReferralRecord {
+  return {
+    id: r.id,
+    reference: r.reference,
+    incidentId: r.incident_id,
+    userId: r.user_id,
+    agencyName: r.agency_name,
+    recipientEmail: r.recipient_email,
+    adminEmail: r.admin_email,
+    adminName: r.admin_name || "",
+    adminTitle: r.admin_title || "",
+    sentAt: new Date(r.sent_at).toISOString(),
+    excerptIncluded: Boolean(r.excerpt_included),
+    userNotified: Boolean(r.user_notified),
+    status: "sent",
+  };
+}
+
+/** Maps a roleflow_law_requests row to LawRequestRecord. */
+function rowToLawRequest(r: any): LawRequestRecord {
+  return {
+    id: r.id,
+    reference: r.reference,
+    requestType: r.request_type,
+    agencyName: r.agency_name,
+    officerName: r.officer_name,
+    badgeId: r.badge_id,
+    caseNumber: r.case_number,
+    accountIdentifier: r.account_identifier,
+    contactEmail: r.contact_email,
+    statement: r.statement,
+    emergency: Boolean(r.emergency),
+    preservationExpiresAt: r.preservation_expires_at ? new Date(r.preservation_expires_at).toISOString() : null,
+    status: r.status,
+    reviewNote: r.review_note || undefined,
+    reviewedBy: r.reviewed_by || undefined,
+    createdAt: new Date(r.created_at).toISOString(),
+    updatedAt: new Date(r.updated_at).toISOString(),
+  };
 }
 
 export function patchUserProfile(user: UserProfile): UserProfile {
@@ -358,6 +402,46 @@ async function ensureDb() {
         redeemed_at TIMESTAMP WITH TIME ZONE,
         redeemed_by_email VARCHAR(255),
         expires_at TIMESTAMP WITH TIME ZONE
+      );
+    `;
+
+    await sql`
+      CREATE TABLE IF NOT EXISTS roleflow_referrals (
+        id VARCHAR(255) PRIMARY KEY,
+        reference VARCHAR(64) UNIQUE NOT NULL,
+        incident_id VARCHAR(255) NOT NULL,
+        user_id VARCHAR(255) NOT NULL,
+        agency_name VARCHAR(255) NOT NULL,
+        recipient_email VARCHAR(255) NOT NULL,
+        admin_email VARCHAR(255) NOT NULL,
+        admin_name VARCHAR(255),
+        admin_title VARCHAR(255),
+        sent_at TIMESTAMP WITH TIME ZONE NOT NULL,
+        excerpt_included BOOLEAN DEFAULT FALSE,
+        user_notified BOOLEAN DEFAULT FALSE,
+        status VARCHAR(20) NOT NULL DEFAULT 'sent'
+      );
+    `;
+
+    await sql`
+      CREATE TABLE IF NOT EXISTS roleflow_law_requests (
+        id VARCHAR(255) PRIMARY KEY,
+        reference VARCHAR(64) UNIQUE NOT NULL,
+        request_type VARCHAR(40) NOT NULL,
+        agency_name VARCHAR(255) NOT NULL,
+        officer_name VARCHAR(255) NOT NULL,
+        badge_id VARCHAR(120) NOT NULL,
+        case_number VARCHAR(255) NOT NULL,
+        account_identifier VARCHAR(255) NOT NULL,
+        contact_email VARCHAR(255) NOT NULL,
+        statement TEXT NOT NULL,
+        emergency BOOLEAN DEFAULT FALSE,
+        preservation_expires_at TIMESTAMP WITH TIME ZONE,
+        status VARCHAR(20) NOT NULL DEFAULT 'received',
+        review_note TEXT,
+        reviewed_by VARCHAR(255),
+        created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+        updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
       );
     `;
 
@@ -719,6 +803,115 @@ export const db = {
     k.remaining -= 1;
     saveLocalStore(store);
     return true;
+  },
+
+  // ───────────────────────────────────────────────────────────────────────────
+  // Law enforcement referrals and requests
+  // ───────────────────────────────────────────────────────────────────────────
+  async createReferral(r: ReferralRecord): Promise<ReferralRecord> {
+    await ensureDb();
+    if (isPostgresConfigured) {
+      await sql`
+        INSERT INTO roleflow_referrals
+          (id, reference, incident_id, user_id, agency_name, recipient_email, admin_email,
+           admin_name, admin_title, sent_at, excerpt_included, user_notified, status)
+        VALUES
+          (${r.id}, ${r.reference}, ${r.incidentId}, ${r.userId}, ${r.agencyName}, ${r.recipientEmail},
+           ${r.adminEmail}, ${r.adminName}, ${r.adminTitle}, ${r.sentAt}, ${r.excerptIncluded},
+           ${r.userNotified}, ${r.status});
+      `;
+      return r;
+    }
+    const store = getLocalStore();
+    store.referrals = store.referrals || {};
+    store.referrals[r.id] = r;
+    saveLocalStore(store);
+    return r;
+  },
+
+  async listReferrals(): Promise<ReferralRecord[]> {
+    await ensureDb();
+    if (isPostgresConfigured) {
+      const { rows } = await sql`SELECT * FROM roleflow_referrals ORDER BY sent_at DESC;`;
+      return rows.map(rowToReferral);
+    }
+    return Object.values(getLocalStore().referrals || {}).sort((a, b) => b.sentAt.localeCompare(a.sentAt));
+  },
+
+  async getReferralByIncident(incidentId: string): Promise<ReferralRecord | null> {
+    await ensureDb();
+    if (isPostgresConfigured) {
+      const { rows } = await sql`SELECT * FROM roleflow_referrals WHERE incident_id = ${incidentId} LIMIT 1;`;
+      return rows[0] ? rowToReferral(rows[0]) : null;
+    }
+    return Object.values(getLocalStore().referrals || {}).find((r) => r.incidentId === incidentId) ?? null;
+  },
+
+  async createLawRequest(r: LawRequestRecord): Promise<LawRequestRecord> {
+    await ensureDb();
+    if (isPostgresConfigured) {
+      await sql`
+        INSERT INTO roleflow_law_requests
+          (id, reference, request_type, agency_name, officer_name, badge_id, case_number,
+           account_identifier, contact_email, statement, emergency, preservation_expires_at,
+           status, created_at, updated_at)
+        VALUES
+          (${r.id}, ${r.reference}, ${r.requestType}, ${r.agencyName}, ${r.officerName}, ${r.badgeId},
+           ${r.caseNumber}, ${r.accountIdentifier}, ${r.contactEmail}, ${r.statement}, ${r.emergency},
+           ${r.preservationExpiresAt}, ${r.status}, ${r.createdAt}, ${r.updatedAt});
+      `;
+      return r;
+    }
+    const store = getLocalStore();
+    store.lawRequests = store.lawRequests || {};
+    store.lawRequests[r.id] = r;
+    saveLocalStore(store);
+    return r;
+  },
+
+  async listLawRequests(): Promise<LawRequestRecord[]> {
+    await ensureDb();
+    if (isPostgresConfigured) {
+      const { rows } = await sql`SELECT * FROM roleflow_law_requests ORDER BY created_at DESC;`;
+      return rows.map(rowToLawRequest);
+    }
+    return Object.values(getLocalStore().lawRequests || {}).sort((a, b) => b.createdAt.localeCompare(a.createdAt));
+  },
+
+  async getLawRequestById(id: string): Promise<LawRequestRecord | null> {
+    await ensureDb();
+    if (isPostgresConfigured) {
+      const { rows } = await sql`SELECT * FROM roleflow_law_requests WHERE id = ${id} LIMIT 1;`;
+      return rows[0] ? rowToLawRequest(rows[0]) : null;
+    }
+    return getLocalStore().lawRequests?.[id] ?? null;
+  },
+
+  async updateLawRequest(
+    id: string,
+    patch: { status: LawRequestStatus; reviewNote?: string; reviewedBy: string; updatedAt: string }
+  ): Promise<LawRequestRecord | null> {
+    await ensureDb();
+    if (isPostgresConfigured) {
+      await sql`
+        UPDATE roleflow_law_requests
+        SET status = ${patch.status}, review_note = ${patch.reviewNote ?? null},
+            reviewed_by = ${patch.reviewedBy}, updated_at = ${patch.updatedAt}
+        WHERE id = ${id};
+      `;
+      return this.getLawRequestById(id);
+    }
+    const store = getLocalStore();
+    const rec = store.lawRequests?.[id];
+    if (!rec) return null;
+    Object.assign(rec, {
+      status: patch.status,
+      reviewNote: patch.reviewNote,
+      reviewedBy: patch.reviewedBy,
+      updatedAt: patch.updatedAt,
+    });
+    saveLocalStore(store);
+    return rec;
   },
 
   // Usage Limits & Tracking

@@ -63,8 +63,10 @@ const SAFETY_RULES: PatternRule[] = [
     confidence: 1.0,
     patterns: [
       /\b(?:csam|child\s*porn(?:ography)?|underage\s*porn(?:ography)?)\b/i,
-      /\b(?:pre-?teen|minor|toddler|infant|underage)\s*(?:sex(?:ual)?|nude|naked|erotic|abuse|molest)/i,
-      /\b(?:pedophil(?:e|ia)|pedophile\s*ring|child\s*sexual\s*abuse)\b/i,
+      // Sexualized content involving a minor. Bare words such as "abuse", "pedophile", or
+      // "sexual offense" appear in protective and legal questions, so they are not matched here.
+      /\b(?:pre-?teen|minor|toddler|infant|underage|child)\s+(?:nude|naked|erotic|pornographic|sexual\s+(?:image|photo|video|story|content|roleplay|scene|act)s?)\b/i,
+      /\b(?:write|generate|create|describe|draw|produce)\b.{0,60}\b(?:sexual(?:ly)?|nude|naked|erotic)\b.{0,60}\b(?:minor|child|kid|teen(?:ager)?|\d{1,2}[\s-]?(?:year|yr)s?[\s-]?old)s?\b/i,
       /\b(?:lolicon|shota(?:con)?)\s*(?:sex|explicit|porn)/i,
     ],
   },
@@ -146,7 +148,7 @@ const SAFETY_RULES: PatternRule[] = [
     reason: "Zero-tolerance violation: Imminent threat to life, targeted assassination, or imminent physical violence.",
     confidence: 0.95,
     patterns: [
-      /\b(?:i\s*(?:am|will|gonna)\s+(?:kill|murder|shoot|slit\s*the\s*throat\s*of|assassinate|strangle))\s+[a-z0-9\s]{2,40}\s*(?:today|tonight|tomorrow|in\s*an?\s*hour|at\s*\d+\s*(?:am|pm)?)\b/i,
+      /\b(?:i\s*(?:am|will|gonna)\s+(?:kill|murder|shoot|slit\s*the\s*throat\s*of|assassinate|strangle))\s+(?:him|her|them|someone|somebody|a\s+person|my\s+(?:neighbou?r|boss|wife|husband|ex|roommate|coworker|landlord|partner|girlfriend|boyfriend|brother|sister|mom|dad|mother|father|teacher|classmate|friend|son|daughter))\s*(?:today|tonight|tomorrow|in\s*an?\s*hour|at\s*\d+\s*(?:am|pm)?)\b/i,
       /\b(?:how\s+to\s+hire|paying|contract\s*for)\s+(?:a\s+)?(?:hitman|assassin)\s+to\s+(?:kill|murder|execute)\b/i,
       /\b(?:planting\s+a\s+bomb\s+(?:at|in)|bomb\s+is\s+set\s+to\s+detonate)\b/i,
       // Requests for help killing or poisoning a person without being caught.
@@ -242,6 +244,10 @@ const SAFETY_RULES: PatternRule[] = [
       /\b(?:lethal\s*dose|fatal\s*dosage|how\s+many\s+pills\s+to\s+overdose\s+and\s+die)\b/i,
       /\b(?:painless\s*suicide|easiest\s*way\s*to\s*die|instruction(?:s)?\s*for\s*suicide)\b/i,
       /\b(?:how\s+to\s+slit\s*(?:my\s*)?wrists|cutting\s*veins\s*deep\s*enough)\b/i,
+      /\bi\s*(?:am|'m|im)?\s*(?:going\s+to|gonna|want\s+to|wanna|plan\s+to|plan\s+on|will)\s+(?:kill\s+myself|end\s+my\s+life|commit\s+suicide|take\s+my\s+own\s+life|hurt\s+myself|end\s+it\s+all)\b/i,
+      /\bi\s*(?:am|'m|im)?\s*(?:thinking\s+(?:about|of)|considering)\s+(?:suicide|killing\s+myself|ending\s+my\s+life|self-?harm)\b/i,
+      /\bi\s+(?:just\s+)?(?:want\s+to|wanna)\s+die\b(?!\s+(?:laughing|of\s+(?:laughter|boredom|embarrassment)))/i,
+      /\b(?:i\s+(?:don'?t|do\s+not)\s+want\s+to\s+(?:be\s+alive|live|exist)|no\s+reason\s+to\s+live|i\s+wish\s+i\s+(?:was|were)\s+dead)\b/i,
     ],
   },
 ];

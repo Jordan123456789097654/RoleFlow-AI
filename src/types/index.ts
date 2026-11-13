@@ -295,3 +295,44 @@ export interface LicenseKeyRecord {
   /** Set when the key is redeemed. Null means no expiry. */
   expiresAt?: string | null;
 }
+
+/** Record of a Tier 1 incident referred to an agency. */
+export interface ReferralRecord {
+  id: string;
+  reference: string;
+  incidentId: string;
+  userId: string;
+  agencyName: string;
+  recipientEmail: string;
+  adminEmail: string;
+  adminName: string;
+  adminTitle: string;
+  sentAt: string;
+  excerptIncluded: boolean;
+  userNotified: boolean;
+  status: "sent";
+}
+
+export type LawRequestType = "subpoena" | "court_order" | "search_warrant" | "emergency_disclosure" | "preservation";
+export type LawRequestStatus = "received" | "in_review" | "closed" | "rejected";
+
+/** A request from a law enforcement agency, submitted at /law-enforcement. */
+export interface LawRequestRecord {
+  id: string;
+  reference: string;
+  requestType: LawRequestType;
+  agencyName: string;
+  officerName: string;
+  badgeId: string;
+  caseNumber: string;
+  accountIdentifier: string;
+  contactEmail: string;
+  statement: string;
+  emergency: boolean;
+  preservationExpiresAt: string | null;
+  status: LawRequestStatus;
+  reviewNote?: string;
+  reviewedBy?: string;
+  createdAt: string;
+  updatedAt: string;
+}

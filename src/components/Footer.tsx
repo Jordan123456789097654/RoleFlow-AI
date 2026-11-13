@@ -86,6 +86,7 @@ export const Footer: React.FC = () => {
                 <Link href="/moderation" className="inline-flex min-h-10 items-center hover:text-ink transition-colors">
                   Moderation & Appeals
                 </Link>
+                <Link href="/law-enforcement" className="inline-flex min-h-10 items-center hover:text-ink transition-colors">Law enforcement</Link>
               </li>
               <li>
                 <Link href="/ai-output" className="inline-flex min-h-10 items-center hover:text-ink transition-colors">
