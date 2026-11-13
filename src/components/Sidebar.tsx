@@ -117,8 +117,10 @@ export const Sidebar: React.FC<SidebarProps> = ({
   const isAdmin = Boolean(user?.isAdmin);
 
   const rowClass = (active: boolean) =>
-    `group flex items-center gap-2 min-h-[36px] pl-2.5 pr-1.5 rounded-lg text-sm cursor-pointer transition-colors duration-150 ${
-      active ? "bg-hover text-ink" : "text-ink/80 hover:bg-hover hover:text-ink"
+    `group flex items-center gap-2 min-h-[38px] pl-3 pr-1.5 rounded-xl text-sm cursor-pointer transition-colors duration-150 ${
+      active
+        ? "bg-hover text-ink shadow-[inset_2px_0_0_0_rgb(var(--c-accent))]"
+        : "text-ink/75 hover:bg-hover hover:text-ink"
     }`;
 
   const iconBtn =
@@ -220,20 +222,51 @@ export const Sidebar: React.FC<SidebarProps> = ({
     </div>
   );
 
-  // Closed on desktop: a single floating button. On phones the header menu button handles this.
+  // Closed on desktop: a slim icon rail keeps the main actions one click away.
+  // On phones the header menu button opens the drawer, so the rail stays hidden there.
   if (!isOpen) {
+    const railBtn =
+      "w-10 h-10 flex items-center justify-center rounded-xl text-muted hover:text-ink hover:bg-hover transition-colors duration-150 outline-none focus-visible:ring-2 focus-visible:ring-accent/40";
     return (
-      <div className="hidden md:block fixed top-3 left-3 z-40">
-        <button
-          type="button"
-          onClick={onToggle}
-          className="p-2 rounded-lg text-muted hover:text-ink hover:bg-hover transition-colors duration-150 outline-none focus-visible:ring-2 focus-visible:ring-accent/40"
-          title="Open sidebar"
-          aria-label="Open sidebar"
+      <aside className="hidden md:flex w-[60px] h-full shrink-0 flex-col items-center gap-1.5 py-3 bg-panel border-r border-line">
+        <Link
+          href="/"
+          title="RoleFlow home"
+          aria-label="RoleFlow home"
+          className="mb-2 p-1 rounded-xl outline-none focus-visible:ring-2 focus-visible:ring-accent/40"
         >
+          <Logo size={30} showText={false} />
+        </Link>
+        <button type="button" onClick={onToggle} className={railBtn} title="Open sidebar" aria-label="Open sidebar">
           <PanelLeftOpen className="w-5 h-5" strokeWidth={1.75} />
         </button>
-      </div>
+        <button
+          type="button"
+          onClick={onNewChat}
+          className="w-10 h-10 flex items-center justify-center rounded-xl bg-accent text-on-accent hover:bg-accent-hover transition-colors duration-150 outline-none focus-visible:ring-2 focus-visible:ring-accent/40"
+          title="New chat"
+          aria-label="New chat"
+        >
+          <Plus className="w-5 h-5" strokeWidth={2} />
+        </button>
+        <button
+          type="button"
+          onClick={() => {
+            onToggle();
+            window.setTimeout(() => document.getElementById("chat-search")?.focus(), 60);
+          }}
+          className={railBtn}
+          title="Search chats"
+          aria-label="Search chats"
+        >
+          <Search className="w-5 h-5" strokeWidth={1.75} />
+        </button>
+        <div className="mt-auto">
+          <button type="button" onClick={onOpenSettings} className={railBtn} title="Settings" aria-label="Settings">
+            <Settings className="w-5 h-5" strokeWidth={1.75} />
+          </button>
+        </div>
+      </aside>
     );
   }
 
@@ -249,8 +282,9 @@ export const Sidebar: React.FC<SidebarProps> = ({
       <aside className="fixed md:static inset-y-0 left-0 z-50 md:z-auto w-[280px] md:w-[260px] h-full bg-panel flex flex-col shrink-0 border-r border-line md:border-r-0 shadow-menu md:shadow-none">
         {/* Top bar */}
         <div className="h-14 px-3 flex items-center justify-between">
-          <Link href="/" title="RoleFlow home" className="px-1.5 outline-none focus-visible:ring-2 focus-visible:ring-accent/40 rounded">
-            <Logo size={24} showText={false} />
+          <Link href="/" title="RoleFlow home" className="flex items-center gap-2 px-1.5 py-1 outline-none focus-visible:ring-2 focus-visible:ring-accent/40 rounded-lg">
+            <Logo size={26} showText={false} />
+            <span className="font-display text-[19px] font-medium tracking-tight text-ink">RoleFlow</span>
           </Link>
           <button
             type="button"
@@ -268,7 +302,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
           <button
             type="button"
             onClick={onNewChat}
-            className="w-full flex items-center gap-2 min-h-[40px] px-2.5 rounded-lg text-sm text-ink hover:bg-hover transition-colors duration-150 outline-none focus-visible:ring-2 focus-visible:ring-accent/40"
+            className="w-full flex items-center gap-2 min-h-[42px] px-3 rounded-xl text-sm font-semibold bg-accent text-on-accent hover:bg-accent-hover transition-colors duration-150 outline-none focus-visible:ring-2 focus-visible:ring-accent/40"
           >
             <Plus className="w-[18px] h-[18px]" strokeWidth={1.75} />
             <span>New chat</span>
@@ -286,7 +320,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
               onChange={(e) => setSearchQuery(e.target.value)}
               placeholder="Search chats"
               aria-label="Search chats"
-              className="w-full min-h-[36px] bg-card text-sm text-ink placeholder:text-muted pl-8 pr-3 rounded-lg border border-line outline-none focus:border-accent/50 focus-visible:ring-2 focus-visible:ring-accent/30 transition-colors duration-150"
+              className="w-full min-h-[38px] bg-card text-sm text-ink placeholder:text-muted pl-8 pr-3 rounded-xl border border-line outline-none focus:border-accent/50 focus-visible:ring-2 focus-visible:ring-accent/30 transition-colors duration-150"
             />
           </div>
         </div>
@@ -406,7 +440,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
               <button
                 type="button"
                 onClick={onOpenAuth}
-                className="w-full flex items-center justify-center gap-2 min-h-[40px] px-3 rounded-lg bg-accent hover:bg-accent-hover text-white text-sm font-medium transition-colors duration-150 outline-none focus-visible:ring-2 focus-visible:ring-accent/40"
+                className="w-full flex items-center justify-center gap-2 min-h-[40px] px-3 rounded-lg bg-accent hover:bg-accent-hover text-on-accent text-sm font-medium transition-colors duration-150 outline-none focus-visible:ring-2 focus-visible:ring-accent/40"
               >
                 <LogIn className="w-4 h-4" strokeWidth={1.75} />
                 <span>Sign in with email</span>

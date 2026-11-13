@@ -73,7 +73,7 @@ const labelClass = "block text-sm font-medium text-ink mb-1.5";
 
 const hintClass = "block text-xs text-muted mt-1.5";
 
-const primaryButtonClass = `inline-flex items-center gap-1.5 px-4 py-2 rounded-xl bg-accent hover:bg-accent-hover text-white text-sm font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed ${focusRing}`;
+const primaryButtonClass = `inline-flex items-center gap-1.5 px-4 py-2 rounded-xl bg-accent hover:bg-accent-hover text-on-accent text-sm font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed ${focusRing}`;
 
 const secondaryButtonClass = `inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-card hover:bg-hover text-ink text-sm font-medium border border-line transition-colors disabled:opacity-50 disabled:cursor-not-allowed ${focusRing}`;
 
@@ -137,9 +137,9 @@ function readStoredTheme(): ThemeChoice {
     const value = localStorage.getItem(THEME_STORAGE_KEY);
     if (value === "light" || value === "dark" || value === "system") return value;
   } catch (e) {
-    // Storage can be blocked (private mode). Fall back to the system setting.
+    // Storage can be blocked (private mode). Fall back to dark, the default look.
   }
-  return "system";
+  return "dark";
 }
 
 function applyTheme(choice: ThemeChoice) {

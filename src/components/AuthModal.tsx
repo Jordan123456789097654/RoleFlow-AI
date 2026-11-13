@@ -16,7 +16,7 @@ const inputClass =
   "w-full rounded-lg border border-line bg-app px-3.5 text-[15px] text-ink placeholder:text-muted/70 transition-colors focus:border-accent focus:outline-none focus:ring-2 focus:ring-accent/20";
 
 const primaryButtonClass =
-  "flex min-h-11 w-full items-center justify-center gap-2 rounded-lg bg-accent px-4 text-sm font-medium text-white transition-colors hover:bg-accent-hover disabled:cursor-not-allowed disabled:opacity-50";
+  "flex min-h-11 w-full items-center justify-center gap-2 rounded-lg bg-accent px-4 text-sm font-medium text-on-accent transition-colors hover:bg-accent-hover disabled:cursor-not-allowed disabled:opacity-50";
 
 export const AuthModal: React.FC<AuthModalProps> = ({
   isOpen,

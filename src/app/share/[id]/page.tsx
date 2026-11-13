@@ -20,7 +20,7 @@ export default async function SharePage({ params }: { params: { id: string } }) 
         </p>
         <Link
           href="/"
-          className="mt-8 inline-flex min-h-11 items-center justify-center rounded-lg bg-accent px-5 text-sm font-medium text-white transition-colors hover:bg-accent-hover"
+          className="mt-8 inline-flex min-h-11 items-center justify-center rounded-lg bg-accent px-5 text-sm font-medium text-on-accent transition-colors hover:bg-accent-hover"
         >
           Go to RoleFlow
         </Link>
@@ -48,7 +48,7 @@ export default async function SharePage({ params }: { params: { id: string } }) 
 
           <Link
             href="/"
-            className="inline-flex min-h-10 shrink-0 items-center rounded-lg bg-accent px-4 text-sm font-medium text-white transition-colors hover:bg-accent-hover"
+            className="inline-flex min-h-10 shrink-0 items-center rounded-lg bg-accent px-4 text-sm font-medium text-on-accent transition-colors hover:bg-accent-hover"
           >
             Start your own chat
           </Link>

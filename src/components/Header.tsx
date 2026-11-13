@@ -51,7 +51,7 @@ export const Header: React.FC<HeaderProps> = ({
   forcedEffort,
 }) => {
   return (
-    <header className="h-14 px-3 sm:px-4 flex items-center justify-between gap-2 shrink-0 z-20 bg-app/90 backdrop-blur-sm">
+    <header className="h-14 px-3 sm:px-5 flex items-center justify-between gap-2 shrink-0 z-20 bg-app/80 backdrop-blur-md">
       <div className="flex items-center gap-1 min-w-0">
         {onToggleSidebar && (
           <button
@@ -75,7 +75,7 @@ export const Header: React.FC<HeaderProps> = ({
         />
 
         {currentProject && (
-          <span className="hidden sm:inline-flex text-xs px-2.5 py-1 rounded-full bg-accent-soft text-accent font-medium truncate max-w-[160px]">
+          <span className="hidden sm:inline-flex text-xs px-2.5 py-1 rounded-full border border-accent/35 text-accent font-medium truncate max-w-[160px]">
             {currentProject.name}
           </span>
         )}
@@ -114,7 +114,7 @@ export const Header: React.FC<HeaderProps> = ({
           <button
             type="button"
             onClick={onOpenAuth}
-            className="min-h-[36px] px-4 rounded-lg bg-ink text-app text-sm font-medium hover:opacity-90 transition-opacity duration-150 outline-none focus-visible:ring-2 focus-visible:ring-accent/40"
+            className="min-h-[36px] px-4 rounded-full bg-accent text-on-accent text-sm font-semibold hover:bg-accent-hover transition-colors duration-150 outline-none focus-visible:ring-2 focus-visible:ring-accent/40"
           >
             Sign in
           </button>

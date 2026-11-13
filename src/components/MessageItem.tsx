@@ -363,7 +363,7 @@ export const MessageItem: React.FC<MessageItemProps> = ({
                   <Pencil className="w-4 h-4" strokeWidth={1.75} />
                 </button>
               )}
-              <div className="bg-hover text-ink px-4 py-2.5 rounded-2xl text-[16px] leading-relaxed whitespace-pre-wrap break-words select-text">
+              <div className="bg-accent-soft text-ink border border-accent/25 px-4 py-2.5 rounded-3xl rounded-br-lg text-[16px] leading-relaxed whitespace-pre-wrap break-words select-text">
                 {message.content}
               </div>
             </div>
@@ -442,7 +442,7 @@ export const MessageItem: React.FC<MessageItemProps> = ({
         </div>
       )}
 
-      <div className="prose-claude text-ink text-[16px] select-text">
+      <div className="prose-rf text-ink text-[16px] select-text">
         {renderFormattedContent(message.content)}
         {isStreaming && (
           <span className="inline-block w-[2px] h-[1.05em] ml-0.5 align-[-0.15em] bg-accent animate-pulse rounded-full" />
@@ -520,7 +520,7 @@ export const MessageItem: React.FC<MessageItemProps> = ({
 
       {/* Action row */}
       <div className="flex items-center gap-0.5 mt-2 -ml-2 text-muted">
-        <button type="button" onClick={handleCopy} className={iconButton} title="Copy response" aria-label="Copy response">
+        <button type="button" onClick={handleCopy} className={iconButton} title="Copy" aria-label="Copy">
           {copied ? <Check className="w-4 h-4 text-accent" strokeWidth={2} /> : <Copy className="w-4 h-4" strokeWidth={1.75} />}
         </button>
 
@@ -542,8 +542,8 @@ export const MessageItem: React.FC<MessageItemProps> = ({
             type="button"
             onClick={() => onBranch(message.id)}
             className={iconButton}
-            title="Branch from here"
-            aria-label="Branch from here"
+            title="Branch into a new chat"
+            aria-label="Branch into a new chat"
           >
             <GitBranch className="w-4 h-4" strokeWidth={1.75} />
           </button>
@@ -553,8 +553,8 @@ export const MessageItem: React.FC<MessageItemProps> = ({
           type="button"
           onClick={() => setFeedback(feedback === "up" ? null : "up")}
           className={`${iconButton} ${feedback === "up" ? "text-accent" : ""}`}
-          title="Good response"
-          aria-label="Good response"
+          title="Helpful"
+          aria-label="Helpful"
           aria-pressed={feedback === "up"}
         >
           <ThumbsUp className="w-4 h-4" strokeWidth={1.75} />
@@ -564,15 +564,15 @@ export const MessageItem: React.FC<MessageItemProps> = ({
           type="button"
           onClick={() => setFeedback(feedback === "down" ? null : "down")}
           className={`${iconButton} ${feedback === "down" ? "text-danger" : ""}`}
-          title="Bad response"
-          aria-label="Bad response"
+          title="Not helpful"
+          aria-label="Not helpful"
           aria-pressed={feedback === "down"}
         >
           <ThumbsDown className="w-4 h-4" strokeWidth={1.75} />
         </button>
 
         {onRegenerate && (
-          <button type="button" onClick={onRegenerate} className={iconButton} title="Regenerate" aria-label="Regenerate">
+          <button type="button" onClick={onRegenerate} className={iconButton} title="Try again" aria-label="Try again">
             <RotateCw className="w-4 h-4" strokeWidth={1.75} />
           </button>
         )}

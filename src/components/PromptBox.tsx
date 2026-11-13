@@ -305,7 +305,7 @@ export const PromptBox: React.FC<PromptBoxProps> = ({
       onDrop={handleDrop}
     >
       <div
-        className={`bg-card rounded-2xl border shadow-[0_4px_24px_rgb(0_0_0/0.04)] focus-within:border-accent/40 transition-colors duration-200 ${
+        className={`flow-focus bg-card rounded-[1.75rem] border shadow-composer ${
           isDragging ? "border-accent ring-2 ring-accent/30" : "border-line"
         }`}
       >
@@ -340,7 +340,7 @@ export const PromptBox: React.FC<PromptBoxProps> = ({
             value={content}
             onChange={(e) => setContent(e.target.value)}
             onKeyDown={handleKeyDown}
-            placeholder="How can I help you today?"
+            placeholder="Ask anything, or drop in a file"
             aria-label="Message RoleFlow"
             rows={1}
             className="w-full bg-transparent text-[16px] text-ink placeholder:text-muted outline-none resize-none leading-relaxed min-h-[44px] max-h-[220px]"
@@ -504,7 +504,7 @@ export const PromptBox: React.FC<PromptBoxProps> = ({
               aria-label="Send message"
               className={`ml-1 w-9 h-9 flex items-center justify-center rounded-full transition-colors duration-150 outline-none focus-visible:ring-2 focus-visible:ring-accent/40 ${
                 canSend
-                  ? "bg-accent hover:bg-accent-hover text-white"
+                  ? "bg-accent hover:bg-accent-hover text-on-accent"
                   : "bg-hover text-muted cursor-not-allowed"
               }`}
             >

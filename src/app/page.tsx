@@ -4,6 +4,7 @@ import React, { useState, useEffect } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { Logo } from "@/components/Logo";
+import { FlowLine } from "@/components/FlowLine";
 import { Footer } from "@/components/Footer";
 import { AuthModal } from "@/components/AuthModal";
 import { SystemStatus } from "@/components/SystemStatus";
@@ -162,7 +163,7 @@ export default function MarketingLandingPage() {
             )}
             <Link
               href="/chat"
-              className="inline-flex min-h-10 items-center gap-1.5 rounded-lg bg-accent px-4 text-sm font-medium text-white transition-colors hover:bg-accent-hover"
+              className="inline-flex min-h-10 items-center gap-1.5 rounded-lg bg-accent px-4 text-sm font-medium text-on-accent transition-colors hover:bg-accent-hover"
             >
               <span>Try free</span>
               <ArrowRight className="h-3.5 w-3.5" />
@@ -173,14 +174,14 @@ export default function MarketingLandingPage() {
 
       <main className="flex-1">
         {/* Hero */}
-        <section className="px-4 pb-20 pt-16 text-center sm:px-6 sm:pt-24 lg:pb-28">
+        <section className="ember-glow px-4 pb-20 pt-16 text-center sm:px-6 sm:pt-24 lg:pb-28">
           <div className="mx-auto max-w-3xl">
             <div className="mb-7 inline-flex items-center gap-2 rounded-full border border-line bg-card px-3.5 py-1.5 text-xs text-muted">
               <Sparkles className="h-3.5 w-3.5 text-accent" />
               <span>RoleFlow Apex 1.0, Omni 1.0, Genesis 1.5, and Flash 2.0</span>
             </div>
 
-            <h1 className="font-display text-4xl font-normal leading-[1.12] tracking-tight text-ink sm:text-5xl lg:text-6xl">
+            <h1 className="font-display text-[44px] font-normal leading-[1.02] tracking-[-0.025em] text-ink sm:text-6xl lg:text-[76px]">
               An assistant for thinking, writing, and building
             </h1>
 
@@ -188,10 +189,12 @@ export default function MarketingLandingPage() {
               Ask questions, draft documents, and write code. Anything RoleFlow builds can be previewed and downloaded.
             </p>
 
+            <FlowLine className="mx-auto mt-8 max-w-[300px]" />
+
             <div className="mt-10 flex flex-col items-center justify-center gap-3 sm:flex-row">
               <Link
                 href="/chat"
-                className="inline-flex min-h-12 w-full items-center justify-center gap-2 rounded-lg bg-accent px-6 text-base font-medium text-white transition-colors hover:bg-accent-hover sm:w-auto"
+                className="inline-flex min-h-12 w-full items-center justify-center gap-2 rounded-full bg-accent px-7 text-base font-semibold text-on-accent transition-colors hover:bg-accent-hover sm:w-auto"
               >
                 <span>Start chatting</span>
                 <ArrowRight className="h-4 w-4" />
@@ -398,7 +401,7 @@ export default function MarketingLandingPage() {
                 </div>
                 <Link
                   href="/chat"
-                  className="mt-8 inline-flex min-h-11 items-center justify-center gap-2 rounded-lg bg-accent text-sm font-medium text-white transition-colors hover:bg-accent-hover"
+                  className="mt-8 inline-flex min-h-11 items-center justify-center gap-2 rounded-lg bg-accent text-sm font-medium text-on-accent transition-colors hover:bg-accent-hover"
                 >
                   <span>Use Genesis 1.5</span>
                   <ArrowRight className="h-4 w-4" />
@@ -538,7 +541,7 @@ export default function MarketingLandingPage() {
             </p>
             <Link
               href="/chat"
-              className="mt-8 inline-flex min-h-12 items-center justify-center gap-2 rounded-lg bg-accent px-7 text-base font-medium text-white transition-colors hover:bg-accent-hover"
+              className="mt-8 inline-flex min-h-12 items-center justify-center gap-2 rounded-lg bg-accent px-7 text-base font-medium text-on-accent transition-colors hover:bg-accent-hover"
             >
               <span>Start chatting</span>
               <ArrowRight className="h-4 w-4" />

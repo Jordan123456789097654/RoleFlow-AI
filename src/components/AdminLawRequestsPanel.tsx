@@ -7,7 +7,7 @@ import { LAW_REQUEST_TYPES } from "@/lib/law-request-types";
 
 const focusRing = "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/40";
 const secondaryButtonClass = `inline-flex items-center gap-1.5 rounded-xl border border-line bg-card px-3 py-1.5 text-xs font-medium text-ink transition-colors hover:bg-hover disabled:cursor-not-allowed disabled:opacity-50 ${focusRing}`;
-const primaryButtonClass = `inline-flex items-center gap-2 rounded-xl bg-accent px-3 py-1.5 text-xs font-medium text-white transition-colors hover:bg-accent-hover disabled:cursor-not-allowed disabled:opacity-50 ${focusRing}`;
+const primaryButtonClass = `inline-flex items-center gap-2 rounded-xl bg-accent px-3 py-1.5 text-xs font-medium text-on-accent transition-colors hover:bg-accent-hover disabled:cursor-not-allowed disabled:opacity-50 ${focusRing}`;
 const cardClass = "rounded-2xl border border-line bg-card";
 const textareaClass = `w-full rounded-xl border border-line bg-app px-3.5 py-2.5 text-sm text-ink focus:outline-none focus:border-accent/60 ${focusRing}`;
 

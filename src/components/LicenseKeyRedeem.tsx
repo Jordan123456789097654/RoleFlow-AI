@@ -5,7 +5,7 @@ import { KeyRound } from "lucide-react";
 
 const focusRing = "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/40";
 const inputClass = `w-full rounded-xl border border-line bg-app px-3.5 py-2.5 font-mono text-sm uppercase tracking-wide text-ink placeholder:normal-case placeholder:tracking-normal placeholder:text-muted/70 focus:outline-none focus:border-accent/60 transition-colors ${focusRing}`;
-const buttonClass = `inline-flex shrink-0 items-center rounded-xl bg-accent px-4 py-2.5 text-sm font-medium text-white transition-colors hover:bg-accent-hover disabled:cursor-not-allowed disabled:opacity-50 ${focusRing}`;
+const buttonClass = `inline-flex shrink-0 items-center rounded-xl bg-accent px-4 py-2.5 text-sm font-medium text-on-accent transition-colors hover:bg-accent-hover disabled:cursor-not-allowed disabled:opacity-50 ${focusRing}`;
 
 interface Balance {
   remaining: number;

@@ -133,7 +133,7 @@ export default function LawEnforcementRequestPage() {
           <button
             type="submit"
             disabled={submitting || !certified}
-            className={`inline-flex items-center rounded-xl bg-accent px-5 py-2.5 text-sm font-medium text-white transition-colors hover:bg-accent-hover disabled:cursor-not-allowed disabled:opacity-50 ${focusRing}`}
+            className={`inline-flex items-center rounded-xl bg-accent px-5 py-2.5 text-sm font-medium text-on-accent transition-colors hover:bg-accent-hover disabled:cursor-not-allowed disabled:opacity-50 ${focusRing}`}
           >
             {submitting ? "Submitting…" : "Submit request"}
           </button>

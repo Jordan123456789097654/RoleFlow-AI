@@ -62,7 +62,7 @@ export const UserAvatarMenu: React.FC<UserAvatarMenuProps> = ({
       <button
         type="button"
         onClick={() => setIsOpen(!isOpen)}
-        className="w-9 h-9 rounded-full bg-accent text-white flex items-center justify-center text-sm font-medium hover:bg-accent-hover transition-colors duration-150 outline-none focus-visible:ring-2 focus-visible:ring-accent/40"
+        className="w-9 h-9 rounded-full bg-accent text-on-accent flex items-center justify-center text-sm font-medium hover:bg-accent-hover transition-colors duration-150 outline-none focus-visible:ring-2 focus-visible:ring-accent/40"
         title={cleanName}
         aria-haspopup="menu"
         aria-expanded={isOpen}
@@ -77,7 +77,7 @@ export const UserAvatarMenu: React.FC<UserAvatarMenuProps> = ({
         >
           {/* User header */}
           <div className="px-2.5 py-2.5 mb-1 border-b border-line flex items-center gap-2.5">
-            <div className="w-9 h-9 rounded-full bg-accent text-white flex items-center justify-center text-sm font-medium shrink-0">
+            <div className="w-9 h-9 rounded-full bg-accent text-on-accent flex items-center justify-center text-sm font-medium shrink-0">
               {initial}
             </div>
             <div className="min-w-0 flex-1">

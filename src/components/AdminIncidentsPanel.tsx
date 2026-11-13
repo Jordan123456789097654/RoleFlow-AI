@@ -285,7 +285,7 @@ export default function AdminIncidentsPanel() {
             <button
               type="submit"
               disabled={actionBusy}
-              className="inline-flex w-full items-center justify-center gap-2 rounded-xl bg-accent px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-accent-hover disabled:opacity-50"
+              className="inline-flex w-full items-center justify-center gap-2 rounded-xl bg-accent px-4 py-2 text-sm font-medium text-on-accent transition-colors hover:bg-accent-hover disabled:opacity-50"
             >
               <Send className="h-4 w-4" />
               Dispatch Incident to Discord

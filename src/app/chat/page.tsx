@@ -13,6 +13,7 @@ import { DEFAULT_MODEL, GUEST_MODEL, isGuestAllowedModel, resolveModelId } from 
 import { CreateProjectModal } from "@/components/CreateProjectModal";
 import { ShareModal } from "@/components/ShareModal";
 import { Logo } from "@/components/Logo";
+import { FlowLine } from "@/components/FlowLine";
 import { Toaster } from "@/components/Toaster";
 import { toast } from "@/lib/toast";
 import {
@@ -862,7 +863,7 @@ export default function ChatPage() {
               href="https://status.roleflow.site"
               target="_blank"
               rel="noopener noreferrer"
-              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-amber-600 hover:bg-amber-700 text-white font-medium text-xs shrink-0 transition-colors"
+              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-amber-600 hover:bg-amber-700 text-on-accent font-medium text-xs shrink-0 transition-colors"
             >
               <span>status.roleflow.site</span>
               <ExternalLink className="w-3.5 h-3.5" />
@@ -886,7 +887,7 @@ export default function ChatPage() {
                 if (systemConfig.forcedModel) setModel(systemConfig.forcedModel);
                 setModelIncidentWarning(null);
               }}
-              className="px-2.5 py-1 rounded-lg bg-accent text-white font-medium hover:bg-accent-hover shrink-0 transition-colors"
+              className="px-2.5 py-1 rounded-lg bg-accent text-on-accent font-medium hover:bg-accent-hover shrink-0 transition-colors"
             >
               Switch to {systemConfig.forcedModelName || "Allowed Model"}
             </button>
@@ -896,14 +897,15 @@ export default function ChatPage() {
         {messages.length === 0 ? (
           /* Empty state: greeting and composer centered in the viewport */
           <div className="flex-1 overflow-y-auto">
-            <div className="min-h-full flex flex-col items-center justify-center px-4 sm:px-6 pb-8 pt-4">
+            <div className="ember-glow min-h-full flex flex-col items-center justify-center px-4 sm:px-6 pb-8 pt-4">
               <div className="w-full max-w-3xl">
                 <div className="flex justify-center mb-5">
                   <Logo size={36} showText={false} />
                 </div>
-                <h1 className="font-display text-[32px] sm:text-[40px] leading-tight text-center text-ink mb-8 sm:mb-10">
+                <h1 className="font-display text-[34px] sm:text-[48px] font-normal leading-[1.06] tracking-[-0.02em] text-center text-ink">
                   {getGreeting()}
                 </h1>
+                <FlowLine className="mx-auto mt-4 mb-8 sm:mb-10 max-w-[260px]" />
 
                 {composer}
 

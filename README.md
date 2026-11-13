@@ -4,7 +4,7 @@ An independent, fully custom AI assistant platform engineered with a clean, inte
 
 ## ✨ Features
 
-- **Brand Identity**: Dual harmonic "Flow Wave" logo with warm terracotta/amber accents and deep charcoal dark mode (`#18181b`).
+- **Brand Identity**: The "Flow Wave" logo sets the palette: charcoal (`#242422`), bone (`#F3F3EE`), amber (`#F59E0B`), ochre, ember, and rust. Dark is the default. The wave draws itself once on the home screen, and the composer glows amber on focus. Headlines use Bricolage Grotesque, text uses Geist, and code uses Martian Mono.
 - **RoleFlow Architecture**:
   - Time-of-day greeting (`"Afternoon, Jordan Daniels"`) on a minimalist home dashboard.
   - Four-tier model selector: **RoleFlow Apex 1.0** (highest-intelligence frontier), **RoleFlow Omni 1.0** (frontier reasoning), **RoleFlow Genesis 1.5** (balanced flagship), & **RoleFlow Flash 2.0** (ultra-fast). `roleflow-flash-1` requests resolve to Flash 2.0. Genesis 1.5 keeps the `roleflow-genesis-1` ID.
