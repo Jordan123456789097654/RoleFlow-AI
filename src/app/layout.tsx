@@ -5,7 +5,11 @@ export const metadata: Metadata = {
   title: "RoleFlow",
   description: "RoleFlow is an AI assistant for general questions, writing, analysis, and software engineering.",
   icons: {
-    icon: "/favicon.ico",
+    icon: [
+      { url: "/icon.svg", type: "image/svg+xml" },
+    ],
+    shortcut: "/icon.svg",
+    apple: "/icon.svg",
   },
 };
 
